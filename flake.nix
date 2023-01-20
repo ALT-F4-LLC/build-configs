@@ -13,8 +13,11 @@
       pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
       naersk' = forAllSystems (system: pkgs.${system}.callPackage naersk { });
     in {
-      packages = forAllSystems
-        (system: { default = naersk'.${system}.buildPackage { src = ./.; }; });
+      packages = forAllSystems (system: {
+        default = naersk'.${system}.buildPackage {
+          src = ./.;
+        };
+      });
 
       devShells = forAllSystems (system: {
         default = pkgs.${system}.mkShellNoCC {
