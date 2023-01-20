@@ -1,10 +1,5 @@
 {
   inputs = {
-    dream2nix = {
-      inputs.nixpkgs.follows = "nixpkgs";
-      url = "github:nix-community/dream2nix";
-    };
-
     flake-parts = {
       inputs.nixpkgs-lib.follows = "nixpkgs";
       url = "github:hercules-ci/flake-parts";
@@ -15,12 +10,32 @@
 
   outputs = inputs:
     inputs.flake-parts.lib.mkFlake { inherit inputs; } {
-      imports = [ inputs.dream2nix.flakeModuleBeta ];
       systems = [ "x86_64-linux" ];
 
-      perSystem = { pkgs, config, ... }: {
-        dream2nix.inputs.self.source = inputs.self;
-        formatter = pkgs.nixpkgs-fmt;
-      };
+      perSystem = { pkgs, lib, config, ... }:
+        let
+          inherit (lib.importTOML (inputs.self + "/Cargo.toml")) package;
+        in
+        {
+          packages = {
+            ${package.name} = pkgs.rustPlatform.buildRustPackage {
+              inherit (package) version;
+
+              cargoLock.lockFile = (inputs.self + "/Cargo.lock");
+              pname = package.name;
+              src = inputs.self;
+            };
+
+            default = config.packages.${package.name};
+          };
+
+          devShells.default = pkgs.mkShell {
+            packages = with pkgs; [
+              cargo
+              rustc
+              rustfmt
+            ];
+          };
+        };
     };
 }
