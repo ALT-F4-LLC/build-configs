@@ -1,3 +1,26 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+enum Language {
+    Go,
+    Nix,
+    Rust,
+    TypeScript,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+enum Template {
+    Docker,
+    Pulumi,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Config {
+    name: String,
+    language: Language,
+    template: Template,
+}
+
 fn main() {
     let cmd = clap::Command::new("build-configs")
         .bin_name("build-configs")
