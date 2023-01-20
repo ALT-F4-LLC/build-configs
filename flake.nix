@@ -18,15 +18,13 @@
         in
         {
           packages = {
-            ${package.name} = pkgs.rustPlatform.buildRustPackage {
+            default = pkgs.rustPlatform.buildRustPackage {
               inherit (package) version;
 
               cargoLock.lockFile = (inputs.self + "/Cargo.lock");
               pname = package.name;
               src = inputs.self;
             };
-
-            default = config.packages.${package.name};
           };
 
           devShells.default = pkgs.mkShell {
@@ -36,6 +34,15 @@
               rustfmt
             ];
           };
+
+          apps = {
+            default = {
+              program = "${config.packages.default}/bin/build-configs";
+              type = "app";
+            };
+          };
+
+          formatter = pkgs.nixpkgs-fmt;
         };
     };
 }
