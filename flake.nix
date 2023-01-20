@@ -1,37 +1,26 @@
 {
   inputs = {
-    flake-utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nix-community/naersk";
+    dream2nix = {
+      inputs.nixpkgs.follows = "nixpkgs";
+      url = "github:nix-community/dream2nix";
+    };
+
+    flake-parts = {
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+      url = "github:hercules-ci/flake-parts";
+    };
+
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
-  outputs = { self, flake-utils, naersk, nixpkgs }:
-    let
-      supportedSystems =
-        [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
-      naersk' = forAllSystems (system: pkgs.${system}.callPackage naersk { });
-    in {
-      packages = forAllSystems (system: {
-        default = naersk'.${system}.buildPackage {
-          src = ./.;
-        };
-      });
+  outputs = inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ inputs.dream2nix.flakeModuleBeta ];
+      systems = [ "x86_64-linux" ];
 
-      devShells = forAllSystems (system: {
-        default = pkgs.${system}.mkShellNoCC {
-          RUST_SRC_PATH = pkgs.${system}.rustPlatform.rustLibSrc;
-          buildInputs = with pkgs.${system}; [ rustfmt ];
-          nativeBuildInputs = with pkgs.${system}; [ rustc cargo gcc libiconv ];
-        };
-      });
-
-      apps = forAllSystems (system: {
-        default = {
-          program = "${self.packages.${system}.default}/bin/build-configs";
-          type = "app";
-        };
-      });
+      perSystem = { pkgs, config, ... }: {
+        dream2nix.inputs.self.source = inputs.self;
+        formatter = pkgs.nixpkgs-fmt;
+      };
     };
 }
