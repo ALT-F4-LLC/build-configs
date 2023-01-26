@@ -1,21 +1,17 @@
+use clap::Parser;
+use cli::{Cli, Commands};
+
+mod cli;
 mod schema;
 
 fn main() {
-    let cmd = clap::Command::new("build-configs")
-        .bin_name("build-configs")
-        .subcommand_required(true)
-        .subcommand(clap::command!("generate").arg(
-            clap::arg!(--"config" <PATH>).value_parser(clap::value_parser!(std::path::PathBuf)),
-        ));
+    let c = Cli::parse();
 
-    let matches = cmd.get_matches();
-
-    match matches.subcommand() {
-        Some(("generate", matches)) => matches,
-        _ => unreachable!("clap should ensure we don't get here"),
-    };
-
-    let manifest_path = matches.get_one::<std::path::PathBuf>("config");
-
-    println!("{:?}", manifest_path);
+    match &c.command {
+        Commands::Generate { config } => {
+            if let Some(c) = config {
+                println!("{}", c)
+            }
+        }
+    }
 }
