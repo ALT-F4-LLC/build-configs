@@ -1,48 +1,76 @@
 {
+  description = "Build configuration generation CLI tool.";
+
   inputs = {
-    flake-parts = {
-      inputs.nixpkgs-lib.follows = "nixpkgs";
-      url = "github:hercules-ci/flake-parts";
+    advisory-db = {
+      url = "github:rustsec/advisory-db";
+      flake = false;
     };
+
+    crane = {
+      url = "github:ipetkov/crane";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    flake-utils.url = "github:numtide/flake-utils";
 
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
-  outputs = inputs:
-    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [ "x86_64-linux" ];
+  outputs = { self, nixpkgs, crane, flake-utils, advisory-db, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
 
-      perSystem = { pkgs, lib, config, ... }:
-        let
-          inherit (lib.importTOML (inputs.self + "/Cargo.toml")) package;
-        in
-        {
-          packages = {
-            default = pkgs.rustPlatform.buildRustPackage {
-              inherit (package) version;
+        inherit (pkgs) lib;
 
-              cargoLock.lockFile = (inputs.self + "/Cargo.lock");
-              pname = package.name;
-              src = inputs.self;
-            };
+        craneLib = crane.lib.${system};
+
+        src = craneLib.cleanCargoSource ./.;
+
+        buildInputs = [ ]
+          ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+
+        cargoArtifacts = craneLib.buildDepsOnly { inherit src buildInputs; };
+
+        build-configs =
+          craneLib.buildPackage { inherit cargoArtifacts src buildInputs; };
+      in {
+        checks = {
+          inherit build-configs;
+
+          build-configs-clippy = craneLib.cargoClippy {
+            inherit cargoArtifacts src buildInputs;
+
+            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
           };
 
-          devShells.default = pkgs.mkShell {
-            packages = with pkgs; [
-              cargo
-              rustc
-              rustfmt
-            ];
-          };
+          build-configs-doc =
+            craneLib.cargoDoc { inherit cargoArtifacts src buildInputs; };
 
-          apps = {
-            default = {
-              program = "${config.packages.default}/bin/build-configs";
-              type = "app";
-            };
-          };
+          build-configs-fmt = craneLib.cargoFmt { inherit src; };
 
-          formatter = pkgs.nixpkgs-fmt;
+          build-configs-audit =
+            craneLib.cargoAudit { inherit src advisory-db; };
+
+          build-configs-nextest = craneLib.cargoNextest {
+            inherit cargoArtifacts src buildInputs;
+            partitions = 1;
+            partitionType = "count";
+          };
+        } // lib.optionalAttrs (system == "x86_64-linux") {
+          build-configs-coverage =
+            craneLib.cargoTarpaulin { inherit cargoArtifacts src; };
         };
-    };
+
+        packages.default = build-configs;
+
+        apps.default = flake-utils.lib.mkApp { drv = build-configs; };
+
+        devShells.default = pkgs.mkShell {
+          inputsFrom = builtins.attrValues self.checks;
+
+          nativeBuildInputs = with pkgs; [ cargo rustc ];
+        };
+      });
 }
