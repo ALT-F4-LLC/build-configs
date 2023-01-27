@@ -1,0 +1,119 @@
+orbs:
+  aws-cli: circleci/aws-cli@3.1.3
+
+commands:
+  login-ecr:
+    steps:
+      - run:
+          name: Login to ECR
+          command: just login ${AWS_ECR_DOMAIN}
+  login-acr:
+    steps:
+      - run:
+          name: Login to ACR
+          command: mycommand
+
+jobs:
+  build:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - aws-cli/install
+
+      - run:
+          name: Install Just CLI - latest
+          command: |
+            curl \
+              --proto '=https' \
+              --tlsv1.2 -sSf https://just.systems/install.sh \
+              | bash -s -- --to /tmp/just
+
+            echo 'export PATH=/tmp/just:"$PATH"' >> "$BASH_ENV"
+
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 20.10.17
+
+      - checkout
+
+      - login-ecr
+
+      - run:
+          name: Build images
+          command: just build "${CIRCLE_SHA1}"
+
+      - run:
+          name: Push images
+          command: just push "${CIRCLE_SHA1}"
+
+  refresh:
+    docker:
+      - image: $AWS_ECR_DOMAIN/{{ name }}:${CIRCLE_SHA1}
+        aws_auth:
+          aws_access_key_id: $AWS_ACCESS_KEY_ID
+          aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+    resource_class: small
+    working_directory: /usr/src/app
+    steps:
+      - run:
+          name: Refresh stack
+          command: just refresh "${CIRCLE_SHA1}"
+
+  preview:
+    docker:
+      - image: $AWS_ECR_DOMAIN/{{ name }}:${CIRCLE_SHA1}
+        aws_auth:
+          aws_access_key_id: $AWS_ACCESS_KEY_ID
+          aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+    resource_class: small
+    working_directory: /usr/src/app
+    steps:
+      - run:
+          name: Preview stack
+          command: just preview "${CIRCLE_SHA1}"
+
+  update:
+    docker:
+      - image: $AWS_ECR_DOMAIN/{{ name }}:${CIRCLE_SHA1}
+        aws_auth:
+          aws_access_key_id: $AWS_ACCESS_KEY_ID
+          aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+    resource_class: small
+    working_directory: /usr/src/app
+
+    steps:
+      - run:
+          name: Update stack
+          command: just update "${CIRCLE_SHA1}"
+
+workflows:
+  build-preview-update:
+    jobs:
+      - build:
+          context:
+            - altf4llc-aws
+
+      - refresh:
+          context:
+            - altf4llc-aws
+          requires:
+            - build
+
+      - preview:
+          context:
+            - altf4llc-aws
+          requires:
+            - refresh
+
+      - update:
+          context:
+            - altf4llc-aws
+          filters:
+            branches:
+              only:
+                - main
+          requires:
+            - preview
+
+version: 2.1

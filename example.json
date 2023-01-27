@@ -1,0 +1,5 @@
+{
+    "name": "altf4llc-pulumi-example",
+    "language": "typescript",
+    "template": "pulumi"
+}
