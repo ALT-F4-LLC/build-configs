@@ -51,8 +51,33 @@ pub fn get_files(config: &Configuration) -> Vec<TemplateFile> {
                     path: Some(".circleci"),
                 },
                 TemplateFile {
+                    data: include_str!("template/pulumi/.dockerignore"),
+                    name: ".dockerignore",
+                    path: None,
+                },
+                TemplateFile {
                     data: include_str!("template/pulumi/justfile"),
                     name: "justfile",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/pulumi/Pulumi.yaml"),
+                    name: "Pulumi.yaml",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/pulumi/.gitignore"),
+                    name: ".gitignore",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/pulumi/Dockerfile"),
+                    name: "Dockerfile",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/pulumi/tsconfig.json"),
+                    name: "tsconfig.json",
                     path: None,
                 },
             ]

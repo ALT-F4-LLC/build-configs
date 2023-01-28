@@ -24,7 +24,7 @@ login:
             "{{registry}}"
 
 preview:
-    doppler run --config "{{config}}" --name "{{project}}" -- \
+    doppler run --config "{{config}}" --project "{{project}}" -- \
         pulumi preview \
             --diff \
             --non-interactive \
@@ -39,7 +39,7 @@ push sha:
     "{{registry}}/altf4llc-{{project}}:{{sha}}"
 
 refresh:
-    doppler run --config "{{config}}" --name "{{project}}" -- \
+    doppler run --config "{{config}}" --project "{{project}}" -- \
         pulumi refresh \
             --diff \
             --non-interactive \
@@ -48,7 +48,7 @@ refresh:
             --yes
 
 update:
-    doppler run --config "{{config}}" --name "{{project}}" -- \
+    doppler run --config "{{config}}" --project "{{project}}" -- \
         pulumi update \
           --diff \
           --non-interactive \
