@@ -1,0 +1,57 @@
+set shell := ["bash", "-c"]
+
+config := "circleci"
+project := "{{ name }}"
+registry := "{{ registry }}"
+stack := "prod"
+
+{% raw -%}
+build sha:
+  docker buildx build \
+    --progress "plain" \
+    --tag "{{registry}}/altf4llc-{{project}}:{{sha}}" \
+    .
+
+install:
+  rm -rf node_modules
+  yarn install
+
+login:
+    aws ecr get-login-password \
+      --region "us-west-2" | docker login \
+        --password-stdin \
+        --username AWS \
+            "{{registry}}"
+
+preview:
+    doppler run --config "{{config}}" --name "{{project}}" -- \
+        pulumi preview \
+            --diff \
+            --non-interactive \
+            --stack "{{stack}}"
+
+pull sha:
+    docker image pull \
+        "{{registry}}/altf4llc-{{project}}:{{sha}}"
+
+push sha:
+  docker image push \
+    "{{registry}}/altf4llc-{{project}}:{{sha}}"
+
+refresh:
+    doppler run --config "{{config}}" --name "{{project}}" -- \
+        pulumi refresh \
+            --diff \
+            --non-interactive \
+            --skip-preview \
+            --stack "{{stack}}" \
+            --yes
+
+update:
+    doppler run --config "{{config}}" --name "{{project}}" -- \
+        pulumi update \
+          --diff \
+          --non-interactive \
+          --stack "{{stack}}" \
+          --yes
+{% endraw -%}

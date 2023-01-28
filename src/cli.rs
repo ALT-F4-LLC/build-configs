@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
-pub struct Cli {
+pub struct BuildConfigs {
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -12,6 +12,7 @@ pub struct Cli {
 pub enum Commands {
     Generate {
         #[arg(short, long)]
-        config: Option<String>,
+        #[arg(default_value_t = String::from("build.json"))]
+        config_path: String,
     },
 }
