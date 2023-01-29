@@ -6,7 +6,7 @@ parameters:
     default: "altf4llc-{{ name }}"
     type: string
   registry:
-    default: "{{ registry }}"
+    default: "{{ dockerfile.registry }}"
     type: string
 
 commands:

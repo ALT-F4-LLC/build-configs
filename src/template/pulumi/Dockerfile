@@ -28,8 +28,10 @@ RUN yarn install --frozen-lockfile
 COPY resource/ resource/
 COPY index.ts index.ts
 COPY justfile justfile
-COPY Pulumi.prod.yaml Pulumi.prod.yaml
 COPY Pulumi.yaml Pulumi.yaml
 COPY tsconfig.json tsconfig.json
+{% for command in dockerfile.build_post_install -%}
+{{ command | safe }}
+{%- endfor %}
 
 ENTRYPOINT ["pulumi"]

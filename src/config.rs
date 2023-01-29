@@ -26,7 +26,16 @@ pub struct Configuration {
     pub language: Language,
     pub template: Template,
 
-    #[serde(default = "default_registry")]
+    #[serde(default = "dockerfile")]
+    pub dockerfile: Dockerfile,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Dockerfile {
+    #[serde(default = "dockerfile_build_post_install")]
+    pub build_post_install: Vec<String>,
+
+    #[serde(default = "dockerfile_registry")]
     pub registry: String,
 }
 
@@ -37,7 +46,18 @@ pub struct TemplateFile<'a> {
     pub path: Option<&'a str>,
 }
 
-fn default_registry() -> String {
+fn dockerfile() -> Dockerfile {
+    Dockerfile {
+        build_post_install: vec![],
+        registry: dockerfile_registry(),
+    }
+}
+
+fn dockerfile_build_post_install() -> Vec<String> {
+    vec![]
+}
+
+fn dockerfile_registry() -> String {
     "677459762413.dkr.ecr.us-west-2.amazonaws.com".to_string()
 }
 
