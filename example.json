@@ -1,0 +1,5 @@
+{
+    "name": "pulumi-example",
+    "language": "typescript",
+    "template": "pulumi"
+}
