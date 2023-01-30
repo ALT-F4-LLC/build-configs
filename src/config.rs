@@ -16,6 +16,16 @@ pub enum Language {
 #[derive(Serialize, Deserialize, Debug, Display)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
+pub enum Product {
+    AltF4Llc,
+    AyaLivingInc,
+    Quirk,
+    RecordingPipeline
+}
+
+#[derive(Serialize, Deserialize, Debug, Display)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 pub enum Template {
     Pulumi,
 }
@@ -28,6 +38,12 @@ pub struct Configuration {
 
     #[serde(default = "dockerfile")]
     pub dockerfile: Dockerfile,
+
+    #[serde(default = "environments")]
+    pub environments: Vec<String>,
+
+    #[serde(default = "product")]
+    pub product: Product,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -46,6 +62,10 @@ pub struct TemplateFile<'a> {
     pub path: Option<&'a str>,
 }
 
+fn environments() -> Vec<String> {
+    vec![]
+}
+
 fn dockerfile() -> Dockerfile {
     Dockerfile {
         build_post_install: vec![],
@@ -59,6 +79,10 @@ fn dockerfile_build_post_install() -> Vec<String> {
 
 fn dockerfile_registry() -> String {
     "677459762413.dkr.ecr.us-west-2.amazonaws.com".to_string()
+}
+
+fn product() -> Product {
+    Product::AltF4Llc
 }
 
 pub fn get_files(config: &Configuration) -> Vec<TemplateFile> {

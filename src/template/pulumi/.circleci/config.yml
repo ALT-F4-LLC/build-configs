@@ -3,7 +3,7 @@ orbs:
 
 parameters:
   image_tag:
-    default: "altf4llc-{{ name }}"
+    default: "{{ product }}-{{ name }}"
     type: string
   registry:
     default: "{{ dockerfile.registry }}"
@@ -56,12 +56,15 @@ jobs:
         aws_auth:
           aws_access_key_id: $AWS_ACCESS_KEY_ID
           aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+    parameters:
+      stack:
+        type: string
     resource_class: small
     working_directory: /usr/src/app
     steps:
       - run:
           name: Refresh stack
-          command: just refresh
+          command: just refresh << parameters.stack >>
 
   preview:
     docker:
@@ -69,12 +72,15 @@ jobs:
         aws_auth:
           aws_access_key_id: $AWS_ACCESS_KEY_ID
           aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+    parameters:
+      stack:
+        type: string
     resource_class: small
     working_directory: /usr/src/app
     steps:
       - run:
           name: Preview stack
-          command: just preview
+          command: just preview << parameters.stack >>
 
   update:
     docker:
@@ -82,13 +88,16 @@ jobs:
         aws_auth:
           aws_access_key_id: $AWS_ACCESS_KEY_ID
           aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+    parameters:
+      stack:
+        type: string
     resource_class: small
     working_directory: /usr/src/app
 
     steps:
       - run:
           name: Update stack
-          command: just update
+          command: just update << parameters.stack >>
 
 workflows:
   build-preview-update:
@@ -97,19 +106,30 @@ workflows:
           context:
             - altf4llc-aws
 
+      {% for environment in environments -%}
       - refresh:
+          name: refresh-{{ environment }}
+          stack: {{ environment }}
           context:
             - altf4llc-aws
           requires:
             - build
+      {%- endfor %}
 
+      {% for environment in environments -%}
       - preview:
+          name: preview-{{ environment }}
+          stack: {{ environment }}
           context:
             - altf4llc-aws
           requires:
-            - refresh
+            - refresh-{{ environment }}
+      {%- endfor %}
 
+      {% for environment in environments -%}
       - update:
+          name: update-{{ environment }}
+          stack: {{ environment }}
           context:
             - altf4llc-aws
           filters:
@@ -117,6 +137,7 @@ workflows:
               only:
                 - main
           requires:
-            - preview
+            - preview-{{ environment }}
+      {%- endfor %}
 
 version: 2.1

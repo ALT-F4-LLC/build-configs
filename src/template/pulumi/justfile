@@ -1,15 +1,14 @@
 set shell := ["bash", "-c"]
 
 config := "circleci"
-project := "{{ name }}"
+project := "{{ product }}-{{ name }}"
 registry := "{{ dockerfile.registry }}"
-stack := "prod"
 
 {% raw -%}
 build sha:
   docker buildx build \
     --progress "plain" \
-    --tag "{{registry}}/altf4llc-{{project}}:{{sha}}" \
+    --tag "{{registry}}/{{project}}:{{sha}}" \
     .
 
 install:
@@ -23,7 +22,7 @@ login:
         --username AWS \
             "{{registry}}"
 
-preview:
+preview stack:
     doppler run --config "{{config}}" --project "{{project}}" -- \
         pulumi preview \
             --diff \
@@ -32,13 +31,13 @@ preview:
 
 pull sha:
     docker image pull \
-        "{{registry}}/altf4llc-{{project}}:{{sha}}"
+        "{{registry}}/{{project}}:{{sha}}"
 
 push sha:
   docker image push \
-    "{{registry}}/altf4llc-{{project}}:{{sha}}"
+    "{{registry}}/{{project}}:{{sha}}"
 
-refresh:
+refresh stack:
     doppler run --config "{{config}}" --project "{{project}}" -- \
         pulumi refresh \
             --diff \
@@ -47,7 +46,7 @@ refresh:
             --stack "{{stack}}" \
             --yes
 
-update:
+update stack:
     doppler run --config "{{config}}" --project "{{project}}" -- \
         pulumi update \
           --diff \
