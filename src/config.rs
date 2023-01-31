@@ -20,7 +20,7 @@ pub enum Product {
     AltF4Llc,
     AyaLivingInc,
     Quirk,
-    RecordingPipeline
+    RecordingPipeline,
 }
 
 #[derive(Serialize, Deserialize, Debug, Display)]
@@ -28,6 +28,25 @@ pub enum Product {
 #[strum(serialize_all = "lowercase")]
 pub enum Template {
     Pulumi,
+    Service,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Service {
+    #[serde(default = "default_service_database")]
+    pub database: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Dockerfile {
+    #[serde(default = "default_dockerfile_build_post_install")]
+    pub build_post_install: Vec<String>,
+
+    #[serde(default = "default_dockerfile_registry")]
+    pub registry: String,
+
+    #[serde(default = "default_dockerfile_service_post_install")]
+    pub service_post_install: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -36,23 +55,17 @@ pub struct Configuration {
     pub language: Language,
     pub template: Template,
 
-    #[serde(default = "dockerfile")]
+    #[serde(default = "default_dockerfile")]
     pub dockerfile: Dockerfile,
 
-    #[serde(default = "environments")]
+    #[serde(default = "default_environments")]
     pub environments: Vec<String>,
 
-    #[serde(default = "product")]
+    #[serde(default = "default_product")]
     pub product: Product,
-}
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Dockerfile {
-    #[serde(default = "dockerfile_build_post_install")]
-    pub build_post_install: Vec<String>,
-
-    #[serde(default = "dockerfile_registry")]
-    pub registry: String,
+    #[serde(default = "default_service")]
+    pub service: Service,
 }
 
 #[derive(Debug)]
@@ -62,27 +75,42 @@ pub struct TemplateFile<'a> {
     pub path: Option<&'a str>,
 }
 
-fn environments() -> Vec<String> {
+fn default_environments() -> Vec<String> {
     vec![]
 }
 
-fn dockerfile() -> Dockerfile {
+fn default_dockerfile() -> Dockerfile {
     Dockerfile {
-        build_post_install: vec![],
-        registry: dockerfile_registry(),
+        build_post_install: default_dockerfile_build_post_install(),
+        registry: default_dockerfile_registry(),
+        service_post_install: default_dockerfile_service_post_install(),
     }
 }
 
-fn dockerfile_build_post_install() -> Vec<String> {
+fn default_dockerfile_build_post_install() -> Vec<String> {
     vec![]
 }
 
-fn dockerfile_registry() -> String {
+fn default_dockerfile_service_post_install() -> Vec<String> {
+    vec![]
+}
+
+fn default_dockerfile_registry() -> String {
     "677459762413.dkr.ecr.us-west-2.amazonaws.com".to_string()
 }
 
-fn product() -> Product {
+fn default_product() -> Product {
     Product::AltF4Llc
+}
+
+fn default_service() -> Service {
+    Service {
+        database: default_service_database(),
+    }
+}
+
+fn default_service_database() -> bool {
+    false
 }
 
 pub fn get_files(config: &Configuration) -> Vec<TemplateFile> {
@@ -122,6 +150,25 @@ pub fn get_files(config: &Configuration) -> Vec<TemplateFile> {
                 TemplateFile {
                     data: include_str!("template/pulumi/tsconfig.json"),
                     name: "tsconfig.json",
+                    path: None,
+                },
+            ]
+        }
+        Template::Service => {
+            vec![
+                TemplateFile {
+                    data: include_str!("template/service/Dockerfile"),
+                    name: "Dockerfile",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/service/.npmrc"),
+                    name: ".npmrc",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/service/justfile"),
+                    name: "justfile",
                     path: None,
                 },
             ]
