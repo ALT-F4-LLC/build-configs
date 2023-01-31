@@ -70,6 +70,9 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = builtins.attrValues self.checks;
 
+          buildInputs = [ ]
+            ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+
           nativeBuildInputs = with pkgs; [ cargo rustc ];
         };
       });

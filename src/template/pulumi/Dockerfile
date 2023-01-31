@@ -32,6 +32,6 @@ COPY Pulumi.yaml Pulumi.yaml
 COPY tsconfig.json tsconfig.json
 {% for command in dockerfile.build_post_install -%}
 {{ command | safe }}
-{%- endfor %}
+{% endfor %}
 
 ENTRYPOINT ["pulumi"]
