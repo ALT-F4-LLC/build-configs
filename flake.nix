@@ -26,7 +26,10 @@
 
         craneLib = crane.lib.${system};
 
-        src = craneLib.cleanCargoSource ./.;
+        src = lib.cleanSourceWith {
+          filter = templatesOrCargo;
+          src = ./.;
+        };
 
         buildInputs = [ ]
           ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
@@ -35,6 +38,11 @@
 
         build-configs =
           craneLib.buildPackage { inherit cargoArtifacts src buildInputs; };
+
+        templatesFilter = path: _type: builtins.match ".*template.*" path != null;
+
+        templatesOrCargo = path: type:
+          (templatesFilter path type) || (craneLib.filterCargoSources path type);
       in {
         checks = {
           inherit build-configs;
