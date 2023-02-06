@@ -38,6 +38,18 @@ pub struct Service {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct Pulumi {
+    #[serde(default = "default_pulumi_eks_cluster")]
+    pub eks_cluster: String,
+
+    #[serde(default = "default_pulumi_npm")]
+    pub npm: bool,
+
+    #[serde(default = "default_pulumi_resource_class")]
+    pub resource_class: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Dockerfile {
     #[serde(default = "default_dockerfile_build_post_install")]
     pub build_post_install: Vec<String>,
@@ -63,6 +75,9 @@ pub struct Configuration {
 
     #[serde(default = "default_product")]
     pub product: Product,
+
+    #[serde(default = "default_pulumi")]
+    pub pulumi: Pulumi,
 
     #[serde(default = "default_service")]
     pub service: Service,
@@ -101,6 +116,26 @@ fn default_dockerfile_registry() -> String {
 
 fn default_product() -> Product {
     Product::AltF4Llc
+}
+
+fn default_pulumi() -> Pulumi {
+    Pulumi {
+        eks_cluster: default_pulumi_eks_cluster(),
+        npm: default_pulumi_npm(),
+        resource_class: default_pulumi_resource_class(),
+    }
+}
+
+fn default_pulumi_eks_cluster() -> String {
+    "".to_string()
+}
+
+fn default_pulumi_npm() -> bool {
+    false
+}
+
+fn default_pulumi_resource_class() -> String {
+    "small".to_string()
 }
 
 fn default_service() -> Service {

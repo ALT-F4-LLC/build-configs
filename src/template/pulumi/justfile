@@ -1,14 +1,15 @@
+#░█▀█░█░█░▀█▀░█▀█░░░░░█▀▀░█▀▀░█▀█░█▀▀░█▀▄░█▀█░▀█▀░█▀▀░█▀▄
+#░█▀█░█░█░░█░░█░█░▄▄▄░█░█░█▀▀░█░█░█▀▀░█▀▄░█▀█░░█░░█▀▀░█░█
+#░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
+# DO NOT UPDATE: This file is managed by "build-configs"
+
 set shell := ["bash", "-c"]
 
-config := "circleci"
-project := "{{ product }}-{{ name }}"
-registry := "{{ dockerfile.registry }}"
-
-{% raw -%}
-build sha:
+build sha {% if pulumi.npm %}$NPM_TOKEN=`doppler secrets get --plain --config "circleci" --project "{{ product }}-{{ name }}" NPM_TOKEN`{% endif %}:
   docker buildx build \
+    {% if pulumi.npm %}--build-arg NPM_TOKEN \{% endif %}
     --progress "plain" \
-    --tag "{{registry}}/{{project}}:{{sha}}" \
+    --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}" \
     .
 
 install:
@@ -20,37 +21,42 @@ login:
       --region "us-west-2" | docker login \
         --password-stdin \
         --username AWS \
-            "{{registry}}"
+            "{{ dockerfile.registry }}"
 
 preview stack:
-    doppler run --config "{{config}}" --project "{{project}}" -- \
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
         pulumi preview \
             --diff \
             --non-interactive \
-            --stack "{{stack}}"
+            --stack "{% raw %}{{stack}}{% endraw %}"
 
 pull sha:
     docker image pull \
-        "{{registry}}/{{project}}:{{sha}}"
+        "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}"
 
 push sha:
   docker image push \
-    "{{registry}}/{{project}}:{{sha}}"
+    "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}"
 
 refresh stack:
-    doppler run --config "{{config}}" --project "{{project}}" -- \
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
         pulumi refresh \
             --diff \
             --non-interactive \
             --skip-preview \
-            --stack "{{stack}}" \
+            --stack "{% raw %}{{stack}}{% endraw %}" \
             --yes
 
 update stack:
-    doppler run --config "{{config}}" --project "{{project}}" -- \
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
         pulumi update \
           --diff \
           --non-interactive \
-          --stack "{{stack}}" \
+          --stack "{% raw %}{{stack}}{% endraw %}" \
           --yes
-{% endraw -%}
+
+{% if pulumi.eks_cluster != "" -%}
+update-kubeconfig:
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        aws eks update-kubeconfig --name "{{ pulumi.eks_cluster }}"
+{%- endif %}

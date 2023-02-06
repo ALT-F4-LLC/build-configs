@@ -1,27 +1,50 @@
-FROM public.ecr.aws/docker/library/node:18-alpine3.16 as build
+#░█▀█░█░█░▀█▀░█▀█░░░░░█▀▀░█▀▀░█▀█░█▀▀░█▀▄░█▀█░▀█▀░█▀▀░█▀▄
+#░█▀█░█░█░░█░░█░█░▄▄▄░█░█░█▀▀░█░█░█▀▀░█▀▄░█▀█░░█░░█▀▀░█░█
+#░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
+# DO NOT UPDATE: This file is managed by "build-configs"
+
+FROM public.ecr.aws/docker/library/node:18 as build
+
+{% if pulumi.npm -%}
+ARG NPM_TOKEN
+ENV NPM_TOKEN ${NPM_TOKEN}
+{%- endif %}
 
 ENV PATH="/root/.pulumi/bin:$PATH"
 
-RUN wget -q -t3 'https://packages.doppler.com/public/cli/rsa.8004D9FF50437357.key' \
-    -O /etc/apk/keys/cli@doppler-8004D9FF50437357.rsa.pub \
-    && echo 'https://packages.doppler.com/public/cli/alpine/any-version/main' \
-    | tee -a /etc/apk/repositories \
-    && apk add --no-cache \
-    curl \
-    bash \
-    doppler \
-    && curl \
-    --proto '=https' \
-    --tlsv1.2 -sSf https://just.systems/install.sh \
-    | bash -s -- --to /usr/local/bin \
+RUN apt-get update \
+    && apt-get install --yes \
+        apt-transport-https \
+        bash \
+        ca-certificates \
+        curl \
+        gnupg \
+    && curl -sLf --retry 3 --tlsv1.2 --proto "=https" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | apt-key add - \
+    && echo "deb https://packages.doppler.com/public/cli/deb/debian any-version main" | tee /etc/apt/sources.list.d/doppler-cli.list \
+    && apt-get update && apt-get install doppler \
+    && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin \
+{%- if pulumi.eks_cluster != "" %}
+    && curl -sL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip \
+    && unzip awscliv2.zip \
+    && aws/install \
+    && rm -rf \
+        awscliv2.zip \
+        aws \
+        /usr/local/aws-cli/v2/*/dist/aws_completer \
+        /usr/local/aws-cli/v2/*/dist/awscli/data/ac.index \
+        /usr/local/aws-cli/v2/*/dist/awscli/examples \
+    && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
+{%- endif %}
     && curl -fsSL https://get.pulumi.com -o /root/setup_pulumi.sh \
     && chmod +x /root/setup_pulumi.sh \
     && /root/setup_pulumi.sh \
-    && rm -rf /root/setup_pulumi.sh
+    && rm -rf /root/setup_pulumi.sh \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 
-COPY package.json yarn.lock ./
+COPY {% if pulumi.npm %}.npmrc {% endif %}package.json yarn.lock ./
 
 RUN yarn install --frozen-lockfile
 
@@ -33,5 +56,4 @@ COPY tsconfig.json tsconfig.json
 {% for command in dockerfile.build_post_install -%}
 {{ command | safe }}
 {% endfor %}
-
 ENTRYPOINT ["pulumi"]
