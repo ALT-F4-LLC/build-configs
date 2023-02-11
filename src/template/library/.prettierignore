@@ -3,4 +3,15 @@
 #░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
 # DO NOT UPDATE: This file is managed by "build-configs"
 
-//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+**/*.js
+**/*.d.ts
+coverage/
+
+### APPLICATION ###
+lib/**/**/*.js
+lib/**/**/*.d.ts
+lib/**/**/*.map
+index.js
+index.d.ts
+index.js.map
+.npmrc

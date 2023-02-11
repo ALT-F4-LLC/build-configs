@@ -3,4 +3,11 @@
 #░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
 # DO NOT UPDATE: This file is managed by "build-configs"
 
-//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+.circleci/
+.eslintignore
+.eslintrc.js
+Dockerfile
+build.json
+jest.config.js
+jest.config.setup.js
+justfile

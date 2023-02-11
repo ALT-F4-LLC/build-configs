@@ -27,25 +27,14 @@ pub enum Product {
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum Template {
+    Library,
     Pulumi,
     Service,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Service {
-    #[serde(default = "default_service_database")]
-    pub database: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Pulumi {
-    #[serde(default = "default_pulumi_eks_cluster")]
-    pub eks_cluster: String,
-
-    #[serde(default = "default_pulumi_npm")]
-    pub npm: bool,
-
-    #[serde(default = "default_pulumi_resource_class")]
+pub struct Library {
+    #[serde(default = "default_library_resource_class")]
     pub resource_class: String,
 }
 
@@ -62,6 +51,24 @@ pub struct Dockerfile {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct Pulumi {
+    #[serde(default = "default_pulumi_eks_cluster")]
+    pub eks_cluster: String,
+
+    #[serde(default = "default_pulumi_npm")]
+    pub npm: bool,
+
+    #[serde(default = "default_pulumi_resource_class")]
+    pub resource_class: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Service {
+    #[serde(default = "default_service_database")]
+    pub database: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
     pub name: String,
     pub language: Language,
@@ -72,6 +79,9 @@ pub struct Configuration {
 
     #[serde(default = "default_environments")]
     pub environments: Vec<String>,
+
+    #[serde(default = "default_library")]
+    pub library: Library,
 
     #[serde(default = "default_product")]
     pub product: Product,
@@ -88,10 +98,6 @@ pub struct TemplateFile<'a> {
     pub data: &'a str,
     pub name: &'a str,
     pub path: Option<&'a str>,
-}
-
-fn default_environments() -> Vec<String> {
-    vec![]
 }
 
 fn default_dockerfile() -> Dockerfile {
@@ -112,6 +118,20 @@ fn default_dockerfile_service_post_install() -> Vec<String> {
 
 fn default_dockerfile_registry() -> String {
     "677459762413.dkr.ecr.us-west-2.amazonaws.com".to_string()
+}
+
+fn default_environments() -> Vec<String> {
+    vec![]
+}
+
+fn default_library_resource_class() -> String {
+    "small".to_string()
+}
+
+fn default_library() -> Library {
+    Library {
+        resource_class: default_library_resource_class(),
+    }
 }
 
 fn default_product() -> Product {
@@ -150,6 +170,65 @@ fn default_service_database() -> bool {
 
 pub fn get_files(config: &Configuration) -> Vec<TemplateFile> {
     match config.template {
+        Template::Library => {
+            vec![
+                TemplateFile {
+                    data: include_str!("template/library/.circleci/config.yml"),
+                    name: "config.yml",
+                    path: Some(".circleci"),
+                },
+                TemplateFile {
+                    data: include_str!("template/library/Dockerfile"),
+                    name: "Dockerfile",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/.eslintignore"),
+                    name: ".eslintignore",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/.eslintrc.js"),
+                    name: ".eslintrc.js",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/.gitignore"),
+                    name: ".gitignore",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/jest.config.js"),
+                    name: "jest.config.js",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/justfile"),
+                    name: "justfile",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/.npmignore"),
+                    name: ".npmignore",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/.prettierignore"),
+                    name: ".prettierignore",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/.prettierrc.js"),
+                    name: ".prettierrc.js",
+                    path: None,
+                },
+                TemplateFile {
+                    data: include_str!("template/library/tsconfig.json"),
+                    name: "tsconfig.json",
+                    path: None,
+                },
+            ]
+        }
         Template::Pulumi => {
             vec![
                 TemplateFile {
@@ -192,13 +271,13 @@ pub fn get_files(config: &Configuration) -> Vec<TemplateFile> {
         Template::Service => {
             vec![
                 TemplateFile {
-                    data: include_str!("template/service/Dockerfile"),
-                    name: "Dockerfile",
+                    data: include_str!("template/service/.npmrc"),
+                    name: ".npmrc",
                     path: None,
                 },
                 TemplateFile {
-                    data: include_str!("template/service/.npmrc"),
-                    name: ".npmrc",
+                    data: include_str!("template/service/Dockerfile"),
+                    name: "Dockerfile",
                     path: None,
                 },
                 TemplateFile {

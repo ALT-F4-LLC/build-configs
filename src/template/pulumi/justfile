@@ -5,7 +5,7 @@
 
 set shell := ["bash", "-c"]
 
-build sha {% if pulumi.npm %}$NPM_TOKEN=`doppler secrets get --plain --config "circleci" --project "{{ product }}-{{ name }}" NPM_TOKEN`{% endif %}:
+build sha{% if pulumi.npm %} $NPM_TOKEN=`doppler secrets get --plain --config "circleci" --project "{{ product }}-{{ name }}" NPM_TOKEN`{% endif %}:
   docker buildx build \
     {% if pulumi.npm %}--build-arg NPM_TOKEN \{% endif %}
     --progress "plain" \
