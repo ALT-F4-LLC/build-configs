@@ -1,4 +1,7 @@
+use anyhow::Result;
 use clap::{Parser, Subcommand};
+
+mod generate;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -15,4 +18,12 @@ pub enum Commands {
         #[arg(default_value_t = String::from("build.json"))]
         config_path: String,
     },
+}
+
+pub fn run() -> Result<()> {
+    let cli = BuildConfigs::parse();
+
+    match &cli.command {
+        Commands::Generate { config_path } => generate::run(config_path),
+    }
 }

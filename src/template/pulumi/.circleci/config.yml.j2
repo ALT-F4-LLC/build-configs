@@ -1,0 +1,82 @@
+#░█▀█░█░█░▀█▀░█▀█░░░░░█▀▀░█▀▀░█▀█░█▀▀░█▀▄░█▀█░▀█▀░█▀▀░█▀▄
+#░█▀█░█░█░░█░░█░█░▄▄▄░█░█░█▀▀░█░█░█▀▀░█▀▄░█▀█░░█░░█▀▀░█░█
+#░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
+# DO NOT UPDATE: This file is managed by "build-configs"
+
+orbs:
+  aws-cli: circleci/aws-cli@3.1.3
+
+parameters:
+  image_tag:
+    default: "{{ product }}-{{ name }}"
+    type: string
+  registry:
+    default: "{{ dockerfile.registry }}"
+    type: string
+
+commands:
+  login-ecr:
+    steps:
+      - run:
+          name: Login to ECR
+          command: just login
+
+jobs:
+  build:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+
+    steps:
+      - aws-cli/install
+{% if dependencies.private %}
+      - run:
+          name: Install Doppler CLI - latest
+          command: |
+            (curl -Ls https://cli.doppler.com/install.sh \
+              || wget -qO- https://cli.doppler.com/install.sh) \
+              | sh -s -- --no-install --no-package-manager
+
+            mkdir -p /tmp/doppler
+            mv ./doppler /tmp/doppler/doppler
+
+            echo 'export PATH=/tmp/doppler:"$PATH"' >> "$BASH_ENV"
+{% endif %}
+      - run:
+          name: Install Just CLI - latest
+          command: |
+            curl \
+              --proto '=https' \
+              --tlsv1.2 -sSf https://just.systems/install.sh \
+              | bash -s -- --to /tmp/just
+
+            echo 'export PATH=/tmp/just:"$PATH"' >> "$BASH_ENV"
+
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 20.10.17
+
+      - checkout
+
+      - login-ecr
+
+      - run:
+          name: Build images
+          command: just build "${CIRCLE_SHA1}"
+
+      - run:
+          name: Push images
+          command: just push "${CIRCLE_SHA1}"
+{% if template == "pulumi" %}
+{% include ".circleci/pulumi-jobs.yml" %}
+{%- endif %}
+workflows:
+  build-preview-update:
+    jobs:
+      - build:
+          context:
+            - altf4llc-aws
+{% if template == "pulumi" -%}
+{% include ".circleci/pulumi-workflows.yml" %}
+{%- endif %}
+version: 2.1

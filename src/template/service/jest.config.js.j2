@@ -1,0 +1,16 @@
+//░█▀█░█░█░▀█▀░█▀█░░░░░█▀▀░█▀▀░█▀█░█▀▀░█▀▄░█▀█░▀█▀░█▀▀░█▀▄
+//░█▀█░█░█░░█░░█░█░▄▄▄░█░█░█▀▀░█░█░█▀▀░█▀▄░█▀█░░█░░█▀▀░█░█
+//░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
+// DO NOT UPDATE: This file is managed by "build-configs"
+
+/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
+module.exports = {
+    collectCoverage: true,
+    coverageDirectory: "./coverage",
+    coverageReporters: ["json", "lcov", "text"],
+    modulePathIgnorePatterns: ["<rootDir>/dist"],
+    preset: "ts-jest",
+    reporters: ["default", ["jest-junit", { outputDirectory: "./coverage" }]],
+    testEnvironment: "node",
+    testMatch: ["**/__tests__/**/*.[t]s?(x)", "**/?(*.)+(spec|test).[t]s?(x)"],
+};

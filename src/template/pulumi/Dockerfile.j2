@@ -5,7 +5,7 @@
 
 FROM public.ecr.aws/docker/library/node:18 as build
 
-{% if pulumi.npm -%}
+{% if dependencies.private -%}
 ARG NPM_TOKEN
 ENV NPM_TOKEN ${NPM_TOKEN}
 {%- endif %}
@@ -44,7 +44,7 @@ RUN apt-get update \
 
 WORKDIR /usr/src/app
 
-COPY {% if pulumi.npm %}.npmrc {% endif %}package.json yarn.lock ./
+COPY {% if dependencies.private %}.npmrc {% endif %}package.json yarn.lock ./
 
 RUN yarn install --frozen-lockfile
 

@@ -15,21 +15,10 @@ parameters:
     type: string
 
 commands:
-  login-ecr:
-    steps:
-      - run:
-          name: Login to ECR
-          command: just login
-
-jobs:
-  build:
-    docker:
-      - image: cimg/base:current
-    resource_class: small
-
+  setup-base:
     steps:
       - aws-cli/install
-{% if pulumi.npm %}
+{% if dependencies.private %}
       - run:
           name: Install Doppler CLI - latest
           command: |
@@ -52,13 +41,24 @@ jobs:
 
             echo 'export PATH=/tmp/just:"$PATH"' >> "$BASH_ENV"
 
+      - checkout
+
       - setup_remote_docker:
           docker_layer_caching: true
           version: 20.10.17
 
-      - checkout
+      - run:
+          name: Login to ECR
+          command: just login
 
-      - login-ecr
+jobs:
+  build:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+
+    steps:
+      - setup-base
 
       - run:
           name: Build images
@@ -66,109 +66,129 @@ jobs:
 
       - run:
           name: Push images
-          command: just push "${CIRCLE_SHA1}"
-
-  refresh:
+          command: |
+            just push "${CIRCLE_SHA1}-build"
+            just push "${CIRCLE_SHA1}"
+{% if service.tests is containing("lint") %}
+  test-lint:
     docker:
-      - image: << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1}
+      - image: << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1}-build
         aws_auth:
           aws_access_key_id: $AWS_ACCESS_KEY_ID
           aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
-    parameters:
-      stack:
-        type: string
-    resource_class: {{ pulumi.resource_class | safe }}
+    resource_class: small
     working_directory: /usr/src/app
 
     steps:
-{%- if pulumi.kubernetes != "" %}
       - run:
-          name: Update kubeconfig
-          command: just update-kubeconfig
-{% endif %}
-      - run:
-          name: Refresh stack
-          command: just refresh << parameters.stack >>
+          name: Run lint
+          command: just lint
+{%- endif -%}
+{% if service.tests is containing("migrate") %}
 
-  preview:
+  test-migrate:
     docker:
-      - image: << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1}
+      - image: << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1}-build
         aws_auth:
           aws_access_key_id: $AWS_ACCESS_KEY_ID
           aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
-    parameters:
-      stack:
-        type: string
-    resource_class: {{ pulumi.resource_class | safe }}
+        environment:
+          POSTGRESQL_DBNAME: "postgres"
+          POSTGRESQL_HOST: "postgres"
+          POSTGRESQL_PASSWORD: "secret"
+          POSTGRESQL_USER: "postgres"
+      - image: cimg/postgres:15.1
+        name: "postgres"
+        environment:
+          POSTGRES_PASSWORD: "secret"
+    resource_class: small
     working_directory: /usr/src/app
 
     steps:
-{%- if pulumi.kubernetes != "" %}
       - run:
-          name: Update kubeconfig
-          command: just update-kubeconfig
-{% endif %}
-      - run:
-          name: Preview stack
-          command: just preview << parameters.stack >>
+          name: Wait for database
+          command: |
+            dockerize -wait "tcp://${POSTGRESQL_HOST}:5432" -timeout 1m
 
-  update:
+      - run:
+          name: Run migrate
+          command: |
+            ./docker-entrypoint.sh migrate
+{%- endif -%}
+{% if service.tests is containing("unit") %}
+
+  test-unit:
     docker:
-      - image: << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1}
+      - image: << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1}-build
         aws_auth:
           aws_access_key_id: $AWS_ACCESS_KEY_ID
           aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
-    parameters:
-      stack:
-        type: string
-    resource_class: {{ pulumi.resource_class | safe }}
+    resource_class: small
     working_directory: /usr/src/app
 
     steps:
-{%- if pulumi.kubernetes != "" %}
       - run:
-          name: Update kubeconfig
-          command: just update-kubeconfig
+          name: Run units
+          command: just test
+
+      - store_artifacts:
+          path: ./coverage
+
+      - store_test_results:
+          path: ./coverage
 {% endif %}
+  tag:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+
+    steps:
+      - setup-base
+
       - run:
-          name: Update stack
-          command: just update << parameters.stack >>
+          name: Pull images
+          command: |
+            just pull ${CIRCLE_SHA1}
+
+      - run:
+          name: Push tags
+          command: |
+            export CURRENT_TAG="$(git describe --tags --abbrev=0)"
+            export CURRENT_VERSION=$(cat package.json | jq -r ".version")
+
+            if [ "$CURRENT_TAG" != "$CURRENT_VERSION" ]; then
+                just tag ${CIRCLE_SHA1} ${CURRENT_VERSION}
+                just push ${CURRENT_VERSION}
+            else
+              echo "Skipped push due to no changes in version."
+            fi
 
 workflows:
-  build-preview-update:
+  build-test-tag:
     jobs:
       - build:
           context:
             - altf4llc-aws
-{% for environment in environments %}
-      - refresh:
-          name: refresh-{{ environment }}
-          stack: {{ environment }}
+{% for test in service.tests %}
+      - test-{{ test }}:
           context:
             - altf4llc-aws
           requires:
             - build
-{% endfor -%}
-{% for environment in environments %}
-      - preview:
-          name: preview-{{ environment }}
-          stack: {{ environment }}
-          context:
-            - altf4llc-aws
-          requires:
-            - refresh-{{ environment }}
-{% endfor -%}
-{% for environment in environments %}
-      - update:
-          name: update-{{ environment }}
-          stack: {{ environment }}
+{% endfor %}
+      - tag:
           context:
             - altf4llc-aws
           filters:
             branches:
-              only:
-                - main
+              only: main
           requires:
-            - preview-{{ environment }}
-{% endfor %}
+{%- if service.tests | length > 0 %}
+{%- for test in service.tests %}
+            - test-{{ test }}
+{%- endfor %}
+{%- else %}
+            - build
+{%- endif %}
+
 version: 2.1

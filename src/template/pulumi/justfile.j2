@@ -5,9 +5,11 @@
 
 set shell := ["bash", "-c"]
 
-build sha{% if pulumi.npm %} $NPM_TOKEN=`doppler secrets get --plain --config "circleci" --project "{{ product }}-{{ name }}" NPM_TOKEN`{% endif %}:
+build sha{% if dependencies.private %} $NPM_TOKEN=`doppler secrets get --plain --config "circleci" --project "{{ product }}-{{ name }}" NPM_TOKEN`{% endif %}:
   docker buildx build \
-    {% if pulumi.npm %}--build-arg NPM_TOKEN \{% endif %}
+{% if dependencies.private %}
+    --build-arg NPM_TOKEN \
+{% endif %}
     --progress "plain" \
     --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}" \
     .
@@ -23,13 +25,6 @@ login:
         --username AWS \
             "{{ dockerfile.registry }}"
 
-preview stack:
-    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
-        pulumi preview \
-            --diff \
-            --non-interactive \
-            --stack "{% raw %}{{stack}}{% endraw %}"
-
 pull sha:
     docker image pull \
         "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}"
@@ -37,6 +32,13 @@ pull sha:
 push sha:
   docker image push \
     "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}"
+
+preview stack:
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        pulumi preview \
+            --diff \
+            --non-interactive \
+            --stack "{% raw %}{{stack}}{% endraw %}"
 
 refresh stack:
     doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
@@ -59,4 +61,4 @@ update stack:
 update-kubeconfig:
     doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
         aws eks update-kubeconfig --name "{{ pulumi.eks_cluster }}"
-{%- endif %}
+{% endif %}
