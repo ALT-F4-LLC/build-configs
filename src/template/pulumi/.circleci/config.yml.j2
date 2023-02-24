@@ -67,16 +67,119 @@ jobs:
       - run:
           name: Push images
           command: just push "${CIRCLE_SHA1}"
-{% if template == "pulumi" %}
-{% include ".circleci/pulumi-jobs.yml" %}
+{% if pulumi.eks_cluster != "" %}
+      - persist_to_workspace:
+          root: .
+          paths:
+            - justfile
 {%- endif %}
+
+  pulumi:
+{%- if pulumi.eks_cluster != "" %}
+    machine: true
+{%- else %}
+    docker:
+      - image: << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1}
+        aws_auth:
+          aws_access_key_id: $AWS_ACCESS_KEY_ID
+          aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+{%- endif %}
+    parameters:
+      command:
+        type: string
+      stack:
+        type: string
+    resource_class: {{ pulumi.resource_class | safe }}
+{%- if pulumi.eks_cluster == "" %}
+    working_directory: /usr/src/app
+{%- endif %}
+
+    steps:
+{%- if pulumi.eks_cluster != "" %}
+      - attach_workspace:
+          at: .
+
+      - login-ecr
+
+      - run:
+          name: Pull image
+          command: |
+            just pull ${CIRCLE_SHA1}
+
+      - run:
+          name: Update kubeconfig
+          command: |
+            docker container run \
+              --env DOPPLER_TOKEN \
+              --interactive \
+              --rm \
+              --tty \
+              --volume "$(pwd)/.kube:/root/.kube" \
+              << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1} \
+              just update-kubeconfig
+
+      - run:
+          name: << parameters.command >> << parameters.stack >>
+          command: |
+            docker container run \
+              --env DOPPLER_TOKEN \
+              --interactive \
+              --rm \
+              --tty \
+              --volume "$(pwd)/.kube:/root/.kube" \
+              << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1} \
+              just << parameters.command >> << parameters.stack >>
+
+      - run:
+          name: Clean environment
+          command: |
+            sudo rm -rf .kube/
+          when: always
+{%- else %}
+      - run:
+          name: << parameters.command >> << parameters.stack >>
+          command: |
+            just << parameters.command >> << parameters.stack >>
+{%- endif %}
+
 workflows:
   build-preview-update:
     jobs:
       - build:
           context:
             - altf4llc-aws
-{% if template == "pulumi" -%}
-{% include ".circleci/pulumi-workflows.yml" %}
-{%- endif %}
+{% for environment in environments %}
+      - pulumi:
+          name: refresh-{{ environment }}
+          command: refresh
+          stack: {{ environment }}
+          context:
+            - altf4llc-aws
+          requires:
+            - build
+{% endfor -%}
+{% for environment in environments %}
+      - pulumi:
+          name: preview-{{ environment }}
+          command: preview
+          stack: {{ environment }}
+          context:
+            - altf4llc-aws
+          requires:
+            - refresh-{{ environment }}
+{% endfor -%}
+{% for environment in environments %}
+      - pulumi:
+          name: update-{{ environment }}
+          command: update
+          stack: {{ environment }}
+          context:
+            - altf4llc-aws
+          filters:
+            branches:
+              only:
+                - main
+          requires:
+            - preview-{{ environment }}
+{% endfor %}
 version: 2.1

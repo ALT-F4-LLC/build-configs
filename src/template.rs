@@ -67,14 +67,6 @@ pub fn get_templates(config: &Configuration) -> Vec<(&str, &str)> {
                     include_str!("./template/pulumi/.circleci/config.yml.j2"),
                 ),
                 (
-                    ".circleci/pulumi-jobs.yml",
-                    include_str!("./template/pulumi/.circleci/pulumi-jobs.yml.j2"),
-                ),
-                (
-                    ".circleci/pulumi-workflows.yml",
-                    include_str!("./template/pulumi/.circleci/pulumi-workflows.yml.j2"),
-                ),
-                (
                     ".dockerignore",
                     include_str!("./template/pulumi/.dockerignore.j2"),
                 ),
@@ -158,10 +150,6 @@ pub fn render_templates(config: &Configuration) -> Result<()> {
     let test_unit_included = config.service.tests.contains(&test_unit);
 
     for (key, _) in template_files {
-        if key == ".circleci/pulumi-jobs.yml" || key == ".circleci/pulumi-workflows.yml" {
-            continue;
-        }
-
         if key == ".npmrc" && !config.dependencies.private {
             continue;
         }

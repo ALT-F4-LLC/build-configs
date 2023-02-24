@@ -4,6 +4,9 @@
 # DO NOT UPDATE: This file is managed by "build-configs"
 
 /bin/
+{% if pulumi.eks_cluster != "" -%}
+.kube/
+{%- endif %}
 {% if language == "typescript" -%}
 /node_modules/
 {%- endif %}
