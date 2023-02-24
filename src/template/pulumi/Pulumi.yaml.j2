@@ -3,5 +3,13 @@
 #░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
 # DO NOT UPDATE: This file is managed by "build-configs"
 
-name: "{{ product }}-{{ name }}"
-runtime: "nodejs"
+name: "{{ name }}"
+runtime:
+{%- if language == "go" %}
+  name: "go"
+  options:
+    binary: "{{ product }}-{{ name }}"
+{%- endif %}
+{%- if language == "typescript" %}
+  name: "nodejs"
+{%- endif %}

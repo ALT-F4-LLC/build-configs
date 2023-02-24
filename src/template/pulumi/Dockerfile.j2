@@ -3,17 +3,33 @@
 #░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
 # DO NOT UPDATE: This file is managed by "build-configs"
 
-FROM public.ecr.aws/docker/library/node:18 as build
+{% if language == "go" -%}
+FROM public.ecr.aws/docker/library/golang:1.20 as build
 
-{% if dependencies.private -%}
-ARG NPM_TOKEN
-ENV NPM_TOKEN ${NPM_TOKEN}
+WORKDIR /usr/src/app
+
+COPY go.mod go.sum ./
+
+RUN go mod download
+
+COPY cmd/ cmd/
+COPY internal/ internal/
+
+RUN go build ./cmd/...
 {%- endif %}
 
+{% if language == "go" %}
+FROM public.ecr.aws/docker/library/golang:1.20
+{% elif language == "typescript" %}
+FROM public.ecr.aws/docker/library/node:18
+{% endif %}
+{% if language == "typescript" and dependencies.private -%}
+ARG NPM_TOKEN
+ENV NPM_TOKEN ${NPM_TOKEN}
+{%- endif -%}
 ENV PATH="/root/.pulumi/bin:$PATH"
 
-RUN apt-get update \
-    && apt-get install --yes \
+RUN apt-get update && apt-get install --yes \
         apt-transport-https \
         bash \
         ca-certificates \
@@ -43,16 +59,19 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
-
+{% if language == "go" %}
+COPY --from=build /usr/src/app/altf4llc-pulumi-vpn /usr/local/bin/altf4llc-pulumi-vpn
+{%- elif language == "typescript" %}
 COPY {% if dependencies.private %}.npmrc {% endif %}package.json yarn.lock ./
 
 RUN yarn install --frozen-lockfile
 
 COPY resource/ resource/
 COPY index.ts index.ts
+COPY tsconfig.json tsconfig.json
+{% endif %}
 COPY justfile justfile
 COPY Pulumi.yaml Pulumi.yaml
-COPY tsconfig.json tsconfig.json
 {% for command in dockerfile.build_post_install -%}
 {{ command | safe }}
 {% endfor %}

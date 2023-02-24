@@ -6,7 +6,7 @@ use std::{
 use anyhow::Result;
 use tera::{Context, Tera};
 
-use crate::config::{Configuration, Template};
+use crate::config::{Configuration, Language, Template};
 
 #[derive(Debug)]
 pub struct TemplateFile<'a> {
@@ -158,11 +158,19 @@ pub fn render_templates(config: &Configuration) -> Result<()> {
     let test_unit_included = config.service.tests.contains(&test_unit);
 
     for (key, _) in template_files {
+        if key == ".circleci/pulumi-jobs.yml" || key == ".circleci/pulumi-workflows.yml" {
+            continue;
+        }
+
         if key == ".npmrc" && !config.dependencies.private {
             continue;
         }
 
         if key == "jest.config.js" && !test_unit_included {
+            continue;
+        }
+
+        if key == "tsconfig.json" && config.language == Language::Go {
             continue;
         }
 

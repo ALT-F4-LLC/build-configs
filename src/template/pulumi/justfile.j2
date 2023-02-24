@@ -5,18 +5,31 @@
 
 set shell := ["bash", "-c"]
 
-build sha{% if dependencies.private %} $NPM_TOKEN=`doppler secrets get --plain --config "circleci" --project "{{ product }}-{{ name }}" NPM_TOKEN`{% endif %}:
+build sha{% if language == "typescript" and dependencies.private %} $NPM_TOKEN=`doppler secrets get --plain --config "circleci" --project "{{ product }}-{{ name }}" NPM_TOKEN`{% endif %}:
+{%- if language == "go" %}
   docker buildx build \
-{% if dependencies.private %}
+    --progress "plain" \
+    --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}-build" \
+    --target "build" \
+    .
+{%- endif %}
+
+  docker buildx build \
+{%- if language == "go" %}
+    --cache-from "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}-build" \
+{%- endif %}
+{%- if language == "typescript" and dependencies.private %}
     --build-arg NPM_TOKEN \
-{% endif %}
+{%- endif %}
     --progress "plain" \
     --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}" \
     .
 
+{%- if language == "typescript" %}
 install:
   rm -rf node_modules
   yarn install
+{% endif %}
 
 login:
     aws ecr get-login-password \
@@ -56,9 +69,8 @@ update stack:
           --non-interactive \
           --stack "{% raw %}{{stack}}{% endraw %}" \
           --yes
-
-{% if pulumi.eks_cluster != "" -%}
+{% if pulumi.eks_cluster != "" %}
 update-kubeconfig:
     doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
         aws eks update-kubeconfig --name "{{ pulumi.eks_cluster }}"
-{% endif %}
+{% endif -%}
