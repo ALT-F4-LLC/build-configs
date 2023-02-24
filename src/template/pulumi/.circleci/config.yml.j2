@@ -137,7 +137,7 @@ jobs:
           when: always
 {%- else %}
       - run:
-          name: << parameters.command >> << parameters.stack >>
+          name: Run << parameters.command >> << parameters.stack >>
           command: |
             just << parameters.command >> << parameters.stack >>
 {%- endif %}
