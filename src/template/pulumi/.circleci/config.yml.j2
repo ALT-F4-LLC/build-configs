@@ -119,7 +119,7 @@ jobs:
               just update-kubeconfig
 
       - run:
-          name: << parameters.command >> << parameters.stack >>
+          name: Run << parameters.command >> << parameters.stack >>
           command: |
             docker container run \
               --env DOPPLER_TOKEN \
