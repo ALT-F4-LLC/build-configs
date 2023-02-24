@@ -13,7 +13,6 @@ build sha{% if language == "typescript" and dependencies.private %} $NPM_TOKEN=`
     --target "build" \
     .
 {%- endif %}
-
   docker buildx build \
 {%- if language == "go" %}
     --cache-from "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}-build" \
@@ -24,13 +23,11 @@ build sha{% if language == "typescript" and dependencies.private %} $NPM_TOKEN=`
     --progress "plain" \
     --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}" \
     .
-
-{%- if language == "typescript" %}
+{% if language == "typescript" %}
 install:
   rm -rf node_modules
   yarn install
 {% endif %}
-
 login:
     aws ecr get-login-password \
       --region "us-west-2" | docker login \
