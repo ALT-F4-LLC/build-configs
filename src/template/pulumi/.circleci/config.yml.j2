@@ -67,7 +67,7 @@ jobs:
       - run:
           name: Push images
           command: just push "${CIRCLE_SHA1}"
-{% if pulumi.eks_cluster != "" %}
+{% if pulumi.resource_class is matching("altf4llc/machine-") %}
       - persist_to_workspace:
           root: .
           paths:
@@ -75,7 +75,7 @@ jobs:
 {%- endif %}
 
   pulumi:
-{%- if pulumi.eks_cluster != "" %}
+{%- if pulumi.resource_class is matching("altf4llc/machine-") %}
     machine: true
 {%- else %}
     docker:
@@ -90,12 +90,12 @@ jobs:
       stack:
         type: string
     resource_class: {{ pulumi.resource_class | safe }}
-{%- if pulumi.eks_cluster == "" %}
+{%- if pulumi.resource_class is not matching("altf4llc/machine-") %}
     working_directory: /usr/src/app
 {%- endif %}
 
     steps:
-{%- if pulumi.eks_cluster != "" %}
+{%- if pulumi.resource_class is matching("altf4llc/machine-") %}
       - attach_workspace:
           at: .
 
@@ -105,7 +105,7 @@ jobs:
           name: Pull image
           command: |
             just pull ${CIRCLE_SHA1}
-
+{% if pulumi.eks_cluster != "" %}
       - run:
           name: Update kubeconfig
           command: |
@@ -117,7 +117,7 @@ jobs:
               --volume "$(pwd)/.kube:/root/.kube" \
               << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1} \
               just update-kubeconfig
-
+{% endif %}
       - run:
           name: Run << parameters.command >> << parameters.stack >>
           command: |
@@ -126,15 +126,18 @@ jobs:
               --interactive \
               --rm \
               --tty \
+              {%- if pulumi.eks_cluster != "" %}
               --volume "$(pwd)/.kube:/root/.kube" \
+              {%- endif %}
               << pipeline.parameters.registry >>/<< pipeline.parameters.image_tag >>:${CIRCLE_SHA1} \
               just << parameters.command >> << parameters.stack >>
-
+{%- if pulumi.eks_cluster != "" %}
       - run:
           name: Clean environment
           command: |
             sudo rm -rf .kube/
           when: always
+{%- endif %}
 {%- else %}
       - run:
           name: Run << parameters.command >> << parameters.stack >>
