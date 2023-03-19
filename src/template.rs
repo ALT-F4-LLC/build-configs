@@ -73,7 +73,29 @@ pub fn get_templates(config: &Configuration) -> Vec<(&str, &str)> {
         },
         Template::Pulumi => match config.language {
             Language::Go => {
-                vec![]
+                vec![
+                    (
+                        ".circleci/config.yml",
+                        include_str!("./template/pulumi/go/.circleci/config.yml.j2"),
+                    ),
+                    (
+                        ".dockerignore",
+                        include_str!("./template/pulumi/go/.dockerignore.j2"),
+                    ),
+                    (
+                        ".gitignore",
+                        include_str!("./template/pulumi/go/.gitignore.j2"),
+                    ),
+                    (
+                        "Dockerfile",
+                        include_str!("./template/pulumi/go/Dockerfile.j2"),
+                    ),
+                    (
+                        "Pulumi.yaml",
+                        include_str!("./template/pulumi/go/Pulumi.yaml.j2"),
+                    ),
+                    ("justfile", include_str!("./template/pulumi/go/justfile.j2")),
+                ]
             }
             Language::Rust => {
                 vec![]
