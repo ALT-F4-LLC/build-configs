@@ -231,10 +231,6 @@ pub fn render_templates(config: &Configuration) -> Result<()> {
             continue;
         }
 
-        if key == "tsconfig.json" && config.language == Language::Go {
-            continue;
-        }
-
         let context = Context::from_serialize(&config)?;
 
         let data = tera.render(key, &context)?;
