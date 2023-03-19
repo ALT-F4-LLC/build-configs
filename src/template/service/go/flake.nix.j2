@@ -1,0 +1,79 @@
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs = inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      perSystem = { config, self', inputs', pkgs, system, ... }:
+        let
+          packageName = "{% if product != "altf4llc" %}{{ product }}-{% endif %}{{ name }}";
+          packageVersion = "{{ service.version }}";
+        in
+        {
+          packages = {
+            default = pkgs.buildGoModule {
+              pname = packageName;
+              src = ./.;
+              vendorSha256 = "{{ service.package.vendor_sha256 }}";
+              version = packageVersion;
+{%- if service.package.build_inputs | length > 0 %}
+
+              buildInputs = with pkgs; [
+                {%- for input in service.package.build_inputs %}
+                {{ input }}
+                {%- endfor %}
+              ];
+{%- endif %}
+{%- if service.package.native_build_inputs | length > 0 %}
+
+              nativeBuildInputs = with pkgs; [
+                {%- for input in service.package.native_build_inputs %}
+                {{ input }}
+                {%- endfor %}
+              ];
+{%- endif %}
+            };
+
+            docker = pkgs.dockerTools.buildLayeredImage {
+              name = packageName;
+              tag = packageVersion;
+
+              config = {
+                Entrypoint = [
+                  "${self'.packages.default}/bin/${packageName}"
+                ];
+              };
+
+              contents = [
+                self'.packages.default
+              ];
+            };
+          };
+
+          apps.default = {
+            type = "app";
+            program = "${self'.packages.default}/bin/${packageName}";
+          };
+
+          devShells.default = pkgs.mkShell {
+{%- if service.devshell.build_inputs | length > 0 %}
+              buildInputs = with pkgs; [
+                {%- for input in service.devshell.build_inputs %}
+                {{ input }}
+                {%- endfor %}
+              ];
+{% endif %}
+{%- if service.devshell.native_build_inputs | length > 0 %}
+              nativeBuildInputs = with pkgs; [
+                {%- for input in service.devshell.native_build_inputs %}
+                {{ input }}
+                {%- endfor %}
+              ];
+{%- endif %}
+            inputsFrom = [ self'.packages.default ];
+          };
+
+          formatter = pkgs.nixpkgs-fmt;
+        };
+    };
+}

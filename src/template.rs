@@ -89,52 +89,81 @@ pub fn get_templates(config: &Configuration) -> Vec<(&str, &str)> {
                 ),
             ]
         }
-        Template::Service => {
-            vec![
-                (
-                    ".circleci/config.yml",
-                    include_str!("./template/service/.circleci/config.yml.j2"),
-                ),
-                (
-                    "Dockerfile",
-                    include_str!("./template/service/Dockerfile.j2"),
-                ),
-                (
-                    ".dockerignore",
-                    include_str!("./template/service/.dockerignore.j2"),
-                ),
-                (
-                    ".eslintignore",
-                    include_str!("./template/service/.eslintignore.j2"),
-                ),
-                (
-                    ".eslintrc.js",
-                    include_str!("./template/service/.eslintrc.js.j2"),
-                ),
-                ("justfile", include_str!("./template/service/justfile.j2")),
-                (".npmrc", include_str!("./template/service/.npmrc.j2")),
-                (
-                    "docker-entrypoint.sh",
-                    include_str!("./template/service/docker-entrypoint.sh.j2"),
-                ),
-                (
-                    "jest.config.js",
-                    include_str!("./template/service/jest.config.js.j2"),
-                ),
-                (
-                    ".prettierignore",
-                    include_str!("./template/service/.prettierignore.j2"),
-                ),
-                (
-                    ".prettierrc.js",
-                    include_str!("./template/service/.prettierrc.js.j2"),
-                ),
-                (
-                    "tsconfig.json",
-                    include_str!("./template/service/tsconfig.json.j2"),
-                ),
-            ]
-        }
+        Template::Service => match config.language {
+            Language::Go => {
+                vec![
+                    (
+                        ".github/workflows/build-and-release.yml",
+                        include_str!(
+                            "./template/service/go/.github/workflows/build-and-release.yml.j2"
+                        ),
+                    ),
+                    (
+                        "flake.nix",
+                        include_str!("./template/service/go/flake.nix.j2"),
+                    ),
+                    (
+                        ".gitignore",
+                        include_str!("./template/service/go/.gitignore.j2"),
+                    ),
+                ]
+            }
+            Language::Rust => {
+                vec![]
+            }
+            Language::TypeScript => {
+                vec![
+                    (
+                        ".circleci/config.yml",
+                        include_str!("./template/service/typescript/.circleci/config.yml.j2"),
+                    ),
+                    (
+                        "Dockerfile",
+                        include_str!("./template/service/typescript/Dockerfile.j2"),
+                    ),
+                    (
+                        ".dockerignore",
+                        include_str!("./template/service/typescript/.dockerignore.j2"),
+                    ),
+                    (
+                        ".eslintignore",
+                        include_str!("./template/service/typescript/.eslintignore.j2"),
+                    ),
+                    (
+                        ".eslintrc.js",
+                        include_str!("./template/service/typescript/.eslintrc.js.j2"),
+                    ),
+                    (
+                        "justfile",
+                        include_str!("./template/service/typescript/justfile.j2"),
+                    ),
+                    (
+                        ".npmrc",
+                        include_str!("./template/service/typescript/.npmrc.j2"),
+                    ),
+                    (
+                        "docker-entrypoint.sh",
+                        include_str!("./template/service/typescript/docker-entrypoint.sh.j2"),
+                    ),
+                    (
+                        "jest.config.js",
+                        include_str!("./template/service/typescript/jest.config.js.j2"),
+                    ),
+                    (
+                        ".prettierignore",
+                        include_str!("./template/service/typescript/.prettierignore.j2"),
+                    ),
+                    (
+                        ".prettierrc.js",
+                        include_str!("./template/service/typescript/.prettierrc.js.j2"),
+                    ),
+                    (
+                        "tsconfig.json",
+                        include_str!("./template/service/typescript/tsconfig.json.j2"),
+                    ),
+                ]
+            }
+        },
     }
 }
 
