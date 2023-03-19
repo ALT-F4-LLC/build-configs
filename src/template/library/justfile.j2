@@ -1,0 +1,51 @@
+#░█▀█░█░█░▀█▀░█▀█░░░░░█▀▀░█▀▀░█▀█░█▀▀░█▀▄░█▀█░▀█▀░█▀▀░█▀▄
+#░█▀█░█░█░░█░░█░█░▄▄▄░█░█░█▀▀░█░█░█▀▀░█▀▄░█▀█░░█░░█▀▀░█░█
+#░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
+# DO NOT UPDATE: This file is managed by "build-configs"
+
+set shell := ["bash", "-c"]
+
+build sha: 
+  docker buildx build \
+    --progress "plain" \
+    --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}" \
+    .
+
+clean:
+    rm -rf coverage/
+    rm -rf node_modules/
+    rm -rf index.js.map
+    rm -rf index.js
+    rm -rf index.d.ts
+
+    find ./lib -name "*.map" | xargs rm -rf {} \;
+    find ./lib -name "*.d.ts" | xargs rm -rf {} \;
+    find ./lib -name "*.js" | xargs rm -rf {} \;
+
+login:
+    aws ecr get-login-password \
+      --region "us-west-2" | docker login \
+        --password-stdin \
+        --username AWS \
+            "{{ dockerfile.registry }}"
+
+install: clean
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        yarn install
+
+lint:
+    npx eslint .
+
+test $PULUMI_TEST_MODE="true" +FILES="":
+    npx jest \
+        --collectCoverage \
+        --runInBand \
+        {% raw %}{{FILES}}{% endraw %}
+
+publish:
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        npm publish
+
+push sha:
+  docker image push \
+    "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}"

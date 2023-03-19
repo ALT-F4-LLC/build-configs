@@ -1,0 +1,83 @@
+#░█▀█░█░█░▀█▀░█▀█░░░░░█▀▀░█▀▀░█▀█░█▀▀░█▀▄░█▀█░▀█▀░█▀▀░█▀▄
+#░█▀█░█░█░░█░░█░█░▄▄▄░█░█░█▀▀░█░█░█▀▀░█▀▄░█▀█░░█░░█▀▀░█░█
+#░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
+# DO NOT UPDATE: This file is managed by "build-configs"
+
+FROM public.ecr.aws/docker/library/node:18-alpine3.16 as build
+{%- if dependencies.private %}
+
+ARG NPM_TOKEN
+{%- endif %}
+{% if service.database %}
+ENV DOCKERIZE_VERSION v0.6.1
+{% endif %}
+RUN apk add --no-cache \
+    bash \
+    curl \
+{%- if service.database %}
+    wget \
+{%- endif %}
+{%- if service.database %}
+    && wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+{%- endif %}
+    && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+{% if service.database %}
+RUN yarn global add envsub@4.0.7
+{% endif %}
+WORKDIR /usr/src/app
+
+COPY {% if dependencies.private %}.npmrc {% endif %}package.json yarn.lock ./
+{% if dependencies.private %}
+RUN yarn install --frozen-lockfile \
+    && rm -rf .npmrc
+{% else %}
+RUN yarn install --frozen-lockfile
+{% endif %}
+COPY .eslintignore ./.eslintignore
+COPY .eslintrc.js ./.eslintrc.js
+COPY .prettierignore ./.eslintignore
+COPY .prettierrc.js ./.eslintrc.js
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+COPY justfile ./justfile
+COPY src ./src
+COPY tsconfig.json ./tsconfig.json
+{% for command in dockerfile.build_post_install -%}
+{{ command | safe }}
+{% endfor %}
+RUN yarn build
+
+ENTRYPOINT [ "./docker-entrypoint.sh" ]
+
+
+FROM public.ecr.aws/docker/library/node:18-alpine3.16 as service
+
+{%- if dependencies.private %}
+
+ARG NPM_TOKEN
+{%- endif %}
+{% if service.database %}
+RUN yarn global add envsub@4.0.7
+{% endif %}
+WORKDIR /usr/src/app
+
+COPY {% if dependencies.private %}.npmrc {% endif %}package.json yarn.lock ./
+{% if dependencies.private %}
+RUN yarn install \
+    --frozen-lockfile \
+    --production \
+    && rm -rf .npmrc
+{% else %}
+RUN yarn install \
+    --frozen-lockfile \
+    --production
+{% endif %}
+COPY --from=build /usr/src/app/dist .
+COPY docker-entrypoint.sh .
+{% for command in dockerfile.service_post_install -%}
+{{ command | safe }}
+{% endfor %}
+EXPOSE 9001
+
+ENTRYPOINT [ "./docker-entrypoint.sh" ]
