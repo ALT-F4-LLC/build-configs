@@ -7,6 +7,4 @@
 {%- if pulumi.eks_cluster != "" -%}
 .kube/
 {%- endif %}
-{% if language == "typescript" -%}
 /node_modules/
-{%- endif %}
