@@ -1,0 +1,63 @@
+#░█▀█░█░█░▀█▀░█▀█░░░░░█▀▀░█▀▀░█▀█░█▀▀░█▀▄░█▀█░▀█▀░█▀▀░█▀▄
+#░█▀█░█░█░░█░░█░█░▄▄▄░█░█░█▀▀░█░█░█▀▀░█▀▄░█▀█░░█░░█▀▀░█░█
+#░▀░▀░▀▀▀░░▀░░▀▀▀░░░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀░▀░░▀░░▀▀▀░▀▀░
+# DO NOT UPDATE: This file is managed by "build-configs"
+
+set shell := ["bash", "-c"]
+
+build sha:
+  docker buildx build \
+    --progress "plain" \
+    --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}-build" \
+    --target "build" \
+    .
+
+  docker buildx build \
+    --cache-from "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}-build" \
+    --progress "plain" \
+    --tag "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}" \
+    .
+
+login:
+    aws ecr get-login-password \
+      --region "us-west-2" | docker login \
+        --password-stdin \
+        --username AWS \
+            "{{ dockerfile.registry }}"
+
+pull sha:
+    docker image pull \
+        "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}"
+
+push sha:
+  docker image push \
+    "{{ dockerfile.registry }}/{{ product }}-{{ name }}:{% raw %}{{sha}}{% endraw %}"
+
+preview stack:
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        pulumi preview \
+            --diff \
+            --non-interactive \
+            --stack "{% raw %}{{stack}}{% endraw %}"
+
+refresh stack:
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        pulumi refresh \
+            --diff \
+            --non-interactive \
+            --skip-preview \
+            --stack "{% raw %}{{stack}}{% endraw %}" \
+            --yes
+
+update stack:
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        pulumi update \
+          --diff \
+          --non-interactive \
+          --stack "{% raw %}{{stack}}{% endraw %}" \
+          --yes
+{% if pulumi.eks_cluster != "" %}
+update-kubeconfig:
+    doppler run --config "circleci" --project "{{ product }}-{{ name }}" -- \
+        aws eks update-kubeconfig --name "{{ pulumi.eks_cluster }}"
+{% endif -%}

@@ -18,7 +18,6 @@ pub struct Dependencies {
 #[strum(serialize_all = "lowercase")]
 pub enum Language {
     Go,
-    Nix,
     Rust,
     TypeScript,
 }
