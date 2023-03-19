@@ -15,80 +15,102 @@ pub struct TemplateFile<'a> {
 
 pub fn get_templates(config: &Configuration) -> Vec<(&str, &str)> {
     match config.template {
-        Template::Library => {
-            vec![
-                (
-                    ".circleci/config.yml",
-                    include_str!("./template/library/.circleci/config.yml.j2"),
-                ),
-                (
-                    "Dockerfile",
-                    include_str!("./template/library/Dockerfile.j2"),
-                ),
-                (
-                    ".eslintignore",
-                    include_str!("./template/library/Dockerfile.j2"),
-                ),
-                (
-                    ".eslintrc.js",
-                    include_str!("./template/library/Dockerfile.j2"),
-                ),
-                (
-                    ".gitignore",
-                    include_str!("./template/library/.gitignore.j2"),
-                ),
-                (
-                    "jest.config.js",
-                    include_str!("./template/library/jest.config.js.j2"),
-                ),
-                ("justfile", include_str!("./template/library/justfile.j2")),
-                (
-                    ".npmignore",
-                    include_str!("./template/library/.npmignore.j2"),
-                ),
-                (
-                    ".prettierignore",
-                    include_str!("./template/library/.prettierignore.j2"),
-                ),
-                (
-                    ".prettierrc.js",
-                    include_str!("./template/library/.prettierrc.js.j2"),
-                ),
-                (
-                    "tsconfig.json",
-                    include_str!("./template/library/tsconfig.json.j2"),
-                ),
-            ]
-        }
-        Template::Pulumi => {
-            vec![
-                (
-                    ".circleci/config.yml",
-                    include_str!("./template/pulumi/.circleci/config.yml.j2"),
-                ),
-                (
-                    ".dockerignore",
-                    include_str!("./template/pulumi/.dockerignore.j2"),
-                ),
-                (
-                    ".gitignore",
-                    include_str!("./template/pulumi/.gitignore.j2"),
-                ),
-                (
-                    "Dockerfile",
-                    include_str!("./template/pulumi/Dockerfile.j2"),
-                ),
-                (
-                    "Pulumi.yaml",
-                    include_str!("./template/pulumi/Pulumi.yaml.j2"),
-                ),
-                ("justfile", include_str!("./template/pulumi/justfile.j2")),
-                (
-                    "tsconfig.json",
-                    include_str!("./template/pulumi/tsconfig.json.j2"),
-                ),
-            ]
-        }
+        Template::Library => match config.language {
+            Language::Go => {
+                vec![]
+            }
+            Language::Rust => {
+                vec![]
+            }
+            Language::TypeScript => {
+                vec![
+                    (
+                        ".circleci/config.yml",
+                        include_str!("./template/library/typescript/.circleci/config.yml.j2"),
+                    ),
+                    (
+                        "Dockerfile",
+                        include_str!("./template/library/typescript/Dockerfile.j2"),
+                    ),
+                    (
+                        ".eslintignore",
+                        include_str!("./template/library/typescript/Dockerfile.j2"),
+                    ),
+                    (
+                        ".eslintrc.js",
+                        include_str!("./template/library/typescript/Dockerfile.j2"),
+                    ),
+                    (
+                        ".gitignore",
+                        include_str!("./template/library/typescript/.gitignore.j2"),
+                    ),
+                    (
+                        "jest.config.js",
+                        include_str!("./template/library/typescript/jest.config.js.j2"),
+                    ),
+                    (
+                        "justfile",
+                        include_str!("./template/library/typescript/justfile.j2"),
+                    ),
+                    (
+                        ".npmignore",
+                        include_str!("./template/library/typescript/.npmignore.j2"),
+                    ),
+                    (
+                        ".prettierignore",
+                        include_str!("./template/library/typescript/.prettierignore.j2"),
+                    ),
+                    (
+                        ".prettierrc.js",
+                        include_str!("./template/library/typescript/.prettierrc.js.j2"),
+                    ),
+                    (
+                        "tsconfig.json",
+                        include_str!("./template/library/typescript/tsconfig.json.j2"),
+                    ),
+                ]
+            }
+        },
+        Template::Pulumi => match config.language {
+            Language::Go => {
+                vec![]
+            }
+            Language::Rust => {
+                vec![]
+            }
+            Language::TypeScript => {
+                vec![
+                    (
+                        ".circleci/config.yml",
+                        include_str!("./template/pulumi/typescript/.circleci/config.yml.j2"),
+                    ),
+                    (
+                        ".dockerignore",
+                        include_str!("./template/pulumi/typescript/.dockerignore.j2"),
+                    ),
+                    (
+                        ".gitignore",
+                        include_str!("./template/pulumi/typescript/.gitignore.j2"),
+                    ),
+                    (
+                        "Dockerfile",
+                        include_str!("./template/pulumi/typescript/Dockerfile.j2"),
+                    ),
+                    (
+                        "Pulumi.yaml",
+                        include_str!("./template/pulumi/typescript/Pulumi.yaml.j2"),
+                    ),
+                    (
+                        "justfile",
+                        include_str!("./template/pulumi/typescript/justfile.j2"),
+                    ),
+                    (
+                        "tsconfig.json",
+                        include_str!("./template/pulumi/typescript/tsconfig.json.j2"),
+                    ),
+                ]
+            }
+        },
         Template::Service => match config.language {
             Language::Go => {
                 vec![
