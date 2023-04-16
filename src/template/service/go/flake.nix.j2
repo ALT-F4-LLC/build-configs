@@ -7,27 +7,27 @@
       perSystem = { config, self', inputs', pkgs, system, ... }:
         let
           packageName = "{% if product != "altf4llc" %}{{ product }}-{% endif %}{{ name }}";
-          packageVersion = "{{ service.version }}";
+          packageVersion = "{{ version }}";
         in
         {
           packages = {
             default = pkgs.buildGoModule {
               pname = packageName;
               src = ./.;
-              vendorSha256 = "{{ service.package.vendor_sha256 }}";
+              vendorSha256 = "{{ flake.package.vendor_sha256 }}";
               version = packageVersion;
-{%- if service.package.build_inputs | length > 0 %}
+{%- if flake.package.build_inputs | length > 0 %}
 
               buildInputs = with pkgs; [
-                {%- for input in service.package.build_inputs %}
+                {%- for input in flake.package.build_inputs %}
                 {{ input }}
                 {%- endfor %}
               ];
 {%- endif %}
-{%- if service.package.native_build_inputs | length > 0 %}
+{%- if flake.package.native_build_inputs | length > 0 %}
 
               nativeBuildInputs = with pkgs; [
-                {%- for input in service.package.native_build_inputs %}
+                {%- for input in flake.package.native_build_inputs %}
                 {{ input }}
                 {%- endfor %}
               ];
@@ -56,16 +56,16 @@
           };
 
           devShells.default = pkgs.mkShell {
-{%- if service.devshell.build_inputs | length > 0 %}
+{%- if flake.devshell.build_inputs | length > 0 %}
               buildInputs = with pkgs; [
-                {%- for input in service.devshell.build_inputs %}
+                {%- for input in flake.devshell.build_inputs %}
                 {{ input }}
                 {%- endfor %}
               ];
 {% endif %}
-{%- if service.devshell.native_build_inputs | length > 0 %}
+{%- if flake.devshell.native_build_inputs | length > 0 %}
               nativeBuildInputs = with pkgs; [
-                {%- for input in service.devshell.native_build_inputs %}
+                {%- for input in flake.devshell.native_build_inputs %}
                 {{ input }}
                 {%- endfor %}
               ];

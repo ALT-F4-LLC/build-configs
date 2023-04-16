@@ -3,6 +3,7 @@ use std::vec;
 use strum_macros::Display;
 
 mod dockerfile;
+mod flake;
 mod library;
 mod pulumi;
 mod service;
@@ -56,6 +57,9 @@ pub struct Configuration {
     #[serde(default = "default_environments")]
     pub environments: Vec<String>,
 
+    #[serde(default = "flake::default_config")]
+    pub flake: flake::Configuration,
+
     #[serde(default = "library::default_library")]
     pub library: library::Configuration,
 
@@ -67,6 +71,9 @@ pub struct Configuration {
 
     #[serde(default = "service::default_config")]
     pub service: service::Configuration,
+
+    #[serde(default = "default_version")]
+    pub version: String,
 }
 
 fn default_dependencies_private() -> bool {
@@ -85,4 +92,8 @@ fn default_environments() -> Vec<String> {
 
 fn default_product() -> Product {
     Product::AltF4Llc
+}
+
+fn default_version() -> String {
+    "0.1.0".to_string()
 }
