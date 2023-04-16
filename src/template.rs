@@ -213,13 +213,11 @@ pub fn get_templates(config: &Configuration) -> Vec<(&str, &str)> {
 
 pub fn render_templates(config: &Configuration) -> Result<()> {
     let template_files = get_templates(&config);
-
     let mut tera = Tera::default();
 
     tera.add_raw_templates(template_files.clone())?;
 
     let test_unit = "unit".to_string();
-
     let test_unit_included = config.service.tests.contains(&test_unit);
 
     for (key, _) in template_files {

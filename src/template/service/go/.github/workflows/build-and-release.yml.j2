@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: cachix/install-nix-action@v20
-
+{% if flake.binary_cache %}
     - uses: cachix/cachix-action@v12
       with:
         {% if product != "altf4llc" -%}
@@ -23,13 +23,13 @@ jobs:
         authToken: {% raw %}${{ secrets.CACHIX_AUTH_TOKEN }}{% endraw %}
         name: {% raw %}{{ CACHIX_CACHE_NAME }}{% endraw %}
         {%- endif %}
-
+{% endif %}
     - uses: actions/checkout@v3
 
     - name: Build binary
       run: |
         nix build --json > output.json
-
+{% if flake.binary_cache %}
     - name: Cache binary
       run: |
         cat output.json \
@@ -49,3 +49,4 @@ jobs:
             {%- else %}
             | cachix push {% raw %}'${{ vars.CACHIX_CACHE_NAME }}'{% endraw %}
             {%- endif %}
+{% endif -%}
