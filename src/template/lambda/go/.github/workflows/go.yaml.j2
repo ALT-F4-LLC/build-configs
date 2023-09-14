@@ -1,0 +1,29 @@
+name: go
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["*"]
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - uses: extractions/setup-just@v1
+
+      - run: just package
+        if: github.ref != 'refs/heads/main'
+
+      - run: just deploy dev
+        if: github.ref == 'refs/heads/main'
+        env:
+          AWS_ACCESS_KEY_ID: ${% raw %}{{ secrets.AWS_ACCESS_KEY_ID }}{% endraw %}
+          AWS_DEFAULT_REGION: ${% raw %}{{ secrets.AWS_DEFAULT_REGION }}{% endraw %}
+          AWS_SECRET_ACCESS_KEY: ${% raw %}{{ secrets.AWS_SECRET_ACCESS_KEY }}{% endraw %}
