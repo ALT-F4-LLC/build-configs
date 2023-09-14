@@ -28,15 +28,14 @@ pub enum Language {
 #[strum(serialize_all = "lowercase")]
 pub enum Product {
     AltF4Llc,
-    AyaLivingInc,
     Quirk,
-    RecordingPipeline,
 }
 
 #[derive(Serialize, Deserialize, Debug, Display)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum Template {
+    Lambda,
     Library,
     Pulumi,
     Service,

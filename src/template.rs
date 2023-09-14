@@ -137,14 +137,8 @@ pub fn get_templates(config: &Configuration) -> Vec<(&str, &str)> {
             Language::Go => {
                 vec![
                     (
-                        ".github/workflows/build-and-release.yml",
-                        include_str!(
-                            "./template/service/go/.github/workflows/build-and-release.yml.j2"
-                        ),
-                    ),
-                    (
-                        "flake.nix",
-                        include_str!("./template/service/go/flake.nix.j2"),
+                        ".github/workflows/flake.yml",
+                        include_str!("./template/service/go/.github/workflows/flake.yml.j2"),
                     ),
                     (
                         ".gitignore",
@@ -206,6 +200,33 @@ pub fn get_templates(config: &Configuration) -> Vec<(&str, &str)> {
                         include_str!("./template/service/typescript/tsconfig.json.j2"),
                     ),
                 ]
+            }
+        },
+        Template::Lambda => match config.language {
+            Language::Go => {
+                vec![
+                    (
+                        ".github/workflows/go.yaml",
+                        include_str!("./template/lambda/go/.github/workflows/go.yaml.j2"),
+                    ),
+                    (
+                        ".github/workflows/golangci-lint.yaml",
+                        include_str!(
+                            "./template/lambda/go/.github/workflows/golangci-lint.yaml.j2"
+                        ),
+                    ),
+                    (
+                        ".gitignore",
+                        include_str!("./template/lambda/go/.gitignore.j2"),
+                    ),
+                    ("justfile", include_str!("./template/lambda/go/justfile.j2")),
+                ]
+            }
+            Language::Rust => {
+                vec![]
+            }
+            Language::TypeScript => {
+                vec![]
             }
         },
     }

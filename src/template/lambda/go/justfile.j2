@@ -1,0 +1,23 @@
+generate rest_api_id stage_name:
+    aws apigateway get-export \
+        --export-type "oas30" \
+        --rest-api-id "{% raw %}{{ rest_api_id }}{% endraw %}" \
+        --stage-name "{% raw %}{{ stage_name }}{% endraw %}" \
+        openapi-spec.json | jq -r "."
+    rm -rf internal/quirk_private
+    mkdir -p internal/quirk_private
+    oapi-codegen \
+        -generate "types,client" \
+        -package quirk_private \
+        openapi-spec.json > internal/quirk_private/client.gen.go
+
+package:
+    GOOS=linux GOARCH=amd64 go build -tags lambda.norpc ./cmd/bootstrap
+    zip lambda.zip bootstrap
+
+deploy environment: package
+    aws lambda update-function-code \
+        --function-name "{% if product != 'altf4llc' %}{{ product }}-{% endif %}{{ name }}-{% raw %}{{ environment }}{% endraw %}" \
+        --output json \
+        --zip-file "fileb://lambda.zip" \
+        | jq ".CodeSha256"
