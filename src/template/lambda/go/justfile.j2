@@ -12,7 +12,8 @@ generate rest_api_id stage_name:
         openapi-spec.json > internal/quirk_private/client.gen.go
 
 package:
-    GOOS=linux GOARCH=amd64 go build -tags lambda.norpc ./cmd/bootstrap
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+        go build -ldflags="-s -w" -tags lambda.norpc ./cmd/bootstrap
     zip lambda.zip bootstrap
 
 deploy environment: package
