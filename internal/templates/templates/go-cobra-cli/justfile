@@ -6,7 +6,7 @@ build profile='default'{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{
         {{- if .PrivateModules }}
         --sandbox \
         --sandbox-paths "{{"{{"}} netrc {{"}}"}}" \
-        {{ end -}}
+        {{- end }}
         '.#{{"{{"}} profile {{"}}"}}'
 
 build-docker{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}: (build 'docker'{{ if .PrivateModules }} netrc{{ end }})
