@@ -17,23 +17,23 @@ type Config struct {
 }
 
 func New(configPath string) (Config, error) {
-	b, err := os.ReadFile(configPath)
+	b, err := os.ReadFile("./" + configPath)
 	if err != nil {
 		return Config{}, err
 	}
 
 	ext := path.Ext(configPath)
 	switch ext {
-	case "json":
+	case ".json":
 		return loadConfigJson(b)
-	case "yaml", "yml":
+	case ".yaml", ".yml":
 		return loadConfigYaml(b)
 	}
 
 	return Config{}, errors.New("unsupported file type; supported types are 'json', 'yaml' and 'yml'")
 }
 
-func (c Config) GetTemplateParams() (Templater, error) {
+func (c Config) GetTemplater() (Templater, error) {
 	switch c.Template {
 	case "go-cobra-cli":
 		var params GoCobraCliConfig

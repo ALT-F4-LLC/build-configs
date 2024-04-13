@@ -21,5 +21,5 @@ func Execute() error {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "D", false, "debug mode")
-	rootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "c", "build-configs.json", "path to the config file")
+	rootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "c", "", "path to the config file")
 }

@@ -12,14 +12,21 @@ var generateCmd = &cobra.Command{
 	Short: "Generates configuration from a project config file.",
 
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if configFile == "" {
+			configFile = config.FindConfigPath()
+		}
+
 		cfg, err := config.New(configFile)
 		if err != nil {
 			return fmt.Errorf("could not load config: %v", err)
 		}
 
+		t, err := cfg.GetTemplater()
+		if err != nil {
+			return fmt.Errorf("could not create templater: %v", err)
+		}
 
-
-		return nil
+		return t.Render()
 	},
 }
 
