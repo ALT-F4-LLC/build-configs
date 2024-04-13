@@ -16,6 +16,7 @@ var goCobraCliTemplates = []string{
 type GoCobraCliConfig struct {
 	Config
 	Nix NixGoConfig `json:"nix,omitempty" yaml:"nix,omitempty"`
+	PrivateModules string `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
 }
 
 func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
