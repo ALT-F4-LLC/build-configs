@@ -2,8 +2,8 @@
 issues:
   exclude:
     {{ range .Lint.Exclude -}}
-    - "{{ . }}"
+    - {{ . }}
     {{- end }}
     {{ range .Lint.ExtraExclude -}}
-    - "{{ . }}"
+    - {{ . }}
     {{- end }}

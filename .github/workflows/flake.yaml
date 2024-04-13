@@ -31,5 +31,5 @@ jobs:
         with:
           authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
           name: ${{ env.CACHIX_BINARY_CACHE }}
-      - uses: actions/checkout@v4
-      - run: nix develop -c just build
+- uses: actions/checkout@v4
+- run: nix develop -c just build

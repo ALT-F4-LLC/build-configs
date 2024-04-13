@@ -26,7 +26,9 @@ var generateCmd = &cobra.Command{
 			return fmt.Errorf("could not create templater: %v", err)
 		}
 
-		fmt.Printf("%+v\n", t)
+		if debug {
+			fmt.Printf("%+v\n", t)
+		}
 
 		return t.Render()
 	},
