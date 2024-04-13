@@ -1,0 +1,8 @@
+---
+name: build-configs
+template: go-cobra-cli
+parameters:
+  nix:
+    vendorHash: ''
+    goPackage: go_1_22
+    buildGoModule: buildGo122Module
