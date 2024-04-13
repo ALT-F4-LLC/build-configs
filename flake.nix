@@ -23,7 +23,7 @@
           packages.default = pkgs.buildGo122Module {
             inherit name;
             src = ./.;
-            vendorHash = "";
+            vendorHash = "sha256-6B9O6ho4COpJy4HlkzQ0lk+ieezRO3xg9LyLHzoxYzc=";
             buildModules = [ "cmd/${name}" ];
           };
         };
