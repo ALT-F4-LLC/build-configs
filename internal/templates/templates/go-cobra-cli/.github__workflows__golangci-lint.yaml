@@ -1,0 +1,39 @@
+name: golangci-lint
+
+on:
+  pull_request:
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    env:
+      CGO_ENABLED: 0
+      GOPRIVATE: github.com/ALT-F4-LLC/quirk-service-kit
+    runs-on: ubuntu-latest
+    steps:
+      {{ if .PrivateModules }}
+      - id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID ${{"}}"}}
+          owner: ${{"{{"}} github.repository_owner ${{"}}"}}
+          private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY ${{"}}"}}
+      - uses: extractions/netrc@v2
+        with:
+          machine: github.com
+          password: ${{"{{"}} steps.generate-token.outputs.token ${{"}}"}}
+          username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER ${{"}}"}}
+      {{ end }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go mod download
+      - uses: golangci/golangci-lint-action@v4
+        with:
+          skip-pkg-cache: true
+          args: ./... --timeout=5m

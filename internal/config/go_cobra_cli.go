@@ -9,20 +9,30 @@ import (
 
 var goCobraCliTemplates = []string{
 	".editorconfig",
+	".envrc",
 	".github/workflows/flake.yaml",
+	".github/workflows/golangci-lint.yaml",
+	".golangci.yaml",
 	"flake.nix",
 	"justfile",
 }
 
 type GoCobraCliConfig struct {
 	Config
-	Nix            NixGoConfig `json:"nix,omitempty" yaml:"nix,omitempty"`
-	PrivateModules string      `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
+	Nix  NixGoConfig        `json:"nix,omitempty" yaml:"nix,omitempty"`
+	Lint GolangCILintConfig `json:"lint,omitempty" yaml:"lint,omitempty"`
+
+	PrivateModules string `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
+	GoVersion      string `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
 }
 
 func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 	return GoCobraCliConfig{
 		Config: c,
+
+		GoVersion: "1.22",
+
+		Lint: NewGolangCiLintConfig(),
 		Nix: NixGoConfig{
 			NixConfig:     NewNixConfig(),
 			GoPackage:     "go",
