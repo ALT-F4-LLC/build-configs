@@ -29,9 +29,8 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: cachix/cachix-action@v14
         with:
-          authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN $}}
-          name: ${{ env.CACHIX_BINARY_CACHE $}}
-      
+          authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
+          name: ${{ env.CACHIX_BINARY_CACHE }}
       - uses: actions/checkout@v4
-      
       - run: nix develop -c just build
+      
