@@ -23,7 +23,7 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 	return GoCobraCliConfig{
 		Config: c,
 		Nix: NixGoConfig{
-			NixConfig:     NixConfig{NixpkgsBranch: "unstable"},
+			NixConfig:     NewNixConfig(),
 			GoPackage:     "go",
 			BuildGoModule: "buildGoModule",
 		},
