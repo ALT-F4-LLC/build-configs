@@ -15,7 +15,6 @@ jobs:
       GOPRIVATE: github.com/ALT-F4-LLC/quirk-service-kit
     runs-on: ubuntu-latest
     steps:
-      
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:

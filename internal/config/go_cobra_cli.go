@@ -1,21 +1,10 @@
 package config
 
 import (
-	"os"
-	"strings"
+	"text/template"
 
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
-
-var goCobraCliTemplates = []string{
-	".editorconfig",
-	".envrc",
-	".github/workflows/flake.yaml",
-	".github/workflows/golangci-lint.yaml",
-	".golangci.yaml",
-	"flake.nix",
-	"justfile",
-}
 
 type GoCobraCliConfig struct {
 	Config
@@ -42,30 +31,24 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 }
 
 func (c GoCobraCliConfig) Render() error {
-	out := map[string]string{}
-
-	for _, tmplPath := range goCobraCliTemplates {
-		sb := strings.Builder{}
-		err := templates.GoCobraCliTemplates.ExecuteTemplate(
-			&sb,
-			templates.PathToTemplate(tmplPath),
-			c,
-		)
-		if err != nil {
-			return err
-		}
-		out["./"+tmplPath] = sb.String()
+	files, err := templates.RenderTemplates(map[*template.Template][]string{
+		templates.AllCommonTemplates: {
+			".envrc",
+		},
+		templates.GoCommonTemplates: {
+			".editorconfig",
+			".github/workflows/golangci-lint.yaml",
+			".golangci.yaml",
+		},
+		templates.GoCobraCliTemplates: {
+			".github/workflows/flake.yaml",
+			"flake.nix",
+			"justfile",
+		},
+	}, c)
+	if err != nil {
+		return err
 	}
 
-	for k, v := range out {
-		if err := templates.EnsureDirExists(k); err != nil {
-			return err
-		}
-
-		if err := os.WriteFile(k, []byte(v), 0644); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return templates.WriteFiles(files)
 }

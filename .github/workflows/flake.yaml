@@ -33,4 +33,3 @@ jobs:
           name: ${{ env.CACHIX_BINARY_CACHE }}
       - uses: actions/checkout@v4
       - run: nix develop -c just build
-      

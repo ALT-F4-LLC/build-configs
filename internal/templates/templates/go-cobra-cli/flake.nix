@@ -30,7 +30,7 @@
 
             docker = pkgs.dockerTools.buildImage {
               inherit name;
-              tag = version;
+              tag = "latest";
               config = {
                 Entrypoint = [ "${config.packages.default}/bin/${name}" ];
                 Env = [

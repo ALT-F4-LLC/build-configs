@@ -20,11 +20,24 @@
             inputsFrom = [ config.packages.default ];
           };
 
-          packages.default = pkgs.buildGo122Module {
-            inherit name;
-            src = ./.;
-            vendorHash = "sha256-6B9O6ho4COpJy4HlkzQ0lk+ieezRO3xg9LyLHzoxYzc=";
-            buildModules = [ "cmd/${name}" ];
+          packages = {
+            default = pkgs.buildGo122Module {
+              inherit name;
+              src = ./.;
+              vendorHash = "sha256-6B9O6ho4COpJy4HlkzQ0lk+ieezRO3xg9LyLHzoxYzc=";
+              buildModules = [ "cmd/${name}" ];
+            };
+
+            docker = pkgs.dockerTools.buildImage {
+              inherit name;
+              tag = "latest";
+              config = {
+                Entrypoint = [ "${config.packages.default}/bin/${name}" ];
+                Env = [
+                  "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+                ];
+              };
+            };
           };
         };
   };
