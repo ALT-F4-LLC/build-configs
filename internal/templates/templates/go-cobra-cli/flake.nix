@@ -20,11 +20,24 @@
             inputsFrom = [ config.packages.default ];
           };
 
-          packages.default = pkgs.{{ .Nix.BuildGoModule }} {
-            inherit name;
-            src = ./.;
-            vendorHash = "{{ .Nix.VendorHash }}";
-            buildModules = [ "cmd/${name}" ];
+          packages = {
+            default = pkgs.{{ .Nix.BuildGoModule }} {
+              inherit name;
+              src = ./.;
+              vendorHash = "{{ .Nix.VendorHash }}";
+              buildModules = [ "cmd/${name}" ];
+            };
+
+            docker = pkgs.dockerTools.buildImage {
+              inherit name;
+              tag = version;
+              config = {
+                Entrypoint = [ "${config.packages.default}/bin/${name}" ];
+                Env = [
+                  "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+                ];
+              };
+            };
           };
         };
   };
