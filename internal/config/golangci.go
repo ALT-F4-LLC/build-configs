@@ -1,8 +1,8 @@
 package config
 
 type GolangCILintConfig struct {
-	Exclude []string `json:"exclude,omitEmpty" yaml:"exclude,omitEmpty"`
-	ExtraExclude []string `json:"extraExclude,omitEmpty" yaml:"extraExclude,omitEmpty"`
+	Exclude      []string `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+	ExtraExclude []string `json:"extraExclude,omitempty" yaml:"extraExclude,omitempty"`
 }
 
 func NewGolangCiLintConfig() GolangCILintConfig {
