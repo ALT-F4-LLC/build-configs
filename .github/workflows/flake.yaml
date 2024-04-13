@@ -7,7 +7,7 @@ on:
   pull_request:
 
 env:
-  CACHIX_BINARY_CACHE: altf4llc
+  CACHIX_BINARY_CACHE: altf4llc-os
 
 jobs:
   check:
