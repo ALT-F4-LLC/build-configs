@@ -1,10 +1,17 @@
 package templates
 
-import "embed"
+import (
+	"embed"
+	"text/template"
+)
 
-//go:embed templates
-var content embed.FS
+var (
+	//go:embed all:templates/go-cobra-cli/*
+	content embed.FS
 
-func RenderTemplate(name string, context interface{}) (string, error) {
-	return "", nil
+	GoCobraCliTemplates *template.Template
+)
+
+func init() {
+	GoCobraCliTemplates = template.Must(template.ParseFS(content, "templates/go-cobra-cli/*"))
 }

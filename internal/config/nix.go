@@ -6,6 +6,7 @@ type NixConfig struct {
 
 type NixGoConfig struct {
 	NixConfig
-	GoPackage string `json:"goPackage,omitempty" yaml:"goPackage,omitempty"`
+	GoPackage     string `json:"goPackage,omitempty" yaml:"goPackage,omitempty"`
 	BuildGoModule string `json:"buildGoModule,omitempty" yaml:"buildGoModule,omitempty"`
+	VendorHash    string `json:"vendorHash,omitempty" yaml:"vendorHash,omitempty"`
 }

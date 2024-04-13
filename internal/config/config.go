@@ -36,7 +36,7 @@ func New(configPath string) (Config, error) {
 func (c Config) GetTemplater() (Templater, error) {
 	switch c.Template {
 	case "go-cobra-cli":
-		var params GoCobraCliConfig
+		params := NewGoCobraCliConfig(c)
 		b, err := json.Marshal(c.Parameters)
 		if err != nil {
 			return params, err
