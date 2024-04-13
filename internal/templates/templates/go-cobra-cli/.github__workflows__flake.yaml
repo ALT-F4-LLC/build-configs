@@ -31,7 +31,7 @@ jobs:
         with:
           authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
           name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
-{{ if .PrivateModules -}}
+      {{ if .PrivateModules -}}
       - id: generate-token
         uses: actions/create-github-app-token@v1
         with:
@@ -45,11 +45,11 @@ jobs:
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
       {{- end -}}
       - uses: actions/checkout@v4
-{{ if .PrivateModules -}}
+      {{ if .PrivateModules -}}
       - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
       {{- end -}}
       - run: nix develop -c just build
-{{ if .PrivateModules -}}
+      {{ if .PrivateModules -}}
       - run: rm -rf /tmp/.netrc
         if: success() || failure()
       {{- end -}}
