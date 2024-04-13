@@ -1,87 +1,31 @@
 {
-  description = "Build configuration generation CLI tool.";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 
-  inputs = {
-    advisory-db = {
-      url = "github:rustsec/advisory-db";
-      flake = false;
-    };
+  outputs = inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
 
-    crane = {
-      url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+      perSystem = { config, pkgs, ... }:
+        let
+          inherit (pkgs)
+            go_1_22
+            just;
 
-    flake-utils.url = "github:numtide/flake-utils";
+          name = "build-configs";
+          CGO_ENABLED = "0";
+        in
+        {
+          devShells.default = pkgs.mkShell {
+            buildInputs = [ just ];
+            inputsFrom = [ config.packages.default ];
+          };
 
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+          packages.default = pkgs.buildGo122Module {
+            inherit name;
+            src = ./.;
+            vendorHash = "";
+            buildModules = [ "cmd/${name}" ];
+          };
+        };
   };
-
-  outputs = { self, nixpkgs, crane, flake-utils, advisory-db, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-
-        inherit (pkgs) lib;
-
-        craneLib = crane.lib.${system};
-
-        src = lib.cleanSourceWith {
-          filter = templatesOrCargo;
-          src = ./.;
-        };
-
-        buildInputs = [ ]
-          ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
-
-        cargoArtifacts = craneLib.buildDepsOnly { inherit src buildInputs; };
-
-        build-configs =
-          craneLib.buildPackage { inherit cargoArtifacts src buildInputs; };
-
-        templatesFilter = path: _type: builtins.match ".*template.*" path != null;
-
-        templatesOrCargo = path: type:
-          (templatesFilter path type) || (craneLib.filterCargoSources path type);
-      in {
-        checks = {
-          inherit build-configs;
-
-          build-configs-clippy = craneLib.cargoClippy {
-            inherit cargoArtifacts src buildInputs;
-
-            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-          };
-
-          build-configs-doc =
-            craneLib.cargoDoc { inherit cargoArtifacts src buildInputs; };
-
-          build-configs-fmt = craneLib.cargoFmt { inherit src; };
-
-          build-configs-audit =
-            craneLib.cargoAudit { inherit src advisory-db; };
-
-          build-configs-nextest = craneLib.cargoNextest {
-            inherit cargoArtifacts src buildInputs;
-            partitions = 1;
-            partitionType = "count";
-          };
-        } // lib.optionalAttrs (system == "x86_64-linux") {
-          build-configs-coverage =
-            craneLib.cargoTarpaulin { inherit cargoArtifacts src; };
-        };
-
-        packages.default = build-configs;
-
-        apps.default = flake-utils.lib.mkApp { drv = build-configs; };
-
-        devShells.default = pkgs.mkShell {
-          inputsFrom = builtins.attrValues self.checks;
-
-          buildInputs = [ ]
-            ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
-
-          nativeBuildInputs = with pkgs; [ cargo rustc ];
-        };
-      });
 }

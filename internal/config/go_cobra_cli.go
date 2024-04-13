@@ -11,12 +11,13 @@ var goCobraCliTemplates = []string{
 	".editorconfig",
 	".github/workflows/flake.yaml",
 	"flake.nix",
+	"justfile",
 }
 
 type GoCobraCliConfig struct {
 	Config
-	Nix NixGoConfig `json:"nix,omitempty" yaml:"nix,omitempty"`
-	PrivateModules string `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
+	Nix            NixGoConfig `json:"nix,omitempty" yaml:"nix,omitempty"`
+	PrivateModules string      `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
 }
 
 func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
@@ -43,12 +44,15 @@ func (c GoCobraCliConfig) Render() error {
 		if err != nil {
 			return err
 		}
-		out["./" + tmplPath] = sb.String()
+		out["./"+tmplPath] = sb.String()
 	}
 
 	for k, v := range out {
-		b := []byte(v)
-		if err := os.WriteFile(k, b, os.ModeAppend); err != nil {
+		if err := templates.EnsureDirExists(k); err != nil {
+			return err
+		}
+
+		if err := os.WriteFile(k, []byte(v), 0644); err != nil {
 			return err
 		}
 	}

@@ -3,14 +3,17 @@ package config
 type NixConfig struct {
 	Cachix        NixCachixConfig `json:"cachix,omitempty" yaml:"cachix,omitempty"`
 	NixpkgsBranch string          `json:"nixpkgsBranch,omitempty" yaml:"nixpkgsBranch,omitempty"`
+	Systems       []string        `json:"systems,omitempty" yaml:"systems,omitempty"`
 }
 
 func NewNixConfig() NixConfig {
 	return NixConfig{
-		NixpkgsBranch: "nixpkgs-unstable",
 		Cachix: NixCachixConfig{
 			BinaryCache: "altf4llc",
 		},
+
+		NixpkgsBranch: "nixpkgs-unstable",
+		Systems:       []string{"x86_64-linux", "aarch64-linux", "x86_64-darwin", "aarch64-darwin"},
 	}
 }
 

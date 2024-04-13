@@ -3,7 +3,7 @@
 
   outputs = inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [ ];
+      systems = [ {{range .Nix.Systems}}"{{.}}" {{end}}];
 
       perSystem = { config, pkgs, ... }:
         let
