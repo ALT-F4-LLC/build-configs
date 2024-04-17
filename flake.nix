@@ -12,6 +12,7 @@
             just;
 
           name = "build-configs";
+          version = "0.1.0";
           CGO_ENABLED = "0";
         in
         {
@@ -22,7 +23,10 @@
 
           packages = {
             default = pkgs.buildGo122Module {
-              inherit name;
+              inherit name version;
+              GOFLAGS = [
+                "-ldflags='github.com/ALT-F4-LLC/build-configs/internal/cli.Version=${version}'"
+              ];
               src = ./.;
               vendorHash = "sha256-6B9O6ho4COpJy4HlkzQ0lk+ieezRO3xg9LyLHzoxYzc=";
               buildModules = [ "cmd/${name}" ];
