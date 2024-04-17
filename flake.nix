@@ -25,7 +25,7 @@
             default = pkgs.buildGo122Module {
               inherit name version;
               GOFLAGS = [
-                "-ldflags='github.com/ALT-F4-LLC/build-configs/internal/cli.Version=${version}'"
+                "-ldflags=github.com/ALT-F4-LLC/build-configs/internal/cli.Version=${version}"
               ];
               src = ./.;
               vendorHash = "sha256-6B9O6ho4COpJy4HlkzQ0lk+ieezRO3xg9LyLHzoxYzc=";
