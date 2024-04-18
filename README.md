@@ -20,6 +20,16 @@ $ nix profile install 'github:ALT-F4-LLC/build-configs#default' # with nix
 $ go install github.com/ALT-F4-LLC/build-configs@latest # with go
 ```
 
+## Usage
+
+To generate configuration with build-configs, you can use the `generate`
+subcommand in a directory with a `build-configs.yaml` or `build-configs.json`
+file present. See [Examples](#examples) for help with this.
+
+```shell
+$ build-configs generate
+```
+
 ## Examples
 
 Some example configurations for our template types exist in the
