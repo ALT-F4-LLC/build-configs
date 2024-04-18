@@ -1,0 +1,97 @@
+---
+name: Check, Build, Deploy*
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CACHIX_BINARY_CACHE: {{ .Nix.Cachix.BinaryCache }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+      - uses: actions/checkout@v4
+      - run: nix develop -c just check
+
+  build:
+    needs:
+      - check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile:
+          {{- range .Lambdas }}
+          - {{ . }}
+          {{- end }}
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+      {{- if .PrivateModules }}
+      - id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID {{"}}"}}
+          owner: ${{"{{"}} github.repository_owner {{"}}"}}
+          private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY {{"}}"}}
+      - uses: extractions/netrc@v2
+        with:
+          machine: github.com
+          password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
+          username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
+      {{- end }}
+      - uses: actions/checkout@v4
+      {{- if .PrivateModules }}
+      - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
+      {{- end }}
+      - run: nix develop -c just build "${{"{{"}} matrix.profile {{"}}"}}"
+      - run: nix develop -c just package "${{"{{"}} matrix.profile {{"}}"}}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
+          path: "dist/${{"{{"}} matrix.profile {{"}}"}}/lambda.zip"
+          if-no-files-found: error
+          retention-days: 7
+      {{- if .PrivateModules }}
+      - run: rm -rf /tmp/.netrc
+        if: success() || failure()
+      {{- end }}
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write
+      contents: read
+    needs: build
+    strategy:
+      matrix:
+        profile:
+          {{- range .Lambdas }}
+          - {{ . }}
+          {{- end }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: {{ .Deploy.Region }}
+          role-to-assume: {{ .Deploy.RoleARN }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
+          path: "dist/${{"{{"}} matrix.profile {{"}}"}}/lambda.zip"
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+      - run: nix develop -c just deploy dev "${{"{{"}} matrix.profile {{"}}"}}"

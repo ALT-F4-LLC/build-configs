@@ -4,21 +4,26 @@ import (
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
-type GoCobraCliConfig struct {
+type GoLambdaConfig struct {
 	Config
 	GoVersion      string             `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
 	Lint           GolangCILintConfig `json:"lint,omitempty" yaml:"lint,omitempty"`
 	Nix            NixGoConfig        `json:"nix,omitempty" yaml:"nix,omitempty"`
+	Quirk          QuirkConfig        `json:"quirk,omitempty" yaml:"quirk,omitempty"`
+	Deploy         DeployConfig       `json:"deploy,omitempty" yaml:"deploy,omitempty"`
 	PrivateModules string             `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
+	Lambdas        []string           `json:"lambdas,omitempty" yaml:"lambdas,omitempty"`
 }
 
-func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
-	return GoCobraCliConfig{
-		Config: c,
-
+func NewGoLambdaConfig(c Config) GoLambdaConfig {
+	return GoLambdaConfig{
+		Config:    c,
 		GoVersion: "1.22",
+		Lint:      NewGolangCiLintConfig(),
+		Quirk:     NewQuirkConfig(c),
+		Deploy:    NewDeployConfig(),
+		Lambdas:   []string{c.Name},
 
-		Lint: NewGolangCiLintConfig(),
 		Nix: NixGoConfig{
 			NixConfig:     NewNixConfig(),
 			GoPackage:     "go",
@@ -27,7 +32,7 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 	}
 }
 
-func (c GoCobraCliConfig) Render() error {
+func (c GoLambdaConfig) Render() error {
 	files, err := templates.RenderTemplates(templates.RenderMap{
 		templates.AllCommonTemplates: {
 			".envrc",
@@ -37,8 +42,9 @@ func (c GoCobraCliConfig) Render() error {
 			".github/workflows/golangci-lint.yaml",
 			".golangci.yaml",
 		},
-		templates.GoCobraCliTemplates: {
+		templates.GoLambdaTemplates: {
 			".github/workflows/flake.yaml",
+			"nix/lambda.nix",
 			"flake.nix",
 			"justfile",
 		},

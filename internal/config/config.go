@@ -45,6 +45,16 @@ func (c Config) GetTemplater() (Templater, error) {
 			return params, err
 		}
 		return params, nil
+	case "go-lambda":
+		params := NewGoLambdaConfig(c)
+		b, err := json.Marshal(c.Parameters)
+		if err != nil {
+			return params, err
+		}
+		if err := json.Unmarshal(b, &params); err != nil {
+			return params, err
+		}
+		return params, nil
 	}
 	return nil, fmt.Errorf("unsupported template: %v", c.Template)
 }

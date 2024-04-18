@@ -17,18 +17,28 @@ var (
 	//go:embed all:templates/go-cobra-cli/*
 	goCobraCliFS embed.FS
 
+	//go:embed all:templates/go-lambda/*
+	goLambdaFS embed.FS
+
 	AllCommonTemplates  *template.Template
 	GoCommonTemplates   *template.Template
 	GoCobraCliTemplates *template.Template
+	GoLambdaTemplates *template.Template
 )
+
+// RenderMap maps a template set to the filenames* that should be written.
+// * - filenames are the end result filenames, not the template names with
+// substitution placeholders.
+type RenderMap = map[*template.Template][]string
 
 func init() {
 	AllCommonTemplates = template.Must(template.ParseFS(allCommonFS, "templates/common/all/*"))
 	GoCommonTemplates = template.Must(template.ParseFS(goCommonFS, "templates/common/go/*"))
 	GoCobraCliTemplates = template.Must(template.ParseFS(goCobraCliFS, "templates/go-cobra-cli/*"))
+	GoLambdaTemplates = template.Must(template.ParseFS(goLambdaFS, "templates/go-lambda/*"))
 }
 
-func RenderTemplates(in map[*template.Template][]string, context any) (map[string]string, error) {
+func RenderTemplates(in RenderMap, context any) (map[string]string, error) {
 	files := map[string]string{}
 
 	for tmpl, set := range in {

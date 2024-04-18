@@ -1,0 +1,56 @@
+build profile{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
+    nix build \
+        --json \
+        --no-link \
+        --print-build-logs \
+        {{- if .PrivateModules }}
+        --sandbox \
+        --sandbox-paths "{{"{{"}} netrc {{"}}"}}" \
+        {{- end }}
+        '.#{{"{{"}} profile {{"}}"}}'
+
+check:
+    nix flake check
+
+package profile{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    DERIVATION=$(just build "{{"{{"}} profile {{"}}"}}" "{{"{{"}} netrc {{"}}"}}")
+    OUTPUT=$(echo $DERIVATION | jq -r ".[0].outputs.out")
+    mkdir -p dist/{{"{{"}} profile {{"}}"}}
+    install -m 755 $OUTPUT/bin/{{"{{"}} profile {{"}}"}} dist/{{"{{"}} profile {{"}}"}}/bootstrap
+    (cd dist/{{"{{"}} profile {{"}}"}} && zip lambda.zip bootstrap)
+
+package-all{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
+    {{- range .Lambdas }}
+    just package "{{.}}"{{ if $.PrivateModules }} {{"{{"}} netrc {{"}}"}}{{ end }}
+    {{- end }}
+
+package-native lambda:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    mkdir -p dist/{{"{{"}} lambda {{"}}"}}
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+        go build \
+            -ldflags="-s -w"
+            -o dist/{{"{{"}} lambda {{"}}"}}/bootstrap \
+            -tags lambda.norpc
+            ./cmd/{{"{{"}} lambda {{"}}"}}
+    (cd dist/{{"{{"}} lambda {{"}}"}} && zip lambda.zip bootstrap)
+
+package-native-all:
+    {{- range .Lambdas }}
+    just package-native "{{.}}"
+    {{- end }}
+
+deploy environment lambda:
+    aws lambda update-function-code \
+        --function-name "quirk-{{"{{"}} environment {{"}}"}}-{{.Quirk.Service}}-{{"{{"}} lambda {{"}}"}}" \
+        --output json \
+        --zip-file "fileb://dist/{{"{{"}} lambda {{"}}"}}/lambda.zip" \
+        | jq ".CodeSha256"
+
+deploy-all environment:
+    {{- range .Lambdas }}
+    just deploy "{{"{{"}} environment {{"}}"}}" "{{.}}"
+    {{- end }}
