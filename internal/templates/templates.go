@@ -2,7 +2,9 @@ package templates
 
 import (
 	"embed"
+	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -64,12 +66,22 @@ func RenderTemplate(t *template.Template, path string, context any) (string, err
 }
 
 func WriteFiles(in map[string]string) error {
-	for k, v := range in {
-		if err := EnsureDirExists(k); err != nil {
+	for filename, contents := range in {
+		if err := EnsureDirExists(filename); err != nil {
 			return err
 		}
 
-		if err := os.WriteFile(k, []byte(v), 0644); err != nil {
+		ignored, err := GetIgnoredFiles(".")
+		if err != nil {
+			return fmt.Errorf("failed to get ignored files: %v", err)
+		}
+
+		// Skip over files in the .bcignore file
+		if slices.Contains(ignored, filename) {
+			continue
+		}
+
+		if err := os.WriteFile(filename, []byte(contents), 0644); err != nil {
 			return err
 		}
 	}
