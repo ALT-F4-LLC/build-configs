@@ -1,0 +1,55 @@
+---
+name: Flake Check & Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CACHIX_BINARY_CACHE: {{ .Nix.Cachix.BinaryCache }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+      - uses: actions/checkout@v4
+      - run: nix develop -c just check
+
+  build:
+    needs:
+      - check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+      {{ if .PrivateModules -}}
+      - id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID {{"}}"}}
+          owner: ${{"{{"}} github.repository_owner {{"}}"}}
+          private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY {{"}}"}}
+      - uses: extractions/netrc@v2
+        with:
+          machine: github.com
+          password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
+          username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
+      {{- end -}}
+      - uses: actions/checkout@v4
+      {{ if .PrivateModules -}}
+      - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
+      {{- end -}}
+      - run: nix develop -c just build
+      {{ if .PrivateModules -}}
+      - run: rm -rf /tmp/.netrc
+        if: success() || failure()
+      {{- end -}}

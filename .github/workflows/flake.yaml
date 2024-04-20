@@ -1,0 +1,36 @@
+---
+name: Flake Check & Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CACHIX_BINARY_CACHE: altf4llc-os
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
+          name: ${{ env.CACHIX_BINARY_CACHE }}
+      - uses: actions/checkout@v4
+      - run: nix develop -c just check
+
+  build:
+    needs:
+      - check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
+          name: ${{ env.CACHIX_BINARY_CACHE }}
+      - uses: actions/checkout@v4
+      - run: nix develop -c just build
+      

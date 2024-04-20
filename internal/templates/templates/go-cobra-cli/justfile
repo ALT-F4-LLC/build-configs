@@ -1,0 +1,15 @@
+build profile='default'{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
+    nix build \
+        --json \
+        --no-link \
+        --print-build-logs \
+        {{- if .PrivateModules }}
+        --sandbox \
+        --sandbox-paths "{{"{{"}} netrc {{"}}"}}" \
+        {{- end }}
+        '.#{{"{{"}} profile {{"}}"}}'
+
+build-docker{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}: (build 'docker'{{ if .PrivateModules }} netrc{{ end }})
+
+check:
+    nix flake check

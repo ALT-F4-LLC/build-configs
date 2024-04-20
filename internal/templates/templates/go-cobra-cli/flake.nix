@@ -1,18 +1,17 @@
 {
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/{{ .Nix.NixpkgsBranch }}";
 
   outputs = inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      systems = [ {{range .Nix.Systems}}"{{.}}" {{end}}];
 
       perSystem = { config, pkgs, ... }:
         let
           inherit (pkgs)
-            go_1_22
+            {{ .Nix.GoPackage }}
             just;
 
-          name = "build-configs";
-          version = "0.1.0";
+          name = "{{ .Name }}";
           CGO_ENABLED = "0";
         in
         {
@@ -22,13 +21,10 @@
           };
 
           packages = {
-            default = pkgs.buildGo122Module {
-              inherit name version;
-              GOFLAGS = [
-                "-ldflags=github.com/ALT-F4-LLC/build-configs/internal/cli.Version=${version}"
-              ];
+            default = pkgs.{{ .Nix.BuildGoModule }} {
+              inherit name;
               src = ./.;
-              vendorHash = "sha256-6B9O6ho4COpJy4HlkzQ0lk+ieezRO3xg9LyLHzoxYzc=";
+              vendorHash = "{{ .Nix.VendorHash }}";
               buildModules = [ "cmd/${name}" ];
             };
 

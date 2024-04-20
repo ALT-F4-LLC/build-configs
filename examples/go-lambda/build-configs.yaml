@@ -1,0 +1,16 @@
+---
+name: project-name
+template: go-lambda
+parameters:
+  lambdas:
+    - lambda1
+    - lambda2
+  privateModules: "github.com/ALT-F4-LLC/quirk-service-kit"
+  quirk:
+    service: lambdatest
+  deploy:
+    roleArn: 'arn:aws:iam::1234567890:role/gha-lambda-test-deploy-dev-role'
+  nix:
+    vendorHash: ''
+    goPackage: go_1_22
+    buildGoModule: buildGo122Module
