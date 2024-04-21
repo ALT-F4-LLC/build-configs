@@ -71,9 +71,12 @@ jobs:
         if: success() || failure()
       {{- end }}
 
-  deploy-dev:
+  {{ range .Deploy }}
+  deploy-{{ .Environment }}:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    {{- if .If }}
+    if: {{ .If }}
+    {{- end }}
     permissions:
       id-token: write
       contents: read
@@ -81,14 +84,14 @@ jobs:
     strategy:
       matrix:
         profile:
-          {{- range .Lambdas }}
+          {{- range $.Lambdas }}
           - {{ . }}
           {{- end }}
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: {{ .Deploy.Region }}
-          role-to-assume: {{ .Deploy.RoleARN }}
+          aws-region: {{ .Region }}
+          role-to-assume: {{ .RoleARN }}
       - uses: actions/download-artifact@v4
         with:
           name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
@@ -100,4 +103,5 @@ jobs:
         with:
           authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
           name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
-      - run: nix develop -c just deploy dev "${{"{{"}} matrix.profile {{"}}"}}"
+      - run: nix develop -c just deploy {{ .Environment }} "${{"{{"}} matrix.profile {{"}}"}}"
+  {{- end }}

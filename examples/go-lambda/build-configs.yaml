@@ -9,7 +9,8 @@ parameters:
   quirk:
     service: lambdatest
   deploy:
-    roleArn: 'arn:aws:iam::1234567890:role/gha-lambda-test-deploy-dev-role'
+    - environment: dev
+      if: github.ref == 'refs/heads/main'
   nix:
     vendorHash: ''
     goPackage: go_1_22

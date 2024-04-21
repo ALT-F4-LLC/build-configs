@@ -4,13 +4,15 @@ import (
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
+const GoLambdaName = "go-lambda"
+
 type GoLambdaConfig struct {
 	Config
 	GoVersion      string             `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
 	Lint           GolangCILintConfig `json:"lint,omitempty" yaml:"lint,omitempty"`
 	Nix            NixGoConfig        `json:"nix,omitempty" yaml:"nix,omitempty"`
 	Quirk          QuirkConfig        `json:"quirk,omitempty" yaml:"quirk,omitempty"`
-	Deploy         DeployConfig       `json:"deploy,omitempty" yaml:"deploy,omitempty"`
+	Deploy         []DeployConfig     `json:"deploy,omitempty" yaml:"deploy,omitempty"`
 	PrivateModules string             `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
 	Lambdas        []string           `json:"lambdas,omitempty" yaml:"lambdas,omitempty"`
 	OpenAPI        OpenAPIConfig      `json:"openapi,omitempty" yaml:"openapi,omitempty"`
@@ -22,7 +24,7 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 		GoVersion: "1.22",
 		Lint:      NewGolangCiLintConfig(),
 		Quirk:     NewQuirkConfig(c),
-		Deploy:    NewDeployConfig(),
+		Deploy:    []DeployConfig{},
 		Lambdas:   []string{c.Name},
 		OpenAPI:   NewOpenAPIConfig(),
 

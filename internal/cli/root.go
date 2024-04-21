@@ -1,9 +1,11 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/ALT-F4-LLC/build-configs/internal/config"
+	"github.com/spf13/cobra"
+)
 
 var (
-	debug      bool
 	configFile string
 )
 
@@ -20,6 +22,6 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "D", false, "debug mode")
+	rootCmd.PersistentFlags().BoolVarP(&config.Debug, "debug", "D", false, "debug mode")
 	rootCmd.PersistentFlags().StringVarP(&configFile, "config-file", "c", "", "path to the config file")
 }

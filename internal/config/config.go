@@ -16,12 +16,18 @@ type Config struct {
 	Parameters map[string]interface{} `json:"parameters" yaml:"parameters"`
 }
 
+var (
+	ErrUnsupportedFileType = errors.New("unsupported config file type")
+	ErrUnsupportedTemplate = errors.New("unsupported template selected")
+)
+
 func New(configPath string) (Config, error) {
 	b, err := os.ReadFile("./" + configPath)
 	if err != nil {
 		return Config{}, err
 	}
 
+	// Detect config file type and load it depending on extension
 	ext := path.Ext(configPath)
 	switch ext {
 	case ".json":
@@ -30,33 +36,49 @@ func New(configPath string) (Config, error) {
 		return loadConfigYaml(b)
 	}
 
-	return Config{}, errors.New("unsupported file type; supported types are 'json', 'yaml' and 'yml'")
+	return Config{}, ErrUnsupportedFileType
 }
 
 func (c Config) GetTemplater() (Templater, error) {
 	switch c.Template {
 	case "go-cobra-cli":
-		params := NewGoCobraCliConfig(c)
+		if Debug {
+			fmt.Println("loading go-cobra-cli templater")
+		}
+		tpl := NewGoCobraCliConfig(c)
+
+		// Convert the parameters (map type) to JSON
 		b, err := json.Marshal(c.Parameters)
 		if err != nil {
-			return params, err
+			return tpl, err
 		}
-		if err := json.Unmarshal(b, &params); err != nil {
-			return params, err
+
+		// Then convert them back into the type for the templater selected
+		if err := json.Unmarshal(b, &tpl); err != nil {
+			return tpl, err
 		}
-		return params, nil
+		return tpl, nil
+
 	case "go-lambda":
-		params := NewGoLambdaConfig(c)
+		if Debug {
+			fmt.Println("loading go-lambda templater")
+		}
+		tpl := NewGoLambdaConfig(c)
+
+		// Convert the parameters (map type) to JSON
 		b, err := json.Marshal(c.Parameters)
 		if err != nil {
-			return params, err
+			return tpl, err
 		}
-		if err := json.Unmarshal(b, &params); err != nil {
-			return params, err
+
+		// Then convert them back into the type for the templater selected
+		if err := json.Unmarshal(b, &tpl); err != nil {
+			return tpl, err
 		}
-		return params, nil
+		return tpl, nil
 	}
-	return nil, fmt.Errorf("unsupported template: %v", c.Template)
+
+	return nil, ErrUnsupportedTemplate
 }
 
 func loadConfigJson(b []byte) (Config, error) {
@@ -65,6 +87,8 @@ func loadConfigJson(b []byte) (Config, error) {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return cfg, err
 	}
+
+	Cfg = cfg
 
 	return cfg, nil
 }
@@ -75,6 +99,8 @@ func loadConfigYaml(b []byte) (Config, error) {
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return cfg, err
 	}
+
+	Cfg = cfg
 
 	return cfg, nil
 }
