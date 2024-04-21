@@ -30,6 +30,16 @@ file present. See [Examples](#examples) for help with this.
 $ build-configs generate
 ```
 
+It is also possible to configure build-configs to leave otherwise templated be,
+similarly to the `.gitignore` file in a Git repository. The file used is called
+`.bcignore`, and takes a direct list of paths (globs are currently unsupported)
+to skip templating:
+
+```gitignore
+# ignore the flake, we customize it further.
+flake.nix
+```
+
 ## Examples
 
 Some example configurations for our template types exist in the
