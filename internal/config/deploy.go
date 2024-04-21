@@ -33,7 +33,7 @@ type DeployConfig struct {
 // contextually
 func (c *DeployConfig) UnmarshalJSON(data []byte) error {
 	defaultRole := fmt.Sprintf(
-		"arn:aws:iam::%s:role/gha-%s-deploy-%s",
+		"arn:aws:iam::%s:role/altf4llc-gha-%s-deploy-%s",
 		DefaultAccount,
 		Cfg.Name,
 		DefaultEnvironment,
