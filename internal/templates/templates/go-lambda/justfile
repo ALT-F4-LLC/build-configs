@@ -54,3 +54,13 @@ deploy-all environment:
     {{- range .Lambdas }}
     just deploy "{{"{{"}} environment {{"}}"}}" "{{.}}"
     {{- end }}
+
+{{ if .OpenAPI.Enable -}}
+build-client:
+    #!/usr/bin/env bash
+    DERIVATION=$(just build client "{{"{{"}} netrc {{"}}"}}")
+    OUTPUT=$(echo $DERIVATION | jq -r ".[0].outputs.out")
+    rm -rf pkg/client
+    cp -r --no-preserve=mode $OUTPUT pkg/client
+    git add pkg/client
+{{- end }}
