@@ -7,11 +7,10 @@ runCommand "client"
   mkdir -p $out
 
   openapi-generator-cli generate \
-    -i $src/openapi.yaml \
+    -i $src/{{ .OpenAPI.Filename }} \
     -g go \
     -o $out \
-    -p packageName="client" \
-    -p packageVersion="0.1.0"
+    -p packageName="client"
 
   rm -rf \
     $out/.gitignore \
