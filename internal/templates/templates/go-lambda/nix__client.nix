@@ -20,6 +20,5 @@ runCommand "client"
     $out/README.md \
     $out/api \
     $out/docs \
-    $out/git_push.sh \
-    $out/test
+    $out/git_push.sh
 ''
