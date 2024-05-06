@@ -15,11 +15,10 @@ check:
 package profile{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
     #!/usr/bin/env bash
     set -euxo pipefail
-    DERIVATION=$(just build "{{"{{"}} profile {{"}}"}}" "{{"{{"}} netrc {{"}}"}}")
+    DERIVATION=$(just build "{{"{{"}} profile {{"}}"}}.bootstrap" "{{"{{"}} netrc {{"}}"}}")
     OUTPUT=$(echo $DERIVATION | jq -r ".[0].outputs.out")
     mkdir -p dist/{{"{{"}} profile {{"}}"}}
-    install -m 755 $OUTPUT/bin/{{"{{"}} profile {{"}}"}} dist/{{"{{"}} profile {{"}}"}}/bootstrap
-    (cd dist/{{"{{"}} profile {{"}}"}} && zip lambda.zip bootstrap)
+    cp --no-preserve=mode $OUTPUT dist/{{"{{"}} profile {{"}}"}}/lambda.zip
 
 package-all{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
     {{- range .Lambdas }}
@@ -54,3 +53,13 @@ deploy-all environment:
     {{- range .Lambdas }}
     just deploy "{{"{{"}} environment {{"}}"}}" "{{.}}"
     {{- end }}
+
+{{ if .OpenAPI.Enable -}}
+build-client:
+    #!/usr/bin/env bash
+    DERIVATION=$(just build client "{{"{{"}} netrc {{"}}"}}")
+    OUTPUT=$(echo $DERIVATION | jq -r ".[0].outputs.out")
+    rm -rf pkg/client
+    cp -r --no-preserve=mode $OUTPUT pkg/client
+    git add pkg/client
+{{- end }}

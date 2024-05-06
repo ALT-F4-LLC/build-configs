@@ -14,3 +14,5 @@ parameters:
     vendorHash: ''
     goPackage: go_1_22
     buildGoModule: buildGo122Module
+  openapi:
+    enable: true

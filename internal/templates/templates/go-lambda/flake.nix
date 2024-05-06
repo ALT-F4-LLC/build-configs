@@ -7,30 +7,31 @@
 
       perSystem = { config, pkgs, ... }:
         let
-          inherit (pkgs)
-            {{ .Nix.GoPackage }}
-            just;
-
-          lambdas = {
-            {{- range $fn := .Lambdas }}
-            {{ $fn }} = pkgs.callPackage ./nix/lambda.nix { name = "{{ $fn }}"; };
-            {{- end }}
-          };
+          inherit (import ./nix) env lambda{{ if .OpenAPI.Enable }} client{{ end }};
+          inherit (pkgs) go-migrate golangci-lint just zip;
         in
         {
           devShells.default = pkgs.mkShell {
-            {{ if .PrivateModules -}}
-            GOPRIVATE = "{{ .PrivateModules }}";
-            {{- end }}
-            buildInputs = [ just ];
+            inherit (env) CGO_ENABLED{{ if .PrivateModules }} GOPRIVATE{{ end }};
+            nativeBuildInputs = [ go-migrate golangci-lint just zip ];
             inputsFrom = [
               {{- range .Lambdas }}
               config.packages.{{.}}
               {{- end }}
+              {{- if .OpenAPI.Enable }}
+              config.packages.client
+              {{- end }}
             ];
           };
 
-          packages = { } // lambdas;
+          packages = {
+            {{- range $fn := .Lambdas }}
+            {{ $fn }} = pkgs.callPackage lambda { name = "{{ $fn }}"; };
+            {{- end }}
+            {{- if .OpenAPI.Enable }}
+            client = pkgs.callPackage client {};
+            {{- end }}
+          };
         };
   };
 }

@@ -13,6 +13,7 @@ type GoLambdaConfig struct {
 	Deploy         DeployConfig       `json:"deploy,omitempty" yaml:"deploy,omitempty"`
 	PrivateModules string             `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
 	Lambdas        []string           `json:"lambdas,omitempty" yaml:"lambdas,omitempty"`
+	OpenAPI        OpenAPIConfig      `json:"openapi,omitempty" yaml:"openapi,omitempty"`
 }
 
 func NewGoLambdaConfig(c Config) GoLambdaConfig {
@@ -23,6 +24,7 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 		Quirk:     NewQuirkConfig(c),
 		Deploy:    NewDeployConfig(),
 		Lambdas:   []string{c.Name},
+		OpenAPI:   NewOpenAPIConfig(),
 
 		Nix: NixGoConfig{
 			NixConfig:     NewNixConfig(),
@@ -33,7 +35,7 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 }
 
 func (c GoLambdaConfig) Render() error {
-	files, err := templates.RenderTemplates(templates.RenderMap{
+	renderMap := templates.RenderMap{
 		templates.AllCommonTemplates: {
 			".envrc",
 		},
@@ -45,10 +47,17 @@ func (c GoLambdaConfig) Render() error {
 		templates.GoLambdaTemplates: {
 			".github/workflows/flake.yaml",
 			"nix/lambda.nix",
+			"nix/default.nix",
 			"flake.nix",
 			"justfile",
 		},
-	}, c)
+	}
+
+	if c.OpenAPI.Enable {
+		renderMap[templates.GoLambdaTemplates] = append(renderMap[templates.GoLambdaTemplates], "nix/client.nix")
+	}
+
+	files, err := templates.RenderTemplates(renderMap, c)
 	if err != nil {
 		return err
 	}
