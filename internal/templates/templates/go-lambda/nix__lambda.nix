@@ -4,6 +4,7 @@
   {{ .Nix.BuildGoModule }},
   name,
   runCommand,
+  zip
 }:
 
 let

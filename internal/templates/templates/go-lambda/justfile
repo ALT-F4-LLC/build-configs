@@ -55,7 +55,7 @@ deploy-all environment:
     {{- end }}
 
 {{ if .OpenAPI.Enable -}}
-build-client:
+build-client{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
     #!/usr/bin/env bash
     DERIVATION=$(just build client "{{"{{"}} netrc {{"}}"}}")
     OUTPUT=$(echo $DERIVATION | jq -r ".[0].outputs.out")
