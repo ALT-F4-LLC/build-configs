@@ -23,4 +23,4 @@ runCommand "client"
     $out/docs \
     $out/git_push.sh \
     $out/test
-'';
+''

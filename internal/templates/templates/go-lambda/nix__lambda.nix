@@ -15,7 +15,7 @@ let
     src = ../.;
     subPackages = ["cmd/${name}"];
     tags = ["lambda.norpc"];
-    vendorHash = "";
+    vendorHash = "{{ .Nix.VendorHash }}";
 
     preBuild = ''
       export HOME=/tmp
@@ -31,4 +31,4 @@ let
 in
   pkg.overrideAttrs (final: {
     passthru.bootstrap = bootstrap;
-  });
+  })
