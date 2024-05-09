@@ -4,6 +4,8 @@ import (
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
+const GoCobraCliName = "go-cobra-cli"
+
 type GoCobraCliConfig struct {
 	Config
 	GoVersion      string             `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
