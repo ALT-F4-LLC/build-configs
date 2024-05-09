@@ -1,6 +1,10 @@
 package config
 
 import (
+	"errors"
+	"fmt"
+	"os"
+
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
@@ -20,13 +24,14 @@ type GoLambdaConfig struct {
 
 func NewGoLambdaConfig(c Config) GoLambdaConfig {
 	return GoLambdaConfig{
-		Config:    c,
-		GoVersion: "1.22",
-		Lint:      NewGolangCiLintConfig(),
-		Quirk:     NewQuirkConfig(c),
-		Deploy:    []DeployConfig{},
-		Lambdas:   []string{c.Name},
-		OpenAPI:   NewOpenAPIConfig(),
+		Config:         c,
+		GoVersion:      "1.22",
+		PrivateModules: "github.com/ALT-F4-LLC/quirk-service-kit",
+		Lint:           NewGolangCiLintConfig(),
+		Quirk:          NewQuirkConfig(c),
+		Deploy:         []DeployConfig{},
+		Lambdas:        []string{c.Name},
+		OpenAPI:        NewOpenAPIConfig(),
 
 		Nix: NixGoConfig{
 			NixConfig:     NewNixConfig(),
@@ -62,6 +67,31 @@ func (c GoLambdaConfig) Render() error {
 	files, err := templates.RenderTemplates(renderMap, c)
 	if err != nil {
 		return err
+	}
+
+	// Create lambda entrypoints on first template run
+	for _, lambda := range c.Lambdas {
+		entry := fmt.Sprintf("cmd/%s/main.go", lambda)
+
+		if _, err := os.Stat(entry); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				out, err := templates.RenderTemplate(
+					templates.GoLambdaTemplates,
+					"cmd/[lambda]/main.go",
+					c,
+				)
+				if err != nil {
+					return err
+				}
+				files[entry] = out
+			} else {
+				// Error was unexpected
+				return err
+			}
+		} else {
+			// File exists
+			continue
+		}
 	}
 
 	return templates.WriteFiles(files)
