@@ -77,7 +77,7 @@ func (c GoLambdaConfig) Render() error {
 			if errors.Is(err, os.ErrNotExist) {
 				out, err := templates.RenderTemplate(
 					templates.GoLambdaTemplates,
-					"cmd/[lambda]/main.go",
+					"cmd/[lambda]/main.go.tmpl",
 					c,
 				)
 				if err != nil {
