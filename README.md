@@ -40,6 +40,20 @@ to skip templating:
 flake.nix
 ```
 
+## Templates
+
+### `go-cobra-cli`
+
+`go-cobra-cli` scaffolds a Cobra CLI tool with Go that can be used to build out
+internal tooling. This is the template this CLI uses.
+
+### `go-lambda`
+
+`go-lambda` scaffolds an lambda setup in Go.
+
+To use it, you need to run the generator and then run `go mod init` and
+`go mod tidy`, then update your `vendorHash`.
+
 ## Examples
 
 Some example configurations for our template types exist in the
