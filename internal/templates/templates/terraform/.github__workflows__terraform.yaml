@@ -9,6 +9,7 @@ on:
   schedule:
     - cron: "{{ .Schedule }}"
   {{- end }}
+  workflow_dispatch:
 
 env:
   CACHIX_BINARY_CACHE: {{ .Nix.Cachix.BinaryCache }}
