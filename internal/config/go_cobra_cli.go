@@ -33,6 +33,7 @@ func (c GoCobraCliConfig) Render() error {
 	files, err := templates.RenderTemplates(templates.RenderMap{
 		templates.AllCommonTemplates: {
 			".envrc",
+			".github/renovate.json",
 		},
 		templates.GoCommonTemplates: {
 			".editorconfig",

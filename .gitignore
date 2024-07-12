@@ -1,3 +1,4 @@
-.direnv
+/.direnv
+/build-configs
 /result
 /target

@@ -1,0 +1,23 @@
+check:
+    nix flake check
+    terraform fmt -check
+
+docs:
+    terraform-docs markdown table \
+        --output-file README.md \
+        --output-mode inject .
+
+format:
+    terraform fmt -recursive
+
+init:
+    terraform init
+
+validate:
+    terraform validate
+
+plan:
+    terraform plan -out "terraform.tfplan"
+
+apply:
+    terraform apply "terraform.tfplan"

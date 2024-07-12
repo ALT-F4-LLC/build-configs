@@ -13,7 +13,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/install-nix-action@v25
+        with:
+          enable_kvm: true
       - uses: cachix/cachix-action@v14
         with:
           authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
@@ -26,7 +28,9 @@ jobs:
       - check
     runs-on: ubuntu-latest
     steps:
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/install-nix-action@v25
+        with:
+          enable_kvm: true
       - uses: cachix/cachix-action@v14
         with:
           authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}

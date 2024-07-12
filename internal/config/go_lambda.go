@@ -45,6 +45,7 @@ func (c GoLambdaConfig) Render() error {
 	renderMap := templates.RenderMap{
 		templates.AllCommonTemplates: {
 			".envrc",
+			".github/renovate.json",
 		},
 		templates.GoCommonTemplates: {
 			".editorconfig",

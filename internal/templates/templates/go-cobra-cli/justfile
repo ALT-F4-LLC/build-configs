@@ -1,4 +1,10 @@
-build profile='default'{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
+build:
+    go build -o {{ .Name }} ./cmd/{{ .Name }}/main.go
+
+check:
+    nix flake check
+
+package profile='default'{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}:
     nix build \
         --json \
         --no-link \
@@ -9,7 +15,4 @@ build profile='default'{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{
         {{- end }}
         '.#{{"{{"}} profile {{"}}"}}'
 
-build-docker{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}: (build 'docker'{{ if .PrivateModules }} netrc{{ end }})
-
-check:
-    nix flake check
+package-docker{{ if .PrivateModules }} netrc="/tmp/.netrc=/tmp/.netrc"{{ end }}: (package 'docker'{{ if .PrivateModules }} netrc{{ end }})
