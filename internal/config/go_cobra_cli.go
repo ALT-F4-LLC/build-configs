@@ -8,24 +8,26 @@ const GoCobraCliName = "go-cobra-cli"
 
 type GoCobraCliConfig struct {
 	Config
+	CgoEnabled     bool               `json:"cgoEnabled,omitempty" yaml:"cgoEnabled,omitempty"`
 	GoVersion      string             `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
 	Lint           GolangCILintConfig `json:"lint,omitempty" yaml:"lint,omitempty"`
 	Nix            NixGoConfig        `json:"nix,omitempty" yaml:"nix,omitempty"`
 	PrivateModules string             `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
+	Version        string             `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 	return GoCobraCliConfig{
-		Config: c,
-
-		GoVersion: "1.22",
-
-		Lint: NewGolangCiLintConfig(),
+		CgoEnabled: false,
+		Config:     c,
+		GoVersion:  "1.22",
+		Lint:       NewGolangCiLintConfig(),
 		Nix: NixGoConfig{
-			NixConfig:     NewNixConfig(),
-			GoPackage:     "go",
 			BuildGoModule: "buildGoModule",
+			GoPackage:     "go",
+			NixConfig:     NewNixConfig(),
 		},
+		Version: "0.1.0",
 	}
 }
 
