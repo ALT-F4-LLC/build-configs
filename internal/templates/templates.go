@@ -25,11 +25,15 @@ var (
 	//go:embed all:templates/terraform/*
 	terraformFS embed.FS
 
-	AllCommonTemplates  *template.Template
-	GoCommonTemplates   *template.Template
-	GoCobraCliTemplates *template.Template
-	GoLambdaTemplates   *template.Template
-	TerraformTemplates  *template.Template
+	//go:embed all:templates/terraform-module/*
+	terraformModuleFS embed.FS
+
+	AllCommonTemplates       *template.Template
+	GoCommonTemplates        *template.Template
+	GoCobraCliTemplates      *template.Template
+	GoLambdaTemplates        *template.Template
+	TerraformTemplates       *template.Template
+	TerraformModuleTemplates *template.Template
 )
 
 // RenderMap maps a template set to the filenames* that should be written.
@@ -43,6 +47,7 @@ func init() {
 	GoCobraCliTemplates = template.Must(template.ParseFS(goCobraCliFS, "templates/go-cobra-cli/*"))
 	GoLambdaTemplates = template.Must(template.ParseFS(goLambdaFS, "templates/go-lambda/*"))
 	TerraformTemplates = template.Must(template.ParseFS(terraformFS, "templates/terraform/*"))
+	TerraformModuleTemplates = template.Must(template.ParseFS(terraformModuleFS, "templates/terraform-module/*"))
 }
 
 func RenderTemplates(in RenderMap, context any) (map[string]string, error) {

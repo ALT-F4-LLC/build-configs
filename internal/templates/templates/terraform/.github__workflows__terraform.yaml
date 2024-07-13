@@ -29,16 +29,16 @@ jobs:
       - run: nix develop -c just check
 
   plan:
-    runs-on: ubuntu-latest
-    needs: check
     concurrency:
-      group: tf-lock
       cancel-in-progress: false
+      group: tf-lock
+    env:
+      TF_VAR_PLATFORM_DIRECTORY_TOKEN: ${{"{{"}} secrets.TF_VAR_PLATFORM_DIRECTORY_TOKEN {{"}}"}}
+    needs: check
     permissions:
       contents: read
       id-token: write
-    env:
-      TF_VAR_PLATFORM_DIRECTORY_TOKEN: ${{"{{"}} secrets.TF_VAR_PLATFORM_DIRECTORY_TOKEN {{"}}"}}
+    runs-on: ubuntu-latest
     steps:
       - uses: cachix/install-nix-action@v27
         with:
@@ -63,19 +63,19 @@ jobs:
           path: terraform.tfplan
 
   apply:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    needs: plan
-    environment:
-      name: prod
-    permissions:
-      contents: read
-      id-token: write
     concurrency:
       group: tf-lock
       cancel-in-progress: false
+    environment:
+      name: prod
     env:
       TF_VAR_PACKER_SSH_PUBLIC_KEY: ${{"{{"}} secrets.TF_VAR_PACKER_SSH_PUBLIC_KEY {{"}}"}}
+    if: github.ref == 'refs/heads/main'
+    needs: plan
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
     steps:
       - uses: cachix/install-nix-action@v27
         with:
