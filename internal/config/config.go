@@ -76,6 +76,42 @@ func (c Config) GetTemplater() (Templater, error) {
 			return tpl, err
 		}
 		return tpl, nil
+
+	case "terraform":
+		if Debug {
+			fmt.Println("loading terraform templater")
+		}
+		tpl := NewTerraformConfig(c)
+
+		// Convert the parameters (map type) to JSON
+		b, err := json.Marshal(c.Parameters)
+		if err != nil {
+			return tpl, err
+		}
+
+		// Then convert them back into the type for the templater selected
+		if err := json.Unmarshal(b, &tpl); err != nil {
+			return tpl, err
+		}
+		return tpl, nil
+
+	case "terraform-module":
+		if Debug {
+			fmt.Println("loading terraform module templater")
+		}
+		tpl := NewTerraformModuleConfig(c)
+
+		// Convert the parameters (map type) to JSON
+		b, err := json.Marshal(c.Parameters)
+		if err != nil {
+			return tpl, err
+		}
+
+		// Then convert them back into the type for the templater selected
+		if err := json.Unmarshal(b, &tpl); err != nil {
+			return tpl, err
+		}
+		return tpl, nil
 	}
 
 	return nil, ErrUnsupportedTemplate
