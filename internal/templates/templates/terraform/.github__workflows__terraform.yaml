@@ -1,3 +1,4 @@
+{{- $envLength := len .GitHub.Env -}}
 name: terraform
 
 on:
@@ -16,83 +17,109 @@ env:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: {{ .GitHub.RunsOn }}
     steps:
-      - uses: cachix/install-nix-action@v27
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - uses: cachix/cachix-action@v15
-        with:
-          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
-      - uses: actions/checkout@v4
-      - run: nix develop -c just check
+    {{- if .GitHub.Action.SetupNix }}
+    - uses: cachix/install-nix-action@v27
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    {{- end }}
+    - uses: cachix/cachix-action@v15
+      with:
+        authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+        name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+    - uses: actions/checkout@v4
+    - run: nix develop -c just check
 
   plan:
     concurrency:
       cancel-in-progress: false
       group: tf-lock
+    {{- if gt $envLength 0 }}
     env:
-      TF_VAR_PLATFORM_DIRECTORY_TOKEN: ${{"{{"}} secrets.TF_VAR_PLATFORM_DIRECTORY_TOKEN {{"}}"}}
+    {{- range $key, $value := .GitHub.Env }}
+      {{ $key }}: {{ $value }}
+    {{- end }}
+    {{- end }}
     needs: check
     permissions:
       contents: read
       id-token: write
-    runs-on: ubuntu-latest
+    runs-on: {{ .GitHub.RunsOn }}
     steps:
-      - uses: cachix/install-nix-action@v27
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - uses: cachix/cachix-action@v15
-        with:
-          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          audience: sts.amazonaws.com
-          aws-region: us-west-2
-          role-to-assume: {{ .Role.PlanARN }}
-      - run: aws sts get-caller-identity
-      - uses: actions/checkout@v4
-      - run: nix develop -c just init
-      - run: nix develop -c just validate
-      - run: nix develop -c just plan
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tf-plan
-          path: terraform.tfplan
+    {{- if .GitHub.Action.SetupNix }}
+    - uses: cachix/install-nix-action@v27
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    {{- end }}
+    - uses: cachix/cachix-action@v15
+      with:
+        authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+        name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+    {{- if .GitHub.Action.SetupDeployKey }}
+    - uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{"{{"}} secrets.ALTF4LLC_DEPLOY_KEY {{"}}"}}
+        known_hosts: unnecessary
+    {{- end }}
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        audience: sts.amazonaws.com
+        aws-region: us-west-2
+        role-to-assume: {{ .Role.PlanARN }}
+    - run: aws sts get-caller-identity
+    - uses: actions/checkout@v4
+    - run: nix develop -c just init
+    - run: nix develop -c just validate
+    - run: nix develop -c just plan
+    - uses: actions/upload-artifact@v4
+      with:
+        name: tf-plan
+        path: terraform.tfplan
 
   apply:
     concurrency:
-      group: tf-lock
       cancel-in-progress: false
+      group: tf-lock
     environment:
       name: prod
+    {{- if gt $envLength 0 }}
     env:
-      TF_VAR_PACKER_SSH_PUBLIC_KEY: ${{"{{"}} secrets.TF_VAR_PACKER_SSH_PUBLIC_KEY {{"}}"}}
+    {{- range $key, $value := .GitHub.Env }}
+      {{ $key }}: {{ $value }}
+    {{- end }}
+    {{- end }}
     if: github.ref == 'refs/heads/main'
     needs: plan
     permissions:
       contents: read
       id-token: write
-    runs-on: ubuntu-latest
+    runs-on: {{ .GitHub.RunsOn }}
     steps:
-      - uses: cachix/install-nix-action@v27
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - uses: cachix/cachix-action@v15
-        with:
-          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          audience: sts.amazonaws.com
-          aws-region: us-west-2
-          role-to-assume: {{ .Role.ApplyARN }}
-      - run: aws sts get-caller-identity
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: tf-plan
-      - run: nix develop -c just init
-      - run: nix develop -c just apply
+    {{- if .GitHub.Action.SetupNix }}
+    - uses: cachix/install-nix-action@v27
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    {{- end }}
+    - uses: cachix/cachix-action@v15
+      with:
+        authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
+        name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+    {{- if .GitHub.Action.SetupDeployKey }}
+    - uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{"{{"}} secrets.ALTF4LLC_DEPLOY_KEY {{"}}"}}
+        known_hosts: unnecessary
+    {{- end }}
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        audience: sts.amazonaws.com
+        aws-region: us-west-2
+        role-to-assume: {{ .Role.ApplyARN }}
+    - run: aws sts get-caller-identity
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: tf-plan
+    - run: nix develop -c just init
+    - run: nix develop -c just apply
