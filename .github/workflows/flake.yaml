@@ -16,7 +16,7 @@ jobs:
       - uses: cachix/install-nix-action@v25
         with:
           enable_kvm: true
-      - uses: cachix/cachix-action@v14
+      - uses: cachix/cachix-action@v15
         with:
           authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
           name: ${{ env.CACHIX_BINARY_CACHE }}
@@ -31,7 +31,7 @@ jobs:
       - uses: cachix/install-nix-action@v25
         with:
           enable_kvm: true
-      - uses: cachix/cachix-action@v14
+      - uses: cachix/cachix-action@v15
         with:
           authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
           name: ${{ env.CACHIX_BINARY_CACHE }}
