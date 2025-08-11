@@ -20,7 +20,7 @@ jobs:
         with:
           authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
           name: ${{ env.CACHIX_BINARY_CACHE }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: nix develop -c just check
 
   build:
@@ -35,6 +35,6 @@ jobs:
         with:
           authToken: ${{ secrets.ALTF4LLC_CACHIX_AUTH_TOKEN }}
           name: ${{ env.CACHIX_BINARY_CACHE }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: nix develop -c just build
       
