@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/template"
@@ -87,7 +88,8 @@ func WriteFiles(in map[string]string) error {
 		}
 
 		// Skip over files in the .bcignore file
-		if slices.Contains(ignored, filename) {
+		normalizedFilename := filepath.Base(filename)
+		if slices.Contains(ignored, normalizedFilename) {
 			continue
 		}
 
