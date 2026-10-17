@@ -1,0 +1,12 @@
+language = "go"
+
+[source]
+includes = [
+    "cmd/vorpal",
+    "go.mod",
+    "go.sum",
+    "internal/vorpal"
+]
+
+[source.go]
+directory = "cmd/vorpal"
