@@ -11,9 +11,10 @@ on:
 jobs:
   build:
     runs-on: altf4llc
+    defaults:
+      run:
+        shell: bash .github/vorpal-shell.sh {0}
     steps:
       - uses: actions/checkout@v7
-
-      - run: echo "SHELL=$(vorpal build --path "build-configs-dev")/bin/activate" >> $GITHUB_ENV
 
       - run: just build
