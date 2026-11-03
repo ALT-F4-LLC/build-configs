@@ -9,11 +9,23 @@ on:
       - "*"
 
 jobs:
-  build:
-    runs-on: altf4llc
+  lint:
     defaults:
       run:
         shell: bash .github/vorpal-shell.sh {0}
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: just lint
+
+  build:
+    defaults:
+      run:
+        shell: bash .github/vorpal-shell.sh {0}
+    needs:
+      - lint
+    runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
 
