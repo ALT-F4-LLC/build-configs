@@ -10,17 +10,17 @@ import (
 func main() {
 	ctx := config.GetContext()
 
-	// -> 1. Activate: `source "$(vorpal build --path 'build-configs-dev')/bin/activate"`
-	// -> 2. Deactivate: `deactivate`
-
-	_, err := language.NewGoDevelopmentEnvironment("build-configs-dev", config.SYSTEMS).
-		Build(ctx)
+	golangciLint, err := ctx.FetchArtifactAlias("golangci-lint:2.11.4")
 	if err != nil {
-		log.Fatalf("error building development environment: %v", err)
+		log.Fatalf("failed fetching golangci-lint alias: %v", err)
 	}
 
-	// -> 1. Build: `vorpal build 'build-configs'`
-	// -> 2. Run: `$(vorpal build --path 'build-configs')/bin/build-configs`
+	_, err = language.NewGoDevelopmentEnvironment("build-configs-dev", config.SYSTEMS).
+		WithArtifacts([]*string{golangciLint}).
+		Build(ctx)
+	if err != nil {
+		log.Fatalf("failed building development environment: %v", err)
+	}
 
 	_, err = language.NewGo("build-configs", config.SYSTEMS).
 		WithBuildDirectory("cmd/build-configs").
@@ -34,8 +34,8 @@ func main() {
 		}).
 		Build(ctx)
 	if err != nil {
-		log.Fatalf("error building: %v", err)
+		log.Fatalf("failed building: %v", err)
 	}
 
-	ctx.Run()
+	ctx.Run() //nolint:errcheck,gosec // keeps the current exit behavior; Run's error is not surfaced today
 }
