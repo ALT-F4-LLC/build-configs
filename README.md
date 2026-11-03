@@ -1,7 +1,7 @@
 # build-configs
 
 [![License: Apache 2.0](https://img.shields.io/github/license/ALT-F4-LLC/build-configs)](./LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/ALT-F4-LLC/build-configs/.github/workflows/flake.yaml)](https://github.com/ALT-F4-LLC/build-configs/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ALT-F4-LLC/build-configs/.github/workflows/ci.yaml)](https://github.com/ALT-F4-LLC/build-configs/actions)
 
 build-configs is an easy-to-use, standardised configuration generator built to
 ease development overhead when bootstrapping and updating configuration in
@@ -13,12 +13,15 @@ configuration updates in a polyrepo environment could be implemented.
 
 ## Installation
 
-Installing build-configs can be done via Nix or by Go binary install:
+Installing build-configs can be done via Vorpal or by Go binary install:
 
 ```shell
-$ nix profile install 'github:ALT-F4-LLC/build-configs#default' # with nix
+$ vorpal build build-configs # with vorpal, from a clone of this repository
 $ go install github.com/ALT-F4-LLC/build-configs@latest # with go
 ```
+
+The Vorpal build places the binary at `bin/build-configs` under the path that
+`vorpal build --path build-configs` prints.
 
 ## Usage
 
@@ -28,6 +31,7 @@ file present. See [Examples](#examples) for help with this.
 
 ```shell
 $ build-configs generate
+$ "$(vorpal build --path build-configs)/bin/build-configs" generate # when built with vorpal
 ```
 
 It is also possible to configure build-configs to leave otherwise templated be,
