@@ -22,7 +22,7 @@ var (
 )
 
 func New(configPath string) (Config, error) {
-	b, err := os.ReadFile("./" + configPath)
+	b, err := os.ReadFile("./" + configPath) //nolint:gosec // config path is chosen by the operator on the command line
 	if err != nil {
 		return Config{}, err
 	}
@@ -31,7 +31,7 @@ func New(configPath string) (Config, error) {
 	ext := path.Ext(configPath)
 	switch ext {
 	case ".json":
-		return loadConfigJson(b)
+		return loadConfigJSON(b)
 	case ".yaml", ".yml":
 		return loadConfigYaml(b)
 	}
@@ -117,7 +117,7 @@ func (c Config) GetTemplater() (Templater, error) {
 	return nil, ErrUnsupportedTemplate
 }
 
-func loadConfigJson(b []byte) (Config, error) {
+func loadConfigJSON(b []byte) (Config, error) {
 	var cfg Config
 
 	if err := json.Unmarshal(b, &cfg); err != nil {

@@ -11,7 +11,7 @@ var Version = "git"
 var versionCmd = &cobra.Command{
 	Use: "version",
 	Short: "Shows the version number of build-configs, then exits.",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Printf("build-configs version '%s'\n", Version)
 	},
 }

@@ -1,4 +1,1 @@
-/.direnv
-/build-configs
-/result
-/target
+/dist

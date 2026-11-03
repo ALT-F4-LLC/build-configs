@@ -24,5 +24,5 @@ func EnsureDirExists(p string) error {
 	if dir == "." {
 		return nil
 	}
-	return os.MkdirAll(dir, 0755)
+	return os.MkdirAll(dir, 0755) //nolint:gosec // generated directories must stay world-readable; tightening would change output
 }

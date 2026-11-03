@@ -91,7 +91,7 @@ func WriteFiles(in map[string]string) error {
 			continue
 		}
 
-		if err := os.WriteFile(filename, []byte(contents), 0o644); err != nil {
+		if err := os.WriteFile(filename, []byte(contents), 0o644); err != nil { //nolint:gosec // generated files must stay world-readable; tightening would change output
 			return err
 		}
 	}

@@ -1,4 +1,14 @@
 ---
-issues:
-  exclude:
-    - Error return value of `\(github.com/go-kit/log.Logger\).Log` is not checked
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gocritic
+    - gosec
+    - misspell
+    - revive
+  exclusions:
+    presets:
+      # Internal CLI packages, not a public API: skip missing doc-comment findings.
+      - comments

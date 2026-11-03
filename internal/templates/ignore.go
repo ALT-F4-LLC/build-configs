@@ -15,7 +15,7 @@ func GetIgnoredFiles(configDir string) (files []string, err error) {
 		return
 	}
 
-	b, err := os.ReadFile(configDir+"/.bcignore")
+	b, err := os.ReadFile(configDir+"/.bcignore") //nolint:gosec // directory is chosen by the operator on the command line
 	if err != nil {
 		return
 	}
