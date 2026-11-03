@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "*"
+
+jobs:
+  build:
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: echo "SHELL=$(vorpal build --path "build-configs-dev")/bin/activate" >> $GITHUB_ENV
+
+      - run: just build
