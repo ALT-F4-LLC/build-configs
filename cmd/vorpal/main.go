@@ -24,7 +24,14 @@ func main() {
 
 	_, err = language.NewGo("build-configs", config.SYSTEMS).
 		WithBuildDirectory("cmd/build-configs").
-		WithIncludes([]string{"cmd/build-configs", "go.mod", "go.sum"}).
+		WithIncludes([]string{
+			"cmd/build-configs",
+			"go.mod",
+			"go.sum",
+			"internal/cli",
+			"internal/config",
+			"internal/templates",
+		}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("error building: %v", err)
