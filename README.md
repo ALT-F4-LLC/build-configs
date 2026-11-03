@@ -17,7 +17,7 @@ Installing build-configs can be done via Vorpal or by Go binary install:
 
 ```shell
 $ vorpal build build-configs # with vorpal, from a clone of this repository
-$ go install github.com/ALT-F4-LLC/build-configs@latest # with go
+$ go install github.com/ALT-F4-LLC/build-configs/cmd/build-configs@latest # with go
 ```
 
 The Vorpal build places the binary at `bin/build-configs` under the path that
@@ -40,8 +40,19 @@ similarly to the `.gitignore` file in a Git repository. The file used is called
 to skip templating:
 
 ```gitignore
-# ignore the flake, we customize it further.
-flake.nix
+# ignore the justfile, we customize it further.
+justfile
+```
+
+## Development
+
+The Vorpal dev shell provides Go and golangci-lint. Enter it with direnv, then
+lint and build:
+
+```shell
+$ direnv allow
+$ just lint
+$ just build
 ```
 
 ## Templates
