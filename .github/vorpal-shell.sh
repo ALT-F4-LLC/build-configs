@@ -4,6 +4,6 @@
 # runs its arguments.
 set -euo pipefail
 
-activate="$(vorpal build --path build-configs-dev)/bin/activate"
+activate="$(vorpal build --path 'build-configs-dev')/bin/activate"
 
 exec "$activate" bash -e "$1"
