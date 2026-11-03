@@ -9,8 +9,5 @@
         "extends": [
             "schedule:weekly"
         ]
-    },
-    "nix": {
-        "enabled": true
     }
 }

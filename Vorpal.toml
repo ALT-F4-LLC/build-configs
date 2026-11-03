@@ -4,8 +4,7 @@ language = "go"
 includes = [
     "cmd/vorpal",
     "go.mod",
-    "go.sum",
-    "internal/vorpal"
+    "go.sum"
 ]
 
 [source.go]
