@@ -1,0 +1,46 @@
+package main
+
+import (
+	"log"
+
+	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact/language"
+	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/config"
+)
+
+func main() {
+	ctx := config.GetContext()
+
+	var tools []*string
+	for _, alias := range []string{
+{{- range .Vorpal.Tools }}
+		{{ printf "%q" . }},
+{{- end }}
+	} {
+		tool, err := ctx.FetchArtifactAlias(alias)
+		if err != nil {
+			log.Fatalf("failed fetching %s alias: %v", alias, err)
+		}
+		tools = append(tools, tool)
+	}
+
+	_, err := language.NewGoDevelopmentEnvironment({{ printf "%q" (printf "%s-dev" .Name) }}, config.SYSTEMS).
+		WithArtifacts(tools).
+		Build(ctx)
+	if err != nil {
+		log.Fatalf("failed building development environment: %v", err)
+	}
+
+	_, err = language.NewGo({{ printf "%q" .Name }}, config.SYSTEMS).
+		WithBuildDirectory({{ printf "%q" .Vorpal.BuildDirectory }}).
+		WithIncludes([]string{
+{{- range .Vorpal.Includes }}
+			{{ printf "%q" . }},
+{{- end }}
+		}).
+		Build(ctx)
+	if err != nil {
+		log.Fatalf("failed building: %v", err)
+	}
+
+	ctx.Run() //nolint:errcheck,gosec // keeps the current exit behavior; Run's error is not surfaced today
+}

@@ -1,0 +1,11 @@
+language = "go"
+
+[source]
+includes = [
+{{- range .Vorpal.SourceIncludes }}
+    {{ printf "%q" . }},
+{{- end }}
+]
+
+[source.go]
+directory = "cmd/vorpal"
