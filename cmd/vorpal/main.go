@@ -25,8 +25,13 @@ func main() {
 		log.Fatalf("failed fetching gitleaks alias: %v", err)
 	}
 
+	rumdl, err := ctx.FetchArtifactAlias("rumdl:0.3.2")
+	if err != nil {
+		log.Fatalf("failed fetching rumdl alias: %v", err)
+	}
+
 	_, err = language.NewGoDevelopmentEnvironment("build-configs-dev", config.SYSTEMS).
-		WithArtifacts([]*string{golangciLint, govulncheck, gitleaks}).
+		WithArtifacts([]*string{golangciLint, govulncheck, gitleaks, rumdl}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)

@@ -1,6 +1,9 @@
 build:
     go build -o dist/build-configs ./cmd/build-configs/main.go
 
+doc-validate:
+    rumdl check --no-cache --deny-config-warnings .
+
 lint:
     golangci-lint run ./...
 

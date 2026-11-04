@@ -16,8 +16,10 @@ configuration updates in a polyrepo environment could be implemented.
 Installing build-configs can be done via Vorpal or by Go binary install:
 
 ```shell
-$ vorpal build build-configs # with vorpal, from a clone of this repository
-$ go install github.com/ALT-F4-LLC/build-configs/cmd/build-configs@latest # with go
+# with vorpal, from a clone of this repository
+vorpal build build-configs
+# with go
+go install github.com/ALT-F4-LLC/build-configs/cmd/build-configs@latest
 ```
 
 The Vorpal build places the binary at `bin/build-configs` under the path that
@@ -30,8 +32,9 @@ subcommand in a directory with a `build-configs.yaml` or `build-configs.json`
 file present. See [Examples](#examples) for help with this.
 
 ```shell
-$ build-configs generate
-$ "$(vorpal build --path build-configs)/bin/build-configs" generate # when built with vorpal
+build-configs generate
+# when built with vorpal
+"$(vorpal build --path build-configs)/bin/build-configs" generate
 ```
 
 It is also possible to configure build-configs to leave otherwise templated be,
@@ -50,9 +53,9 @@ The Vorpal dev shell provides Go and golangci-lint. Enter it with direnv, then
 lint and build:
 
 ```shell
-$ direnv allow
-$ just lint
-$ just build
+direnv allow
+just lint
+just build
 ```
 
 ## Templates
