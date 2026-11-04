@@ -2,6 +2,7 @@ package templates
 
 import (
 	"os"
+	"path"
 	"strings"
 )
 
@@ -21,10 +22,11 @@ func GetIgnoredFiles(configDir string) (files []string, err error) {
 	}
 
 	for _, line := range strings.Split(string(b), "\n") {
-		if strings.HasPrefix(line, "#") {
+		entry := strings.TrimSpace(line)
+		if entry == "" || strings.HasPrefix(entry, "#") {
 			continue
 		}
-		files = append(files, line)
+		files = append(files, path.Clean(entry))
 	}
 
 	return
