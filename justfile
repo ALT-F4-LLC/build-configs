@@ -6,3 +6,9 @@ lint:
 
 package:
     vorpal build build-configs
+
+test:
+    go test ./...
+
+vuln-scan:
+    govulncheck ./...
