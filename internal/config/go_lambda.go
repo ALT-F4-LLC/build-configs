@@ -12,14 +12,20 @@ const GoLambdaName = "go-lambda"
 
 type GoLambdaConfig struct {
 	Config
-	GoVersion      string             `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
-	Lint           GolangCILintConfig `json:"lint,omitempty" yaml:"lint,omitempty"`
-	Nix            NixGoConfig        `json:"nix,omitempty" yaml:"nix,omitempty"`
-	Quirk          QuirkConfig        `json:"quirk,omitempty" yaml:"quirk,omitempty"`
-	Deploy         []DeployConfig     `json:"deploy,omitempty" yaml:"deploy,omitempty"`
-	PrivateModules string             `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
-	Lambdas        []string           `json:"lambdas,omitempty" yaml:"lambdas,omitempty"`
-	OpenAPI        OpenAPIConfig      `json:"openapi,omitempty" yaml:"openapi,omitempty"`
+	GoVersion      string               `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
+	Lint           GolangCILintConfig   `json:"lint,omitempty" yaml:"lint,omitempty"`
+	Nix            NixGoConfig          `json:"nix,omitempty" yaml:"nix,omitempty"`
+	Quirk          QuirkConfig          `json:"quirk,omitempty" yaml:"quirk,omitempty"`
+	Deploy         []DeployConfig       `json:"deploy,omitempty" yaml:"deploy,omitempty"`
+	PrivateModules string               `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
+	Lambdas        []string             `json:"lambdas,omitempty" yaml:"lambdas,omitempty"`
+	OpenAPI        OpenAPIConfig        `json:"openapi,omitempty" yaml:"openapi,omitempty"`
+	Vorpal         GoLambdaVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
+}
+
+type GoLambdaVorpalConfig struct {
+	// Tools are Vorpal artifact aliases added to the `dev` environment.
+	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty"`
 }
 
 func NewGoLambdaConfig(c Config) GoLambdaConfig {
@@ -32,6 +38,9 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 		Deploy:         []DeployConfig{},
 		Lambdas:        []string{c.Name},
 		OpenAPI:        NewOpenAPIConfig(),
+		Vorpal: GoLambdaVorpalConfig{
+			Tools: []string{"golangci-lint:2.11.4", "just:1.45.0"},
+		},
 
 		Nix: NixGoConfig{
 			NixConfig:     NewNixConfig(),
@@ -58,6 +67,7 @@ func (c GoLambdaConfig) Render() error {
 			"nix/default.nix",
 			"flake.nix",
 			"justfile",
+			"Vorpal.toml",
 		},
 	}
 
@@ -69,6 +79,16 @@ func (c GoLambdaConfig) Render() error {
 	if err != nil {
 		return err
 	}
+
+	vorpalProgram, err := templates.RenderTemplate(
+		templates.GoLambdaTemplates,
+		"cmd/vorpal/main.go.tmpl",
+		c,
+	)
+	if err != nil {
+		return err
+	}
+	files["./cmd/vorpal/main.go"] = vorpalProgram
 
 	// Create lambda entrypoints on first template run
 	for _, lambda := range c.Lambdas {

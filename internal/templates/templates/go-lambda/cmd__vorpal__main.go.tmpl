@@ -1,0 +1,48 @@
+package main
+
+import (
+	"log"
+
+	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact/language"
+	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/config"
+)
+
+func main() {
+	ctx := config.GetContext()
+
+	var tools []*string
+	for _, alias := range []string{
+		{{- range .Vorpal.Tools }}
+		"{{ . }}",
+		{{- end }}
+	} {
+		tool, err := ctx.FetchArtifactAlias(alias)
+		if err != nil {
+			log.Fatalf("failed fetching %s alias: %v", alias, err)
+		}
+		tools = append(tools, tool)
+	}
+
+	_, err := language.NewGoDevelopmentEnvironment("dev", config.SYSTEMS).
+		WithArtifacts(tools).
+		{{- if .PrivateModules }}
+		WithEnvironments([]string{"GOPRIVATE={{ .PrivateModules }}"}).
+		{{- end }}
+		Build(ctx)
+	if err != nil {
+		log.Fatalf("failed building development environment: %v", err)
+	}
+{{ range .Lambdas }}
+	_, err = language.NewGo("{{ . }}", config.SYSTEMS).
+		WithBuildDirectory("cmd/{{ . }}").
+		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
+		WithEnvironments([]string{"CGO_ENABLED=0"}).
+		Build(ctx)
+	if err != nil {
+		log.Fatalf("failed building {{ . }}: %v", err)
+	}
+{{ end }}
+	if err := ctx.Run(); err != nil {
+		log.Fatalf("failed running vorpal: %v", err)
+	}
+}
