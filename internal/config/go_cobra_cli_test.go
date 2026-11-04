@@ -29,7 +29,7 @@ func goCobraCliRenderTemp(t *testing.T, parameters map[string]interface{}) {
 
 func goCobraCliReadFile(t *testing.T, name string) string {
 	t.Helper()
-	b, err := os.ReadFile(name)
+	b, err := os.ReadFile(name) //nolint:gosec // reads a file the test rendered into its own temp dir
 	if err != nil {
 		t.Fatalf("read %s: %v", name, err)
 	}
