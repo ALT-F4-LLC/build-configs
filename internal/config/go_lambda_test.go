@@ -123,8 +123,6 @@ func TestGoLambdaRenderVorpalToml(t *testing.T) {
 
 	for _, want := range []string{
 		`language = "go"`,
-		`"cmd/vorpal"`,
-		`"internal/vorpal"`,
 		`script = "go mod init github.com/ALT-F4-LLC/example && go mod tidy"`,
 		"[source.go]\ndirectory = \"cmd/vorpal\"",
 	} {
@@ -133,8 +131,11 @@ func TestGoLambdaRenderVorpalToml(t *testing.T) {
 		}
 	}
 
-	includes := got[strings.Index(got, "includes = ["):]
-	includes = includes[:strings.Index(includes, "]")]
+	_, afterIncludes, found := strings.Cut(got, "includes = [")
+	if !found {
+		t.Fatalf("Vorpal.toml has no includes array:\n%s", got)
+	}
+	includes, _, _ := strings.Cut(afterIncludes, "]")
 	for _, want := range []string{`"cmd/vorpal"`, `"internal/vorpal"`} {
 		if !strings.Contains(includes, want) {
 			t.Errorf("[source] includes %q missing %s", includes, want)
