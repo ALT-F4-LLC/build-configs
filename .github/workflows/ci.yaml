@@ -19,6 +19,26 @@ jobs:
 
       - run: just lint
 
+  doc-validate:
+    defaults:
+      run:
+        shell: bash .github/vorpal-shell.sh {0}
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: just doc-validate
+
+  vuln-scan:
+    defaults:
+      run:
+        shell: bash .github/vorpal-shell.sh {0}
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: just vuln-scan
+
   build:
     defaults:
       run:
