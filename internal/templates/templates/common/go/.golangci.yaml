@@ -1,9 +1,25 @@
 ---
-issues:
-  exclude:
-    {{- range .Lint.Exclude }}
-    - {{ . }}
-    {{- end }}
-    {{- range .Lint.ExtraExclude }}
-    - {{ . }}
-    {{- end }}
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gocritic
+    - gosec
+    - misspell
+    - revive
+  exclusions:
+    presets:
+      # Internal CLI packages, not a public API: skip missing doc-comment findings.
+      - comments
+{{- if or .Lint.Exclude .Lint.ExtraExclude }}
+    rules:
+{{- range .Lint.Exclude }}
+      - path: '(.+)\.go$'
+        text: {{ printf "%q" . }}
+{{- end }}
+{{- range .Lint.ExtraExclude }}
+      - path: '(.+)\.go$'
+        text: {{ printf "%q" . }}
+{{- end }}
+{{- end }}
