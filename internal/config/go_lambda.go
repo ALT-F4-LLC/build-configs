@@ -50,10 +50,9 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 	}
 }
 
-func (c GoLambdaConfig) Render() error {
+func (c GoLambdaConfig) renderMap() templates.RenderMap {
 	renderMap := templates.RenderMap{
 		templates.AllCommonTemplates: {
-			".envrc",
 			".github/renovate.json",
 		},
 		templates.GoCommonTemplates: {
@@ -62,6 +61,7 @@ func (c GoLambdaConfig) Render() error {
 			".golangci.yaml",
 		},
 		templates.GoLambdaTemplates: {
+			".envrc",
 			".github/workflows/flake.yaml",
 			"nix/lambda.nix",
 			"nix/default.nix",
@@ -75,7 +75,11 @@ func (c GoLambdaConfig) Render() error {
 		renderMap[templates.GoLambdaTemplates] = append(renderMap[templates.GoLambdaTemplates], "nix/client.nix")
 	}
 
-	files, err := templates.RenderTemplates(renderMap, c)
+	return renderMap
+}
+
+func (c GoLambdaConfig) Render() error {
+	files, err := templates.RenderTemplates(c.renderMap(), c)
 	if err != nil {
 		return err
 	}
