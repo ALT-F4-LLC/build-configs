@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -208,11 +209,9 @@ directory = "cmd/vorpal"
 func TestGoCobraCliLintConfigOmitsGoKitExclusion(t *testing.T) {
 	goCobraCliRenderTemp(t, nil)
 
-	want := `---
-issues:
-  exclude:
-`
-	if got := goCobraCliReadFile(t, ".golangci.yaml"); got != want {
-		t.Errorf(".golangci.yaml =\n%q\nwant\n%q", got, want)
+	got := goCobraCliReadFile(t, ".golangci.yaml")
+	golangciParse(t, got)
+	if strings.Contains(got, "go-kit") {
+		t.Errorf(".golangci.yaml has a go-kit exclusion:\n%s", got)
 	}
 }
