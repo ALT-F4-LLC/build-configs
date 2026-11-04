@@ -26,12 +26,17 @@ type TerraformConfigRole struct {
 
 type TerraformConfig struct {
 	Config
-	GitHub    GitHubConfig        `json:"github,omitempty" yaml:"github,omitempty"`
-	Nix       NixConfig           `json:"nix,omitempty" yaml:"nix,omitempty"`
-	Region    string              `json:"region,omitempty" yaml:"region,omitempty"`
-	Role      TerraformConfigRole `json:"role,omitempty" yaml:"role,omitempty"`
-	Schedule  *string             `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	Providers []string            `json:"providers,omitempty" yaml:"providers,omitempty"`
+	GitHub    GitHubConfig          `json:"github,omitempty" yaml:"github,omitempty"`
+	Nix       NixConfig             `json:"nix,omitempty" yaml:"nix,omitempty"`
+	Region    string                `json:"region,omitempty" yaml:"region,omitempty"`
+	Role      TerraformConfigRole   `json:"role,omitempty" yaml:"role,omitempty"`
+	Schedule  *string               `json:"schedule,omitempty" yaml:"schedule,omitempty"`
+	Providers []string              `json:"providers,omitempty" yaml:"providers,omitempty"`
+	Vorpal    TerraformVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
+}
+
+type TerraformVorpalConfig struct {
+	TerraformVersion string `json:"terraformVersion,omitempty" yaml:"terraformVersion,omitempty"`
 }
 
 func NewGitHubConfigAction() GitHubConfigAction {
@@ -64,6 +69,7 @@ func NewTerraformConfig(c Config) TerraformConfig {
 		Region:   "us-west-2",
 		Role:     NewTerraformConfigRole(c.Name),
 		Schedule: nil,
+		Vorpal:   TerraformVorpalConfig{TerraformVersion: "1.13.1"},
 	}
 }
 
@@ -76,6 +82,7 @@ func (c TerraformConfig) Render() error {
 		templates.TerraformTemplates: {
 			".github/workflows/terraform.yaml",
 			".gitignore",
+			"Vorpal.toml",
 			"flake.nix",
 			"justfile",
 		},
@@ -85,6 +92,12 @@ func (c TerraformConfig) Render() error {
 	if err != nil {
 		return err
 	}
+
+	vorpalMain, err := templates.RenderTemplate(templates.TerraformTemplates, "cmd/vorpal/main.go.tmpl", c)
+	if err != nil {
+		return err
+	}
+	files["./cmd/vorpal/main.go"] = vorpalMain
 
 	return templates.WriteFiles(files)
 }
