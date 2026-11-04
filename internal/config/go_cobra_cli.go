@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
@@ -56,10 +58,16 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 	}
 }
 
-func (c GoCobraCliConfig) Render() error {
-	files, err := templates.RenderTemplates(templates.RenderMap{
+// ShellQuotedDevEnvironment returns the Vorpal development environment name,
+// <name>-dev, as one POSIX single-quoted shell word, so the generated .envrc
+// passes it to vorpal verbatim whatever characters the name holds.
+func (c GoCobraCliConfig) ShellQuotedDevEnvironment() string {
+	return "'" + strings.ReplaceAll(c.Name+"-dev", "'", `'\''`) + "'"
+}
+
+func (c GoCobraCliConfig) renderMap() templates.RenderMap {
+	return templates.RenderMap{
 		templates.AllCommonTemplates: {
-			".envrc",
 			".github/renovate.json",
 		},
 		templates.GoCommonTemplates: {
@@ -68,12 +76,17 @@ func (c GoCobraCliConfig) Render() error {
 			".golangci.yaml",
 		},
 		templates.GoCobraCliTemplates: {
+			".envrc",
 			".github/workflows/flake.yaml",
 			"Vorpal.toml",
 			"flake.nix",
 			"justfile",
 		},
-	}, c)
+	}
+}
+
+func (c GoCobraCliConfig) Render() error {
+	files, err := templates.RenderTemplates(c.renderMap(), c)
 	if err != nil {
 		return err
 	}
