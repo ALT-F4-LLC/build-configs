@@ -73,13 +73,13 @@ func NewTerraformConfig(c Config) TerraformConfig {
 	}
 }
 
-func (c TerraformConfig) Render() error {
-	renderMap := templates.RenderMap{
+func (c TerraformConfig) renderMap() templates.RenderMap {
+	return templates.RenderMap{
 		templates.AllCommonTemplates: {
-			".envrc",
 			".github/renovate.json",
 		},
 		templates.TerraformTemplates: {
+			".envrc",
 			".github/workflows/terraform.yaml",
 			".gitignore",
 			"Vorpal.toml",
@@ -87,8 +87,10 @@ func (c TerraformConfig) Render() error {
 			"justfile",
 		},
 	}
+}
 
-	files, err := templates.RenderTemplates(renderMap, c)
+func (c TerraformConfig) Render() error {
+	files, err := templates.RenderTemplates(c.renderMap(), c)
 	if err != nil {
 		return err
 	}
