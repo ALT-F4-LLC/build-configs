@@ -7,6 +7,9 @@ lint:
 package:
     vorpal build build-configs
 
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
+
 test:
     go test ./...
 

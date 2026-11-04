@@ -20,8 +20,13 @@ func main() {
 		log.Fatalf("failed fetching govulncheck alias: %v", err)
 	}
 
+	gitleaks, err := ctx.FetchArtifactAlias("gitleaks:8.30.1")
+	if err != nil {
+		log.Fatalf("failed fetching gitleaks alias: %v", err)
+	}
+
 	_, err = language.NewGoDevelopmentEnvironment("build-configs-dev", config.SYSTEMS).
-		WithArtifacts([]*string{golangciLint, govulncheck}).
+		WithArtifacts([]*string{golangciLint, govulncheck, gitleaks}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
