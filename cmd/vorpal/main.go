@@ -15,8 +15,13 @@ func main() {
 		log.Fatalf("failed fetching golangci-lint alias: %v", err)
 	}
 
+	govulncheck, err := ctx.FetchArtifactAlias("govulncheck:1.9.0")
+	if err != nil {
+		log.Fatalf("failed fetching govulncheck alias: %v", err)
+	}
+
 	_, err = language.NewGoDevelopmentEnvironment("build-configs-dev", config.SYSTEMS).
-		WithArtifacts([]*string{golangciLint}).
+		WithArtifacts([]*string{golangciLint, govulncheck}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
