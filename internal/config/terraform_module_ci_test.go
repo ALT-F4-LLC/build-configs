@@ -31,7 +31,7 @@ type terraformModuleWorkflowStep struct {
 
 func terraformModuleReadFile(t *testing.T, path string) string {
 	t.Helper()
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) //nolint:gosec // reads a file the test rendered into its own temp dir
 	if err != nil {
 		t.Fatalf("%s was not written: %v", path, err)
 	}
