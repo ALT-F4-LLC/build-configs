@@ -20,8 +20,7 @@ type TerraformModuleVorpalConfig struct {
 
 type TerraformModuleConfig struct {
 	Config
-	Providers []string                    `json:"providers,omitempty" yaml:"providers,omitempty"`
-	Vorpal    TerraformModuleVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
+	Vorpal TerraformModuleVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
 }
 
 func NewTerraformModuleConfig(c Config) TerraformModuleConfig {
@@ -33,23 +32,24 @@ func NewTerraformModuleConfig(c Config) TerraformModuleConfig {
 	}
 }
 
-func (c TerraformModuleConfig) Render() error {
-	renderMap := templates.RenderMap{
+func (c TerraformModuleConfig) renderMap() templates.RenderMap {
+	return templates.RenderMap{
 		templates.AllCommonTemplates: {
-			".envrc",
 			".github/renovate.json",
 		},
 		templates.TerraformModuleTemplates: {
+			".envrc",
 			terraformModuleVorpalShell,
 			".github/workflows/terraform.yaml",
 			".gitignore",
 			"Vorpal.toml",
-			"flake.nix",
 			"justfile",
 		},
 	}
+}
 
-	files, err := templates.RenderTemplates(renderMap, c)
+func (c TerraformModuleConfig) Render() error {
+	files, err := templates.RenderTemplates(c.renderMap(), c)
 	if err != nil {
 		return err
 	}
