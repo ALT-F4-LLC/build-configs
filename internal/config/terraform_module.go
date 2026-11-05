@@ -20,7 +20,6 @@ type TerraformModuleVorpalConfig struct {
 
 type TerraformModuleConfig struct {
 	Config
-	Nix       NixConfig                   `json:"nix,omitempty" yaml:"nix,omitempty"`
 	Providers []string                    `json:"providers,omitempty" yaml:"providers,omitempty"`
 	Vorpal    TerraformModuleVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
 }
@@ -28,7 +27,6 @@ type TerraformModuleConfig struct {
 func NewTerraformModuleConfig(c Config) TerraformModuleConfig {
 	return TerraformModuleConfig{
 		Config: c,
-		Nix:    NewNixConfig(),
 		Vorpal: TerraformModuleVorpalConfig{
 			TerraformVersion: "1.13.1",
 		},
