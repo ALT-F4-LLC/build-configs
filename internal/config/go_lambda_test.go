@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
@@ -217,6 +219,39 @@ func TestGoLambdaRenderVorpalProgramArtifactPerLambda(t *testing.T) {
 			}
 			if cgo != len(tc.lambdas) {
 				t.Errorf("CGO_ENABLED=0 appears %d times, want %d", cgo, len(tc.lambdas))
+			}
+		})
+	}
+}
+
+func TestGoLambdaRenderVorpalProgramGofmtCleanForAnyTools(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		tools []string
+	}{
+		{name: "default", tools: NewGoLambdaConfig(Config{}).Vorpal.Tools},
+		{name: "one", tools: []string{"just:1.45.0"}},
+		{name: "empty", tools: []string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+			cfg.Lambdas = []string{"api"}
+			cfg.Vorpal.Tools = tc.tools
+			if err := cfg.Render(); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+
+			src, err := os.ReadFile("cmd/vorpal/main.go")
+			if err != nil {
+				t.Fatalf("reading cmd/vorpal/main.go: %v", err)
+			}
+			formatted, err := format.Source(src)
+			if err != nil {
+				t.Fatalf("gofmt cmd/vorpal/main.go: %v\n%s", err, src)
+			}
+			if !bytes.Equal(formatted, src) {
+				t.Errorf("cmd/vorpal/main.go is not gofmt-clean:\n%s", src)
 			}
 		})
 	}

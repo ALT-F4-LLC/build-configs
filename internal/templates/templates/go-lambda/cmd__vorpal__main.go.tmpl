@@ -12,9 +12,11 @@ func main() {
 
 	var tools []*string
 	for _, alias := range []string{
-		{{- range .Vorpal.Tools }}
+{{- if .Vorpal.Tools }}
+{{- range .Vorpal.Tools }}
 		"{{ . }}",
-		{{- end }}
+{{- end }}
+	{{ end -}}
 	} {
 		tool, err := ctx.FetchArtifactAlias(alias)
 		if err != nil {
