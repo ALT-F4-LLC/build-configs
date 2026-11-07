@@ -12,9 +12,11 @@ func main() {
 
 	var tools []*string
 	for _, alias := range []string{
+{{- if .Vorpal.Tools }}
 {{- range .Vorpal.Tools }}
 		{{ printf "%q" . }},
 {{- end }}
+	{{ end -}}
 	} {
 		tool, err := ctx.FetchArtifactAlias(alias)
 		if err != nil {
@@ -33,9 +35,11 @@ func main() {
 	_, err = language.NewGo({{ printf "%q" .Name }}, config.SYSTEMS).
 		WithBuildDirectory({{ printf "%q" .Vorpal.BuildDirectory }}).
 		WithIncludes([]string{
+{{- if .Vorpal.Includes }}
 {{- range .Vorpal.Includes }}
 			{{ printf "%q" . }},
 {{- end }}
+		{{ end -}}
 		}).
 		Build(ctx)
 	if err != nil {

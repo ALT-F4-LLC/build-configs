@@ -206,6 +206,19 @@ directory = "cmd/vorpal"
 		[]string{"cmd/other", "go.mod", "pkg"})
 }
 
+func TestGoCobraCliRendersEmptyVorpalLists(t *testing.T) {
+	goCobraCliRenderTemp(t, map[string]interface{}{
+		"vorpal": map[string]interface{}{
+			"tools":    []string{},
+			"includes": []string{},
+		},
+	})
+
+	file := goCobraCliParseProgram(t)
+	goCobraCliAssertStrings(t, "FetchArtifactAlias aliases", goCobraCliFetchedAliases(t, file), nil)
+	goCobraCliAssertStrings(t, "artifact includes", goCobraCliCallStrings(t, file, "WithIncludes"), nil)
+}
+
 func TestGoCobraCliLintConfigOmitsGoKitExclusion(t *testing.T) {
 	goCobraCliRenderTemp(t, nil)
 
