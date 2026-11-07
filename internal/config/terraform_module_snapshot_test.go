@@ -47,8 +47,24 @@ func TestTerraformModuleSnapshot(t *testing.T) {
 	terraformModuleCompareGolden(t, golden, terraformModuleSnapshot(t, root))
 }
 
+func TestTerraformModuleSnapshotRecordsMissingFinalNewline(t *testing.T) {
+	without, with := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(without, "file"), []byte("abc"), 0o600); err != nil {
+		t.Fatalf("write file without final newline: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(with, "file"), []byte("abc\n"), 0o600); err != nil {
+		t.Fatalf("write file with final newline: %v", err)
+	}
+
+	if bytes.Equal(terraformModuleSnapshot(t, without), terraformModuleSnapshot(t, with)) {
+		t.Errorf("snapshots of %q and %q are identical; a dropped final newline would go undetected", "abc", "abc\n")
+	}
+}
+
 // terraformModuleSnapshot lists every regular file under root in sorted path
 // order, each as a "-- <path> --" header line followed by the file's content.
+// Content that lacks a final newline is followed by a newline and the line
+// "\ No newline at end of file", so the snapshot keeps that difference.
 // Paths are slash-separated and relative to root.
 func terraformModuleSnapshot(t *testing.T, root string) []byte {
 	t.Helper()
@@ -77,7 +93,7 @@ func terraformModuleSnapshot(t *testing.T, root string) []byte {
 		snap.WriteString("-- " + path + " --\n")
 		snap.Write(content)
 		if len(content) > 0 && content[len(content)-1] != '\n' {
-			snap.WriteByte('\n')
+			snap.WriteString("\n\\ No newline at end of file\n")
 		}
 	}
 	return snap.Bytes()
