@@ -12,9 +12,12 @@ func main() {
 
 	var tools []*string
 	for _, alias := range []string{
-{{- if .Vorpal.Tools }}
+{{- if or .Vorpal.Tools .OpenAPI.Enable }}
 {{- range .Vorpal.Tools }}
 		"{{ . }}",
+{{- end }}
+{{- if .OpenAPI.Enable }}
+		"openapi-generator-cli:7.18.0",
 {{- end }}
 	{{ end -}}
 	} {

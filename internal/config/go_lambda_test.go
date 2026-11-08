@@ -226,18 +226,22 @@ func TestGoLambdaRenderVorpalProgramArtifactPerLambda(t *testing.T) {
 
 func TestGoLambdaRenderVorpalProgramGofmtCleanForAnyTools(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		tools []string
+		name    string
+		tools   []string
+		openAPI bool
 	}{
 		{name: "default", tools: NewGoLambdaConfig(Config{}).Vorpal.Tools},
 		{name: "one", tools: []string{"just:1.45.0"}},
 		{name: "empty", tools: []string{}},
+		{name: "default with openapi", tools: NewGoLambdaConfig(Config{}).Vorpal.Tools, openAPI: true},
+		{name: "empty with openapi", tools: []string{}, openAPI: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
 			cfg.Lambdas = []string{"api"}
 			cfg.Vorpal.Tools = tc.tools
+			cfg.OpenAPI.Enable = tc.openAPI
 			if err := cfg.Render(); err != nil {
 				t.Fatalf("Render: %v", err)
 			}

@@ -6,27 +6,24 @@ on:
     branches: [main]
   pull_request:
 
-env:
-  CACHIX_BINARY_CACHE: {{ .Nix.Cachix.BinaryCache }}
-
 jobs:
   check:
-    runs-on: ubuntu-latest
+    if: {{ .ForkGuardedIf "" }}
+    permissions:
+      contents: read
+    runs-on: altf4llc
     steps:
-      - uses: cachix/install-nix-action@v25
-        with:
-          enable_kvm: true
-      - uses: cachix/cachix-action@v14
-        with:
-          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
       - uses: actions/checkout@v4
-      - run: nix develop -c just check
+      - run: just check
+        shell: bash .github/vorpal-shell.sh {0}
 
   build:
+    if: {{ .ForkGuardedIf "" }}
     needs:
       - check
-    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    runs-on: altf4llc
     strategy:
       matrix:
         profile:
@@ -34,13 +31,7 @@ jobs:
           - {{ . }}
           {{- end }}
     steps:
-      - uses: cachix/install-nix-action@v25
-        with:
-          enable_kvm: true
-      - uses: cachix/cachix-action@v14
-        with:
-          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
+      - uses: actions/checkout@v4
       {{- if .PrivateModules }}
       - id: generate-token
         uses: actions/create-github-app-token@v1
@@ -53,13 +44,12 @@ jobs:
           machine: github.com
           password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
-      {{- end }}
-      - uses: actions/checkout@v4
-      {{- if .PrivateModules }}
       - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
       {{- end }}
-      - run: nix develop -c just build "${{"{{"}} matrix.profile {{"}}"}}"
-      - run: nix develop -c just package "${{"{{"}} matrix.profile {{"}}"}}"
+      - run: just build "${{"{{"}} matrix.profile {{"}}"}}"
+        shell: bash .github/vorpal-shell.sh {0}
+      - run: just package "${{"{{"}} matrix.profile {{"}}"}}"
+        shell: bash .github/vorpal-shell.sh {0}
       - uses: actions/upload-artifact@v4
         with:
           name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
@@ -67,20 +57,19 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       {{- if .PrivateModules }}
-      - run: rm -rf /tmp/.netrc
-        if: success() || failure()
+      - run: rm -f /tmp/.netrc
+        if: always()
+      - run: rm -f ~/.netrc
+        if: always()
       {{- end }}
-
   {{ range .Deploy }}
   deploy-{{ .Environment }}:
-    runs-on: ubuntu-latest
-    {{- if .If }}
-    if: {{ .If }}
-    {{- end }}
+    if: {{ $.ForkGuardedIf .If }}
     permissions:
       id-token: write
       contents: read
     needs: build
+    runs-on: altf4llc
     strategy:
       matrix:
         profile:
@@ -88,6 +77,7 @@ jobs:
           - {{ . }}
           {{- end }}
     steps:
+      - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: {{ .Region }}
@@ -96,12 +86,6 @@ jobs:
         with:
           name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
           path: "dist/${{"{{"}} matrix.profile {{"}}"}}/lambda.zip"
-      - uses: cachix/install-nix-action@v25
-        with:
-          enable_kvm: true
-      - uses: cachix/cachix-action@v14
-        with:
-          authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-          name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
-      - run: nix develop -c just deploy {{ .Environment }} "${{"{{"}} matrix.profile {{"}}"}}"
+      - run: just deploy {{ .Environment }} "${{"{{"}} matrix.profile {{"}}"}}"
+        shell: bash .github/vorpal-shell.sh {0}
   {{- end }}

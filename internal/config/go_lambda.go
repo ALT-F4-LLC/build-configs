@@ -4,17 +4,26 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
-const GoLambdaName = "go-lambda"
+const (
+	GoLambdaName = "go-lambda"
+
+	goLambdaVorpalShell = ".github/vorpal-shell.sh"
+
+	// goLambdaForkGuard keeps CI jobs, which run on the self-hosted runner
+	// and may hold secrets, from running for pull requests opened from forks.
+	goLambdaForkGuard = "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
+)
 
 type GoLambdaConfig struct {
 	Config
 	GoVersion      string               `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
 	Lint           GolangCILintConfig   `json:"lint,omitempty" yaml:"lint,omitempty"`
-	Nix            NixGoConfig          `json:"nix,omitempty" yaml:"nix,omitempty"`
 	Quirk          QuirkConfig          `json:"quirk,omitempty" yaml:"quirk,omitempty"`
 	Deploy         []DeployConfig       `json:"deploy,omitempty" yaml:"deploy,omitempty"`
 	PrivateModules string               `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
@@ -39,19 +48,13 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 		Lambdas:        []string{c.Name},
 		OpenAPI:        NewOpenAPIConfig(),
 		Vorpal: GoLambdaVorpalConfig{
-			Tools: []string{"golangci-lint:2.11.4", "just:1.45.0"},
-		},
-
-		Nix: NixGoConfig{
-			NixConfig:     NewNixConfig(),
-			GoPackage:     "go",
-			BuildGoModule: "buildGoModule",
+			Tools: []string{"awscli2:2.33.1", "golangci-lint:2.11.4", "jq:1.8.1", "just:1.45.0"},
 		},
 	}
 }
 
 func (c GoLambdaConfig) renderMap() templates.RenderMap {
-	renderMap := templates.RenderMap{
+	return templates.RenderMap{
 		templates.AllCommonTemplates: {
 			".github/renovate.json",
 		},
@@ -62,20 +65,12 @@ func (c GoLambdaConfig) renderMap() templates.RenderMap {
 		},
 		templates.GoLambdaTemplates: {
 			".envrc",
-			".github/workflows/flake.yaml",
-			"nix/lambda.nix",
-			"nix/default.nix",
-			"flake.nix",
+			goLambdaVorpalShell,
+			".github/workflows/ci.yaml",
 			"justfile",
 			"Vorpal.toml",
 		},
 	}
-
-	if c.OpenAPI.Enable {
-		renderMap[templates.GoLambdaTemplates] = append(renderMap[templates.GoLambdaTemplates], "nix/client.nix")
-	}
-
-	return renderMap
 }
 
 func (c GoLambdaConfig) Render() error {
@@ -119,5 +114,40 @@ func (c GoLambdaConfig) Render() error {
 		}
 	}
 
-	return templates.WriteFiles(files)
+	if err := templates.WriteFiles(files); err != nil {
+		return err
+	}
+
+	return goLambdaMakeVorpalShellExecutable()
+}
+
+// ForkGuardedIf returns a GitHub Actions job `if:` expression that requires
+// the fork guard and, when condition is set, condition as well. condition may
+// be bare or wrapped in `${{ }}`. Both operands are parenthesised because
+// `&&` binds tighter than `||` inside the guard.
+func (c GoLambdaConfig) ForkGuardedIf(condition string) string {
+	condition = strings.TrimSpace(condition)
+	if inner, ok := strings.CutPrefix(condition, "${{"); ok {
+		if inner, ok := strings.CutSuffix(inner, "}}"); ok {
+			condition = strings.TrimSpace(inner)
+		}
+	}
+	if condition == "" {
+		return "${{ " + goLambdaForkGuard + " }}"
+	}
+	return "${{ (" + goLambdaForkGuard + ") && (" + condition + ") }}"
+}
+
+// goLambdaMakeVorpalShellExecutable sets the CI step shell to 0755, since
+// templates.WriteFiles writes every file 0644. A path listed in .bcignore is
+// left untouched, including any copy the repository keeps.
+func goLambdaMakeVorpalShellExecutable() error {
+	ignored, err := templates.GetIgnoredFiles(".")
+	if err != nil {
+		return fmt.Errorf("failed to get ignored files: %w", err)
+	}
+	if slices.Contains(ignored, goLambdaVorpalShell) {
+		return nil
+	}
+	return os.Chmod(goLambdaVorpalShell, 0o755) //nolint:gosec // CI runs this script directly, so it must be executable
 }
