@@ -85,13 +85,15 @@ func TestTerraformModuleRendersVorpalToml(t *testing.T) {
 		t.Fatalf("Vorpal.toml was not written: %v", err)
 	}
 
-	want := `script = "go mod init github.com/ALT-F4-LLC/demo-module && go mod tidy"`
-	lines := strings.Split(string(got), "\n")
-	for i := range lines {
-		lines[i] = strings.TrimSpace(lines[i])
+	for _, want := range []string{`language = "go"`, "includes = [\n    \"cmd/vorpal\",\n    \"go.mod\",\n    \"go.sum\"\n]", "[source.go]\ndirectory = \"cmd/vorpal\""} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("Vorpal.toml missing %q:\n%s", want, got)
+		}
 	}
-	if !slices.Contains(lines, want) {
-		t.Errorf("Vorpal.toml has no line %q:\n%s", want, got)
+	for line := range strings.SplitSeq(string(got), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "script") {
+			t.Errorf("Vorpal.toml has a script line %q by default, want none:\n%s", line, got)
+		}
 	}
 }
 
@@ -100,8 +102,8 @@ func TestTerraformModuleVorpalProgramDefaults(t *testing.T) {
 
 	program := terraformModuleParseVorpalProgram(t)
 
-	if !slices.Equal(program.environmentNames, []string{"dev"}) {
-		t.Errorf("development environments = %q, want [\"dev\"]", program.environmentNames)
+	if !slices.Equal(program.environmentNames, []string{"demo-module-dev"}) {
+		t.Errorf("development environments = %q, want [\"demo-module-dev\"]", program.environmentNames)
 	}
 	for _, alias := range []string{"just:1.45.0", "terraform:1.13.1"} {
 		if !slices.Contains(program.aliases, alias) {

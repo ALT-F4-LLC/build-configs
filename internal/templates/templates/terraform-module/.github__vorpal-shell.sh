@@ -3,4 +3,4 @@
 # environment. The activate script sets PATH, then runs its arguments.
 set -euo pipefail
 
-exec "$(vorpal build --path 'dev')/bin/activate" bash -e "$1"
+exec "$(vorpal build --path {{ .ShellQuotedDevEnvironment }})/bin/activate" bash -e "$1"

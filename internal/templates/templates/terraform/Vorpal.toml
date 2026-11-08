@@ -1,8 +1,12 @@
 language = "go"
 
 [source]
-includes = ["cmd/vorpal"]
-script = "go mod init github.com/ALT-F4-LLC/{{ .Name }} && go mod tidy"
-
+includes = [
+    "cmd/vorpal",
+    "go.mod",
+    "go.sum"
+]
+{{ if .Vorpal.Script }}script = {{ printf "%q" .Vorpal.Script }}
+{{ end }}
 [source.go]
 directory = "cmd/vorpal"

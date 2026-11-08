@@ -128,7 +128,7 @@ func TestTerraformModuleJustfileRecipes(t *testing.T) {
 		"check":    {"terraform fmt -check"},
 		"docs":     {"terraform-docs markdown table --output-file README.md --output-mode inject ."},
 		"init":     {"terraform init"},
-		"package":  {"vorpal build --path 'dev'"},
+		"package":  {"vorpal build --path 'demo-module-dev'"},
 		"validate": {"terraform validate"},
 	}
 	if !maps.EqualFunc(got, want, slices.Equal) {

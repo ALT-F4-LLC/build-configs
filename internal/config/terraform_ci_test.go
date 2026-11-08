@@ -374,7 +374,7 @@ func TestTerraformRendersExecutableVorpalShell(t *testing.T) {
 	}
 
 	got := terraformVorpalReadFile(t, terraformVorpalShell)
-	for _, want := range []string{"vorpal build --path 'dev'", "bin/activate"} {
+	for _, want := range []string{"vorpal build --path 'demo-dev'", "bin/activate"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("%s does not contain %q:\n%s", terraformVorpalShell, want, got)
 		}

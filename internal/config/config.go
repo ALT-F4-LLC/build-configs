@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,6 +15,18 @@ type Config struct {
 	Name       string                 `json:"name" yaml:"name"`
 	Template   string                 `json:"template" yaml:"template"`
 	Parameters map[string]interface{} `json:"parameters" yaml:"parameters"`
+}
+
+// DevEnvironment returns the Vorpal development environment name, <name>-dev.
+func (c Config) DevEnvironment() string {
+	return c.Name + "-dev"
+}
+
+// ShellQuotedDevEnvironment returns DevEnvironment as one POSIX single-quoted
+// shell word, so generated scripts pass it to vorpal verbatim whatever
+// characters the name holds.
+func (c Config) ShellQuotedDevEnvironment() string {
+	return "'" + strings.ReplaceAll(c.DevEnvironment(), "'", `'\''`) + "'"
 }
 
 var (

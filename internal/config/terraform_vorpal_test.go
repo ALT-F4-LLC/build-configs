@@ -125,8 +125,7 @@ func TestTerraformRenderWritesVorpalConfig(t *testing.T) {
 	got := terraformVorpalReadFile(t, "Vorpal.toml")
 	for _, want := range []string{
 		`language = "go"`,
-		`"cmd/vorpal"`,
-		`script = "go mod init github.com/ALT-F4-LLC/demo && go mod tidy"`,
+		"includes = [\n    \"cmd/vorpal\",\n    \"go.mod\",\n    \"go.sum\"\n]",
 		"[source.go]\ndirectory = \"cmd/vorpal\"",
 	} {
 		if !strings.Contains(got, want) {
@@ -139,8 +138,8 @@ func TestTerraformRenderWritesVorpalDevEnvironment(t *testing.T) {
 	terraformVorpalRender(t, nil)
 
 	envName, aliases, envArtifacts := terraformVorpalDevEnvironment(t, terraformVorpalReadFile(t, "cmd/vorpal/main.go"))
-	if envName != "dev" {
-		t.Errorf("development environment name = %q, want %q", envName, "dev")
+	if envName != "demo-dev" {
+		t.Errorf("development environment name = %q, want %q", envName, "demo-dev")
 	}
 	for _, want := range []string{"just:1.45.0", "terraform:1.13.1", "awscli2:2.33.1"} {
 		if !slices.Contains(aliases, want) {

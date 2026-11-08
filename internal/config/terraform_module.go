@@ -15,6 +15,7 @@ const (
 )
 
 type TerraformModuleVorpalConfig struct {
+	Script           string `json:"script,omitempty" yaml:"script,omitempty"`
 	TerraformVersion string `json:"terraformVersion,omitempty" yaml:"terraformVersion,omitempty"`
 }
 

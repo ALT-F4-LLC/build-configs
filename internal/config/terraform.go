@@ -39,6 +39,7 @@ type TerraformConfig struct {
 }
 
 type TerraformVorpalConfig struct {
+	Script           string `json:"script,omitempty" yaml:"script,omitempty"`
 	TerraformVersion string `json:"terraformVersion,omitempty" yaml:"terraformVersion,omitempty"`
 }
 
@@ -70,7 +71,9 @@ func NewTerraformConfig(c Config) TerraformConfig {
 		Region:   "us-west-2",
 		Role:     NewTerraformConfigRole(c.Name),
 		Schedule: nil,
-		Vorpal:   TerraformVorpalConfig{TerraformVersion: "1.13.1"},
+		Vorpal: TerraformVorpalConfig{
+			TerraformVersion: "1.13.1",
+		},
 	}
 }
 

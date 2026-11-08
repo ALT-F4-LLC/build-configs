@@ -28,5 +28,5 @@ jobs:
       - uses: actions/checkout@v7
       - run: just package
         shell: bash .github/vorpal-shell.sh {0}
-      - run: echo "just package built the Vorpal dev environment (vorpal build --path 'dev'); it does not run terraform init or validate." >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "just package built the Vorpal dev environment (vorpal build --path {{ .ShellQuotedDevEnvironment }}); it does not run terraform init or validate." >> "$GITHUB_STEP_SUMMARY"
         shell: bash .github/vorpal-shell.sh {0}

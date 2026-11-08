@@ -11,7 +11,7 @@ init:
     terraform init
 
 package:
-    vorpal build --path 'dev'
+    vorpal build --path {{ .ShellQuotedDevEnvironment }}
 
 validate:
     terraform validate

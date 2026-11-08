@@ -25,7 +25,7 @@ func main() {
 		log.Fatalf("failed fetching terraform alias: %v", err)
 	}
 
-	_, err = artifact.NewDevelopmentEnvironment("dev", config.SYSTEMS).
+	_, err = artifact.NewDevelopmentEnvironment({{ printf "%q" .DevEnvironment }}, config.SYSTEMS).
 		WithArtifacts([]*string{awscli2, just, terraform}).
 		Build(ctx)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 )
 
 const terraformModuleEnvrcWant = `use_vorpal() {
-    source "$(vorpal build --path 'dev')/bin/activate"
+    source "$(vorpal build --path 'demo-module-dev')/bin/activate"
 }
 
 use vorpal
