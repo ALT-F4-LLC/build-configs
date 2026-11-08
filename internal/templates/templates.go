@@ -17,6 +17,12 @@ var (
 	//go:embed all:templates/common/go/*
 	goCommonFS embed.FS
 
+	//go:embed all:templates/common/terraform/*
+	terraformCommonFS embed.FS
+
+	//go:embed all:templates/common/vorpal/*
+	vorpalCommonFS embed.FS
+
 	//go:embed all:templates/go-cobra-cli/*
 	goCobraCliFS embed.FS
 
@@ -31,6 +37,8 @@ var (
 
 	AllCommonTemplates       *template.Template
 	GoCommonTemplates        *template.Template
+	TerraformCommonTemplates *template.Template
+	VorpalCommonTemplates    *template.Template
 	GoCobraCliTemplates      *template.Template
 	GoLambdaTemplates        *template.Template
 	TerraformTemplates       *template.Template
@@ -45,6 +53,8 @@ type RenderMap = map[*template.Template][]string
 func init() {
 	AllCommonTemplates = template.Must(template.ParseFS(allCommonFS, "templates/common/all/*"))
 	GoCommonTemplates = template.Must(template.ParseFS(goCommonFS, "templates/common/go/*"))
+	TerraformCommonTemplates = template.Must(template.ParseFS(terraformCommonFS, "templates/common/terraform/*"))
+	VorpalCommonTemplates = template.Must(template.ParseFS(vorpalCommonFS, "templates/common/vorpal/*"))
 	GoCobraCliTemplates = template.Must(template.ParseFS(goCobraCliFS, "templates/go-cobra-cli/*"))
 	GoLambdaTemplates = template.Must(template.ParseFS(goLambdaFS, "templates/go-lambda/*"))
 	TerraformTemplates = template.Must(template.ParseFS(terraformFS, "templates/terraform/*"))

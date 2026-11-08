@@ -13,8 +13,6 @@ import (
 const (
 	GoLambdaName = "go-lambda"
 
-	goLambdaVorpalShell = ".github/vorpal-shell.sh"
-
 	// goLambdaForkGuard keeps CI jobs, which run on the self-hosted runner
 	// and may hold secrets, from running for pull requests opened from forks.
 	goLambdaForkGuard = "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
@@ -71,12 +69,10 @@ func (c GoLambdaConfig) renderMap() templates.RenderMap {
 		},
 		templates.GoCommonTemplates: {
 			".editorconfig",
-			".github/workflows/golangci-lint.yaml",
 			".golangci.yaml",
 		},
+		templates.VorpalCommonTemplates: vorpalCommonFiles(),
 		templates.GoLambdaTemplates: {
-			".envrc",
-			goLambdaVorpalShell,
 			".github/workflows/ci.yaml",
 			"justfile",
 			"Vorpal.toml",
@@ -141,7 +137,7 @@ func (c GoLambdaConfig) Render() error {
 		return err
 	}
 
-	return goLambdaMakeVorpalShellExecutable()
+	return makeVorpalShellExecutable()
 }
 
 // ForkGuardedIf returns a GitHub Actions job `if:` expression that requires
@@ -159,18 +155,4 @@ func (c GoLambdaConfig) ForkGuardedIf(condition string) string {
 		return "${{ " + goLambdaForkGuard + " }}"
 	}
 	return "${{ (" + goLambdaForkGuard + ") && (" + condition + ") }}"
-}
-
-// goLambdaMakeVorpalShellExecutable sets the CI step shell to 0755, since
-// templates.WriteFiles writes every file 0644. A path listed in .bcignore is
-// left untouched, including any copy the repository keeps.
-func goLambdaMakeVorpalShellExecutable() error {
-	ignored, err := templates.GetIgnoredFiles(".")
-	if err != nil {
-		return fmt.Errorf("failed to get ignored files: %w", err)
-	}
-	if slices.Contains(ignored, goLambdaVorpalShell) {
-		return nil
-	}
-	return os.Chmod(goLambdaVorpalShell, 0o755) //nolint:gosec // CI runs this script directly, so it must be executable
 }

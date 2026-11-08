@@ -1,19 +1,10 @@
 package config
 
 import (
-	"fmt"
-	"os"
-	"slices"
-	"strings"
-
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
-const (
-	GoCobraCliName = "go-cobra-cli"
-
-	goCobraCliVorpalShell = ".github/vorpal-shell.sh"
-)
+const GoCobraCliName = "go-cobra-cli"
 
 type GoCobraCliConfig struct {
 	Config
@@ -59,13 +50,6 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 	}
 }
 
-// ShellQuotedDevEnvironment returns the Vorpal development environment name,
-// <name>-dev, as one POSIX single-quoted shell word, so the generated .envrc
-// passes it to vorpal verbatim whatever characters the name holds.
-func (c GoCobraCliConfig) ShellQuotedDevEnvironment() string {
-	return "'" + strings.ReplaceAll(c.Name+"-dev", "'", `'\''`) + "'"
-}
-
 func (c GoCobraCliConfig) renderMap() templates.RenderMap {
 	return templates.RenderMap{
 		templates.AllCommonTemplates: {
@@ -73,12 +57,10 @@ func (c GoCobraCliConfig) renderMap() templates.RenderMap {
 		},
 		templates.GoCommonTemplates: {
 			".editorconfig",
-			".github/workflows/golangci-lint.yaml",
 			".golangci.yaml",
 		},
+		templates.VorpalCommonTemplates: vorpalCommonFiles(),
 		templates.GoCobraCliTemplates: {
-			".envrc",
-			goCobraCliVorpalShell,
 			".github/workflows/ci.yaml",
 			"Vorpal.toml",
 			"justfile",
@@ -102,19 +84,5 @@ func (c GoCobraCliConfig) Render() error {
 		return err
 	}
 
-	return goCobraCliMakeVorpalShellExecutable()
-}
-
-// goCobraCliMakeVorpalShellExecutable sets the CI step shell to 0755, since
-// templates.WriteFiles writes every file 0644. A path listed in .bcignore is
-// left untouched, including any copy the repository keeps.
-func goCobraCliMakeVorpalShellExecutable() error {
-	ignored, err := templates.GetIgnoredFiles(".")
-	if err != nil {
-		return fmt.Errorf("failed to get ignored files: %w", err)
-	}
-	if slices.Contains(ignored, goCobraCliVorpalShell) {
-		return nil
-	}
-	return os.Chmod(goCobraCliVorpalShell, 0o755) //nolint:gosec // CI runs this script directly, so it must be executable
+	return makeVorpalShellExecutable()
 }

@@ -1,18 +1,10 @@
 package config
 
 import (
-	"fmt"
-	"os"
-	"slices"
-
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
-const (
-	TerraformModuleName = "terraform-module"
-
-	terraformModuleVorpalShell = ".github/vorpal-shell.sh"
-)
+const TerraformModuleName = "terraform-module"
 
 type TerraformModuleVorpalConfig struct {
 	Script           string `json:"script,omitempty" yaml:"script,omitempty"`
@@ -38,12 +30,13 @@ func (c TerraformModuleConfig) renderMap() templates.RenderMap {
 		templates.AllCommonTemplates: {
 			".github/renovate.json",
 		},
-		templates.TerraformModuleTemplates: {
-			".envrc",
-			terraformModuleVorpalShell,
-			".github/workflows/terraform.yaml",
+		templates.VorpalCommonTemplates: vorpalCommonFiles(),
+		templates.TerraformCommonTemplates: {
 			".gitignore",
 			"Vorpal.toml",
+		},
+		templates.TerraformModuleTemplates: {
+			".github/workflows/terraform.yaml",
 			"justfile",
 		},
 	}
@@ -69,19 +62,5 @@ func (c TerraformModuleConfig) Render() error {
 		return err
 	}
 
-	return terraformModuleMakeVorpalShellExecutable()
-}
-
-// terraformModuleMakeVorpalShellExecutable sets the CI step shell to 0755,
-// since templates.WriteFiles writes every file 0644. A path listed in
-// .bcignore is left untouched, including any copy the repository keeps.
-func terraformModuleMakeVorpalShellExecutable() error {
-	ignored, err := templates.GetIgnoredFiles(".")
-	if err != nil {
-		return fmt.Errorf("failed to get ignored files: %w", err)
-	}
-	if slices.Contains(ignored, terraformModuleVorpalShell) {
-		return nil
-	}
-	return os.Chmod(terraformModuleVorpalShell, 0o755) //nolint:gosec // CI runs this script directly, so it must be executable
+	return makeVorpalShellExecutable()
 }

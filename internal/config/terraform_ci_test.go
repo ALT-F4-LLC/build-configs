@@ -15,7 +15,7 @@ import (
 const (
 	terraformCIWorkflowPath = ".github/workflows/terraform.yaml"
 	terraformCIForkGuard    = "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
-	terraformCIVorpalShell  = "bash " + terraformVorpalShell + " {0}"
+	terraformCIVorpalShell  = "bash " + vorpalShell + " {0}"
 )
 
 type terraformCIWorkflow struct {
@@ -365,25 +365,25 @@ func TestTerraformWorkflowOmitsNixCachixFlake(t *testing.T) {
 func TestTerraformRendersExecutableVorpalShell(t *testing.T) {
 	terraformVorpalRender(t, nil)
 
-	info, err := os.Stat(terraformVorpalShell)
+	info, err := os.Stat(vorpalShell)
 	if err != nil {
-		t.Fatalf("%s was not written: %v", terraformVorpalShell, err)
+		t.Fatalf("%s was not written: %v", vorpalShell, err)
 	}
 	if got := info.Mode().Perm(); got != 0o755 {
-		t.Errorf("%s mode = %#o, want %#o", terraformVorpalShell, got, 0o755)
+		t.Errorf("%s mode = %#o, want %#o", vorpalShell, got, 0o755)
 	}
 
-	got := terraformVorpalReadFile(t, terraformVorpalShell)
+	got := terraformVorpalReadFile(t, vorpalShell)
 	for _, want := range []string{"vorpal build --path 'demo-dev'", "bin/activate"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("%s does not contain %q:\n%s", terraformVorpalShell, want, got)
+			t.Errorf("%s does not contain %q:\n%s", vorpalShell, want, got)
 		}
 	}
 }
 
 func TestTerraformVorpalShellHonorsBcignore(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := os.WriteFile(".bcignore", []byte(terraformVorpalShell+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(".bcignore", []byte(vorpalShell+"\n"), 0o600); err != nil {
 		t.Fatalf("write .bcignore: %v", err)
 	}
 
@@ -392,10 +392,10 @@ func TestTerraformVorpalShellHonorsBcignore(t *testing.T) {
 		t.Fatalf("GetTemplater: %v", err)
 	}
 	if err := tpl.Render(); err != nil {
-		t.Fatalf("Render with %s ignored: %v", terraformVorpalShell, err)
+		t.Fatalf("Render with %s ignored: %v", vorpalShell, err)
 	}
 
-	if _, err := os.Stat(terraformVorpalShell); !errors.Is(err, fs.ErrNotExist) {
-		t.Errorf("%s stat error = %v, want it absent", terraformVorpalShell, err)
+	if _, err := os.Stat(vorpalShell); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("%s stat error = %v, want it absent", vorpalShell, err)
 	}
 }

@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -12,8 +11,7 @@ import (
 )
 
 type golangciRenderContext struct {
-	Lint           GolangCILintConfig
-	PrivateModules string
+	Lint GolangCILintConfig
 }
 
 func golangciRender(t *testing.T, name string, ctx golangciRenderContext) string {
@@ -101,49 +99,5 @@ func TestGolangciConfigExcludesRenderAsTextRules(t *testing.T) {
 	want := append(slices.Clone(excludes), extra)
 	if !slices.Equal(texts, want) {
 		t.Errorf("exclusion rule texts = %q, want %q\n%s", texts, want, out)
-	}
-}
-
-func TestGolangciLintWorkflowUsesV2CapableAction(t *testing.T) {
-	for _, privateModules := range []string{"", "github.com/example/private"} {
-		t.Run("privateModules="+strconv.Quote(privateModules), func(t *testing.T) {
-			out := golangciRender(t, ".github/workflows/golangci-lint.yaml", golangciRenderContext{
-				PrivateModules: privateModules,
-			})
-			if strings.Contains(out, "skip-pkg-cache") {
-				t.Errorf("workflow still sets skip-pkg-cache:\n%s", out)
-			}
-
-			var doc struct {
-				Jobs map[string]struct {
-					Steps []struct {
-						Uses string            `yaml:"uses"`
-						With map[string]string `yaml:"with"`
-					} `yaml:"steps"`
-				} `yaml:"jobs"`
-			}
-			if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
-				t.Fatalf("rendered workflow is not valid YAML: %v\n%s", err, out)
-			}
-
-			var found bool
-			for _, step := range doc.Jobs["lint"].Steps {
-				ref, ok := strings.CutPrefix(step.Uses, "golangci/golangci-lint-action@v")
-				if !ok {
-					continue
-				}
-				found = true
-				major, err := strconv.Atoi(strings.SplitN(ref, ".", 2)[0])
-				if err != nil || major < 7 {
-					t.Errorf("golangci-lint action %q, want major v7 or later", step.Uses)
-				}
-				if got := step.With["args"]; got != "./... --timeout=5m" {
-					t.Errorf("golangci-lint action args = %q, want %q", got, "./... --timeout=5m")
-				}
-			}
-			if !found {
-				t.Errorf("no golangci/golangci-lint-action step in lint job:\n%s", out)
-			}
-		})
 	}
 }

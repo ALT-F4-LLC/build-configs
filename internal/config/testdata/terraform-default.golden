@@ -1,0 +1,225 @@
+-- out/.envrc --
+use_vorpal() {
+    source "$(vorpal build --path 'example-dev')/bin/activate"
+}
+
+use vorpal
+-- out/.github/renovate.json --
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:base",
+        ":semanticCommitTypeAll(chore)"
+    ],
+    "lockFileMaintenance": {
+        "enabled": true,
+        "extends": [
+            "schedule:weekly"
+        ]
+    }
+}
+-- out/.github/vorpal-shell.sh --
+#!/usr/bin/env bash
+# Step shell for CI: runs the step script ($1) inside the dev Vorpal
+# environment. The activate script sets PATH, then runs its arguments.
+set -euo pipefail
+
+exec "$(vorpal build --path 'example-dev')/bin/activate" bash -e "$1"
+-- out/.github/workflows/terraform.yaml --
+name: terraform
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - run: just check
+      shell: bash .github/vorpal-shell.sh {0}
+
+  plan:
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: check
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: altf4llc
+    steps:
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        audience: sts.amazonaws.com
+        aws-region: us-west-2
+        role-to-assume: arn:aws:iam::677459762413:role/altf4llc-gha-example-plan
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - run: aws sts get-caller-identity
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just init
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just validate
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just plan
+      shell: bash .github/vorpal-shell.sh {0}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: tf-plan
+        path: terraform.tfplan
+
+  apply:
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    environment:
+      name: prod
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.ref == 'refs/heads/main') }}
+    needs: plan
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: altf4llc
+    steps:
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        audience: sts.amazonaws.com
+        aws-region: us-west-2
+        role-to-assume: arn:aws:iam::677459762413:role/altf4llc-gha-example-apply
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/download-artifact@v4
+      with:
+        name: tf-plan
+    - run: aws sts get-caller-identity
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just init
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just apply
+      shell: bash .github/vorpal-shell.sh {0}
+-- out/.gitignore --
+.direnv
+*.tfplan
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files, which are likely to contain sensitive data, such as
+# password, private keys, and other secrets. These should not be part of version
+# control as they are data points which are potentially sensitive and subject
+# to change depending on the environment.
+*.tfvars
+*.tfvars.json
+
+# Ignore override files as they are usually used to override resources locally and so
+# are not checked in
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Include override files you do wish to add to version control using negated pattern
+# !example_override.tf
+
+# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
+# example: *tfplan*
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+.terraform.lock.hcl
+-- out/Vorpal.toml --
+language = "go"
+
+[source]
+includes = [
+    "cmd/vorpal",
+    "go.mod",
+    "go.sum"
+]
+
+[source.go]
+directory = "cmd/vorpal"
+-- out/cmd/vorpal/main.go --
+package main
+
+import (
+	"log"
+
+	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact"
+	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/config"
+)
+
+func main() {
+	ctx := config.GetContext()
+
+	awscli2, err := ctx.FetchArtifactAlias("awscli2:2.33.1")
+	if err != nil {
+		log.Fatalf("failed fetching awscli2 alias: %v", err)
+	}
+
+	just, err := ctx.FetchArtifactAlias("just:1.45.0")
+	if err != nil {
+		log.Fatalf("failed fetching just alias: %v", err)
+	}
+
+	terraform, err := ctx.FetchArtifactAlias("terraform:1.13.1")
+	if err != nil {
+		log.Fatalf("failed fetching terraform alias: %v", err)
+	}
+
+	_, err = artifact.NewDevelopmentEnvironment("example-dev", config.SYSTEMS).
+		WithArtifacts([]*string{awscli2, just, terraform}).
+		Build(ctx)
+	if err != nil {
+		log.Fatalf("failed building development environment: %v", err)
+	}
+
+	if err := ctx.Run(); err != nil {
+		log.Fatalf("failed running config: %v", err)
+	}
+}
+-- out/justfile --
+check:
+    terraform fmt -check
+
+docs:
+    terraform-docs markdown table \
+        --output-file README.md \
+        --output-mode inject .
+
+format:
+    terraform fmt -recursive
+
+init:
+    terraform init
+
+validate:
+    terraform validate
+
+plan:
+    terraform plan -out "terraform.tfplan"
+
+apply:
+    terraform apply "terraform.tfplan"
