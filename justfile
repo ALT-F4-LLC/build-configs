@@ -4,6 +4,9 @@ build:
 doc-validate:
     rumdl check --no-cache --deny-config-warnings .
 
+install:
+    go install ./cmd/build-configs
+
 lint:
     golangci-lint run ./...
 
