@@ -102,7 +102,7 @@ func TestGoLambdaRendersExecutableVorpalShell(t *testing.T) {
 		t.Errorf("%s mode = %#o, want %#o", goLambdaVorpalShellPath, got, 0o755)
 	}
 	got := goLambdaReadFile(t, goLambdaVorpalShellPath)
-	for _, want := range []string{"vorpal build --path 'dev'", "bin/activate"} {
+	for _, want := range []string{"vorpal build --path 'example-dev'", "bin/activate"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("%s does not contain %q:\n%s", goLambdaVorpalShellPath, want, got)
 		}

@@ -16,6 +16,47 @@ jobs:
       - uses: actions/checkout@v4
       - run: just check
         shell: bash .github/vorpal-shell.sh {0}
+{{- if .Services }}
+
+  build-services:
+    if: {{ .ForkGuardedIf "" }}
+    needs:
+      - check
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    strategy:
+      matrix:
+        service:
+          {{- range .Services }}
+          - {{ . }}
+          {{- end }}
+    steps:
+      - uses: actions/checkout@v4
+      {{- if .PrivateModules }}
+      - id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID {{"}}"}}
+          owner: ${{"{{"}} github.repository_owner {{"}}"}}
+          private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY {{"}}"}}
+      - uses: extractions/netrc@v2
+        with:
+          machine: github.com
+          password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
+          username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
+      - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
+      {{- end }}
+      - run: just build "${{"{{"}} matrix.service {{"}}"}}"
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- if .PrivateModules }}
+      - run: rm -f /tmp/.netrc
+        if: always()
+      - run: rm -f ~/.netrc
+        if: always()
+      {{- end }}
+{{- end }}
+{{- if or .Lambdas (not .Services) }}
 
   build:
     if: {{ .ForkGuardedIf "" }}
@@ -89,3 +130,4 @@ jobs:
       - run: just deploy {{ .Environment }} "${{"{{"}} matrix.profile {{"}}"}}"
         shell: bash .github/vorpal-shell.sh {0}
   {{- end }}
+{{- end }}

@@ -20,7 +20,7 @@ func TestGoLambdaRenderEnvrcActivatesVorpalDevEnvironment(t *testing.T) {
 
 	for _, want := range []string{
 		"use_vorpal() {",
-		`source "$(vorpal build --path 'dev')/bin/activate"`,
+		`source "$(vorpal build --path 'example-dev')/bin/activate"`,
 		"\nuse vorpal\n",
 	} {
 		if !strings.Contains(got, want) {

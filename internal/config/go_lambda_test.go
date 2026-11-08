@@ -125,7 +125,6 @@ func TestGoLambdaRenderVorpalToml(t *testing.T) {
 
 	for _, want := range []string{
 		`language = "go"`,
-		`script = "go mod init github.com/ALT-F4-LLC/example && go mod tidy"`,
 		"[source.go]\ndirectory = \"cmd/vorpal\"",
 	} {
 		if !strings.Contains(got, want) {
@@ -138,7 +137,7 @@ func TestGoLambdaRenderVorpalToml(t *testing.T) {
 		t.Fatalf("Vorpal.toml has no includes array:\n%s", got)
 	}
 	includes, _, _ := strings.Cut(afterIncludes, "]")
-	for _, want := range []string{`"cmd/vorpal"`, `"internal/vorpal"`} {
+	for _, want := range []string{`"cmd/vorpal"`, `"go.mod"`, `"go.sum"`, `"internal/vorpal"`} {
 		if !strings.Contains(includes, want) {
 			t.Errorf("[source] includes %q missing %s", includes, want)
 		}
@@ -150,8 +149,8 @@ func TestGoLambdaRenderVorpalProgramDevEnvironment(t *testing.T) {
 	file := goLambdaParseVorpalProgram(t)
 
 	devEnvs := goLambdaCallStringArgs(t, file, "language", "NewGoDevelopmentEnvironment")
-	if !slices.Equal(devEnvs, []string{"dev"}) {
-		t.Errorf("development environments = %q, want [\"dev\"]", devEnvs)
+	if !slices.Equal(devEnvs, []string{"example-dev"}) {
+		t.Errorf("development environments = %q, want [\"example-dev\"]", devEnvs)
 	}
 
 	lits := goLambdaStringLits(t, file)
@@ -165,6 +164,8 @@ func TestGoLambdaRenderVorpalProgramDevEnvironment(t *testing.T) {
 		}
 	}
 
+	// Scoped to vorpal.extension unset: a set extension imports the repo's own
+	// package, which may legitimately end in internal/vorpal.
 	for _, imp := range file.Imports {
 		path, err := strconv.Unquote(imp.Path.Value)
 		if err != nil {

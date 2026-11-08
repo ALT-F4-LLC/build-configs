@@ -72,6 +72,69 @@ internal tooling. This is the template this CLI uses.
 To use it, you need to run the generator and then run `go mod init` and
 `go mod tidy`, then update your `vendorHash`.
 
+#### Services
+
+`services` lists Go binaries built from `cmd/<name>` that are not lambdas, such
+as a long-running MCP server:
+
+```yaml
+parameters:
+  lambdas: [api]
+  services: [mcp]
+```
+
+A service is added to `cmd/vorpal/main.go` with build directory `cmd/<name>`,
+`-ldflags='-s -w'` and `CGO_ENABLED=0`, as a lambda is, but without
+`-tags='lambda.norpc'`. CI builds it in a `build-services` job with `just build`
+only: there is no package, upload or deploy step, and the `*-all` recipes in the
+`justfile` leave it out. The template does not scaffold `cmd/<name>/main.go`.
+A name listed in both `lambdas` and `services` is an error. `lambdas` defaults
+to `[<name>]`, so set `lambdas: []` for a services-only project. That project
+has no lambda `build` job, and `deploy` together with `services` and an empty
+`lambdas` is an error.
+
+#### `vorpal.extension`
+
+`vorpal.extension` is the full import path of a package in your own repository.
+When set, the generated `cmd/vorpal/main.go` imports it as `project`, calls
+`project.Artifacts` once after the development environment, and passes every
+lambda and service builder through `project.Go` before it builds:
+
+```yaml
+parameters:
+  vorpal:
+    extension: github.com/example/platform/internal/vorpal
+```
+
+The generated `Vorpal.toml` lists only `cmd/vorpal`, `go.mod`, `go.sum` and
+`internal/vorpal` under `[source] includes`, so keep the extension package, and
+any repository package it imports, under `internal/vorpal`. This has not been
+confirmed with a Vorpal build.
+
+The package must export both hooks:
+
+```go
+// Artifacts registers extra Vorpal artifacts for the repository.
+func Artifacts(ctx *config.ConfigContext) error
+
+// Go adjusts the builder for the lambda or service called name, and returns
+// the builder to build. Return b unchanged to leave it alone.
+func Go(ctx *config.ConfigContext, name string, b *language.Go) (*language.Go, error)
+```
+
+`config` is `github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/config` and `language` is
+`github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact/language`. With the extension
+unset (the default), `cmd/vorpal/main.go` has no project import and builds each
+artifact in one chained call. Setting `vorpal.extension` does not change
+`vorpal.tools`.
+
+If you would rather hand-write `cmd/vorpal/main.go`, list it in `.bcignore`
+and the generator leaves it alone:
+
+```
+cmd/vorpal/main.go
+```
+
 ## Examples
 
 Some example configurations for our template types exist in the

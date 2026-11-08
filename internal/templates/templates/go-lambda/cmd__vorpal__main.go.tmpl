@@ -5,6 +5,10 @@ import (
 
 	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact/language"
 	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/config"
+{{- if .Vorpal.Extension }}
+
+	project {{ printf "%q" .Vorpal.Extension }}
+{{- end }}
 )
 
 func main() {
@@ -28,7 +32,7 @@ func main() {
 		tools = append(tools, tool)
 	}
 
-	_, err := language.NewGoDevelopmentEnvironment("dev", config.SYSTEMS).
+	_, err := language.NewGoDevelopmentEnvironment({{ printf "%q" .DevEnvironment }}, config.SYSTEMS).
 		WithArtifacts(tools).
 		{{- if .PrivateModules }}
 		WithEnvironments([]string{"GOPRIVATE={{ .PrivateModules }}"}).
@@ -37,12 +41,55 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
 	}
+{{- if .Vorpal.Extension }}
+
+	if err := project.Artifacts(ctx); err != nil {
+		log.Fatalf("failed building project artifacts: %v", err)
+	}
+
+{{- if or .Lambdas .Services }}
+
+	var builder *language.Go
+{{- end }}
+{{- end }}
 {{ range .Lambdas }}
+{{- if $.Vorpal.Extension }}
+	builder, err = project.Go(ctx, "{{ . }}", language.NewGo("{{ . }}", config.SYSTEMS).
+		WithBuildDirectory("cmd/{{ . }}").
+		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
+		WithEnvironments([]string{"CGO_ENABLED=0"}))
+	if err != nil {
+		log.Fatalf("failed preparing {{ . }}: %v", err)
+	}
+	_, err = builder.Build(ctx)
+{{- else }}
 	_, err = language.NewGo("{{ . }}", config.SYSTEMS).
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
 		WithEnvironments([]string{"CGO_ENABLED=0"}).
 		Build(ctx)
+{{- end }}
+	if err != nil {
+		log.Fatalf("failed building {{ . }}: %v", err)
+	}
+{{ end }}
+{{- range .Services }}
+{{- if $.Vorpal.Extension }}
+	builder, err = project.Go(ctx, "{{ . }}", language.NewGo("{{ . }}", config.SYSTEMS).
+		WithBuildDirectory("cmd/{{ . }}").
+		WithBuildFlags("-ldflags='-s -w'").
+		WithEnvironments([]string{"CGO_ENABLED=0"}))
+	if err != nil {
+		log.Fatalf("failed preparing {{ . }}: %v", err)
+	}
+	_, err = builder.Build(ctx)
+{{- else }}
+	_, err = language.NewGo("{{ . }}", config.SYSTEMS).
+		WithBuildDirectory("cmd/{{ . }}").
+		WithBuildFlags("-ldflags='-s -w'").
+		WithEnvironments([]string{"CGO_ENABLED=0"}).
+		Build(ctx)
+{{- end }}
 	if err != nil {
 		log.Fatalf("failed building {{ . }}: %v", err)
 	}
