@@ -27,6 +27,11 @@ type DeployConfig struct {
 	// If is the value of the `if` field for the GitHub Actions job that will
 	// deploy this application.
 	If string `json:"if,omitempty" yaml:"if,omitempty"`
+
+	// GithubEnvironment is the GitHub environment the deploy job runs in; empty
+	// leaves the job without an `environment:` key. A role that trusts only an
+	// environment's OIDC subject needs this set.
+	GithubEnvironment string `json:"githubEnvironment,omitempty" yaml:"githubEnvironment,omitempty"`
 }
 
 // UnmarshalJSON unmarshals the JSON blob while adding default values

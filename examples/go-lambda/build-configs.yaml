@@ -13,3 +13,12 @@ parameters:
       if: github.ref == 'refs/heads/main'
   openapi:
     enable: true
+  # Optional: shell lines for a `generate` recipe that `check` depends on.
+  # generate:
+  #   - just build-data
+  # Optional: Lambda function name as a just string (default quirk-{{ environment }}-<service>-{{ lambda }}).
+  # functionName: "example-{{ lambda }}"
+  # Optional: extra Vorpal artifacts CI builds with `just build <name>`.
+  # artifacts:
+  #   - example-client
+  # Per deploy entry, `githubEnvironment: prod` runs that job in a GitHub environment.

@@ -127,7 +127,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: "zip-${{ matrix.profile }}"
-          path: "dist/${{ matrix.profile }}/lambda.zip"
+          path: "dist/${{ matrix.profile }}"
       - run: just deploy dev "${{ matrix.profile }}"
         shell: bash .github/vorpal-shell.sh {0}
   deploy-prod:
@@ -151,7 +151,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: "zip-${{ matrix.profile }}"
-          path: "dist/${{ matrix.profile }}/lambda.zip"
+          path: "dist/${{ matrix.profile }}"
       - run: just deploy prod "${{ matrix.profile }}"
         shell: bash .github/vorpal-shell.sh {0}
 -- out/.golangci.yaml --

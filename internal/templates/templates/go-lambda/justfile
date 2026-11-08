@@ -1,7 +1,16 @@
 build profile:
     vorpal build '{{"{{"}} profile {{"}}"}}'
 
-check:
+{{ if .Generate -}}
+generate:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    {{- range .Generate }}
+    {{ . }}
+    {{- end }}
+
+{{ end -}}
+check{{ if .Generate }}: generate{{ else }}:{{ end }}
     golangci-lint run ./...
 
 package profile:
@@ -37,7 +46,7 @@ package-native-all:
 
 deploy environment lambda:
     aws lambda update-function-code \
-        --function-name "quirk-{{"{{"}} environment {{"}}"}}-{{.Quirk.Service}}-{{"{{"}} lambda {{"}}"}}" \
+        --function-name "{{ .DeployFunctionName }}" \
         --output json \
         --zip-file "fileb://dist/{{"{{"}} lambda {{"}}"}}/lambda.zip" \
         | jq ".CodeSha256"

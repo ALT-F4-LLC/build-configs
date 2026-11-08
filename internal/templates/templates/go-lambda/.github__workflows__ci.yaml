@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: just check
         shell: bash .github/vorpal-shell.sh {0}
-{{- if .Services }}
+{{- if or .Services .Artifacts }}
 
   build-services:
     if: {{ .ForkGuardedIf "" }}
@@ -29,6 +29,9 @@ jobs:
       matrix:
         service:
           {{- range .Services }}
+          - {{ . }}
+          {{- end }}
+          {{- range .Artifacts }}
           - {{ . }}
           {{- end }}
     steps:
@@ -56,7 +59,7 @@ jobs:
         if: always()
       {{- end }}
 {{- end }}
-{{- if or .Lambdas (not .Services) }}
+{{- if or .Lambdas (not (or .Services .Artifacts)) }}
 
   build:
     if: {{ .ForkGuardedIf "" }}
@@ -106,6 +109,9 @@ jobs:
   {{ range .Deploy }}
   deploy-{{ .Environment }}:
     if: {{ $.ForkGuardedIf .If }}
+    {{- if .GithubEnvironment }}
+    environment: {{ .GithubEnvironment }}
+    {{- end }}
     permissions:
       id-token: write
       contents: read
@@ -126,7 +132,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
-          path: "dist/${{"{{"}} matrix.profile {{"}}"}}/lambda.zip"
+          path: "dist/${{"{{"}} matrix.profile {{"}}"}}"
       - run: just deploy {{ .Environment }} "${{"{{"}} matrix.profile {{"}}"}}"
         shell: bash .github/vorpal-shell.sh {0}
   {{- end }}

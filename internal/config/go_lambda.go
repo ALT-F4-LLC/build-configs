@@ -29,9 +29,23 @@ type GoLambdaConfig struct {
 	// Services are Go binaries built from cmd/<name> that are not lambdas.
 	// CI only builds them: no package, upload or deploy, and no scaffolded
 	// entrypoint.
-	Services []string             `json:"services,omitempty" yaml:"services,omitempty"`
-	OpenAPI  OpenAPIConfig        `json:"openapi,omitempty" yaml:"openapi,omitempty"`
-	Vorpal   GoLambdaVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
+	Services []string `json:"services,omitempty" yaml:"services,omitempty"`
+	// Generate lists shell lines for a `generate` justfile recipe that
+	// `check` depends on, for files the build needs but the repository does
+	// not commit. Empty omits the recipe. just interpolates `{{ }}` in each
+	// line. A line holds no newline.
+	Generate []string `json:"generate,omitempty" yaml:"generate,omitempty"`
+	// FunctionName is the Lambda function name passed to the deploy recipe's
+	// --function-name, as a just string: `{{ environment }}` and `{{ lambda }}`
+	// are the recipe parameters. Empty uses
+	// `quirk-{{ environment }}-<quirk.service>-{{ lambda }}`.
+	FunctionName string `json:"functionName,omitempty" yaml:"functionName,omitempty"`
+	// Artifacts are extra Vorpal artifact names that CI builds with
+	// `just build <name>`, in the build-services matrix. Unlike services they
+	// do not pass through the generated vorpal program's Go() hook.
+	Artifacts []string             `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
+	OpenAPI   OpenAPIConfig        `json:"openapi,omitempty" yaml:"openapi,omitempty"`
+	Vorpal    GoLambdaVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
 }
 
 type GoLambdaVorpalConfig struct {
@@ -87,6 +101,12 @@ func (c GoLambdaConfig) Render() error {
 		}
 	}
 
+	for _, line := range c.Generate {
+		if strings.ContainsAny(line, "\r\n") {
+			return fmt.Errorf("generate line %q contains a newline; list one shell line per entry", line)
+		}
+	}
+
 	// Deploy jobs publish lambda zips, so without lambdas they would have
 	// nothing to deploy. Reject the config instead of dropping them silently.
 	if len(c.Services) > 0 && len(c.Lambdas) == 0 && len(c.Deploy) > 0 {
@@ -138,6 +158,16 @@ func (c GoLambdaConfig) Render() error {
 	}
 
 	return makeVorpalShellExecutable()
+}
+
+// DeployFunctionName returns the just string for the deploy recipe's
+// --function-name. The default holds just interpolations as data, which
+// text/template does not re-evaluate.
+func (c GoLambdaConfig) DeployFunctionName() string {
+	if c.FunctionName != "" {
+		return c.FunctionName
+	}
+	return "quirk-{{ environment }}-" + c.Quirk.Service + "-{{ lambda }}"
 }
 
 // ForkGuardedIf returns a GitHub Actions job `if:` expression that requires
