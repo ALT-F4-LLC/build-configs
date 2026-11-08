@@ -1,10 +1,12 @@
 package config
 
 import (
+	"errors"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"slices"
 	"strconv"
@@ -226,5 +228,64 @@ func TestGoCobraCliLintConfigOmitsGoKitExclusion(t *testing.T) {
 	golangciParse(t, got)
 	if strings.Contains(got, "go-kit") {
 		t.Errorf(".golangci.yaml has a go-kit exclusion:\n%s", got)
+	}
+}
+
+func TestGoCobraCliRendersNoFlake(t *testing.T) {
+	goCobraCliRenderTemp(t, nil)
+
+	if _, err := os.Stat("flake.nix"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("flake.nix stat error = %v, want it absent", err)
+	}
+}
+
+// goCobraCliJustRecipes maps each recipe name in a justfile to its body lines,
+// trimmed of indentation.
+func goCobraCliJustRecipes(src string) map[string][]string {
+	recipes := map[string][]string{}
+	var current string
+	for _, line := range strings.Split(src, "\n") {
+		switch {
+		case strings.TrimSpace(line) == "":
+		case line[0] == ' ' || line[0] == '\t':
+			recipes[current] = append(recipes[current], strings.TrimSpace(line))
+		default:
+			current = strings.FieldsFunc(line, func(r rune) bool { return r == ' ' || r == ':' })[0]
+			recipes[current] = nil
+		}
+	}
+	return recipes
+}
+
+func TestGoCobraCliJustfileIsNixFree(t *testing.T) {
+	for name, parameters := range map[string]map[string]interface{}{
+		"default":         nil,
+		"private modules": goCobraCliPrivateModules,
+	} {
+		t.Run(name, func(t *testing.T) {
+			goCobraCliRenderTemp(t, parameters)
+			got := goCobraCliReadFile(t, "justfile")
+
+			lower := strings.ToLower(got)
+			for _, banned := range []string{"nix", "cachix", "flake"} {
+				if strings.Contains(lower, banned) {
+					t.Errorf("justfile contains %q:\n%s", banned, got)
+				}
+			}
+
+			recipes := goCobraCliJustRecipes(got)
+			if _, ok := recipes["package-docker"]; ok {
+				t.Errorf("justfile has a package-docker recipe:\n%s", got)
+			}
+			if check := recipes["check"]; !slices.Equal(check, []string{"golangci-lint run ./..."}) {
+				t.Errorf("check recipe = %q, want [golangci-lint run ./...]:\n%s", check, got)
+			}
+			for _, recipe := range []string{"build", "package"} {
+				body := recipes[recipe]
+				if len(body) == 0 || !strings.HasPrefix(body[0], "vorpal build ") {
+					t.Errorf("%s recipe = %q, want a vorpal build:\n%s", recipe, body, got)
+				}
+			}
+		})
 	}
 }

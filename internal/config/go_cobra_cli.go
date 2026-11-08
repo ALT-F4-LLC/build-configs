@@ -1,19 +1,25 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"slices"
 	"strings"
 
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
-const GoCobraCliName = "go-cobra-cli"
+const (
+	GoCobraCliName = "go-cobra-cli"
+
+	goCobraCliVorpalShell = ".github/vorpal-shell.sh"
+)
 
 type GoCobraCliConfig struct {
 	Config
 	CgoEnabled     bool                   `json:"cgoEnabled,omitempty" yaml:"cgoEnabled,omitempty"`
 	GoVersion      string                 `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
 	Lint           GolangCILintConfig     `json:"lint,omitempty" yaml:"lint,omitempty"`
-	Nix            NixGoConfig            `json:"nix,omitempty" yaml:"nix,omitempty"`
 	PrivateModules string                 `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
 	Version        string                 `json:"version,omitempty" yaml:"version,omitempty"`
 	Vorpal         GoCobraCliVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
@@ -38,12 +44,7 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 		Config:     c,
 		GoVersion:  "1.22",
 		Lint:       lint,
-		Nix: NixGoConfig{
-			BuildGoModule: "buildGoModule",
-			GoPackage:     "go",
-			NixConfig:     NewNixConfig(),
-		},
-		Version: "0.1.0",
+		Version:    "0.1.0",
 		Vorpal: GoCobraCliVorpalConfig{
 			BuildDirectory: "cmd/" + c.Name,
 			Includes:       []string{"cmd/" + c.Name, "go.mod", "go.sum", "internal"},
@@ -77,9 +78,9 @@ func (c GoCobraCliConfig) renderMap() templates.RenderMap {
 		},
 		templates.GoCobraCliTemplates: {
 			".envrc",
-			".github/workflows/flake.yaml",
+			goCobraCliVorpalShell,
+			".github/workflows/ci.yaml",
 			"Vorpal.toml",
-			"flake.nix",
 			"justfile",
 		},
 	}
@@ -97,5 +98,23 @@ func (c GoCobraCliConfig) Render() error {
 	}
 	files["./cmd/vorpal/main.go"] = program
 
-	return templates.WriteFiles(files)
+	if err := templates.WriteFiles(files); err != nil {
+		return err
+	}
+
+	return goCobraCliMakeVorpalShellExecutable()
+}
+
+// goCobraCliMakeVorpalShellExecutable sets the CI step shell to 0755, since
+// templates.WriteFiles writes every file 0644. A path listed in .bcignore is
+// left untouched, including any copy the repository keeps.
+func goCobraCliMakeVorpalShellExecutable() error {
+	ignored, err := templates.GetIgnoredFiles(".")
+	if err != nil {
+		return fmt.Errorf("failed to get ignored files: %w", err)
+	}
+	if slices.Contains(ignored, goCobraCliVorpalShell) {
+		return nil
+	}
+	return os.Chmod(goCobraCliVorpalShell, 0o755) //nolint:gosec // CI runs this script directly, so it must be executable
 }
