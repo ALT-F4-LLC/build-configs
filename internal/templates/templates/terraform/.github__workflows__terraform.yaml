@@ -12,24 +12,18 @@ on:
   {{- end }}
   workflow_dispatch:
 
-env:
-  CACHIX_BINARY_CACHE: {{ .Nix.Cachix.BinaryCache }}
-
 jobs:
   check:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
     runs-on: {{ .GitHub.RunsOn }}
     steps:
-    {{- if .GitHub.Action.SetupNix }}
-    - uses: cachix/install-nix-action@v27
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    {{- end }}
-    - uses: cachix/cachix-action@v15
-      with:
-        authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-        name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
     - uses: actions/checkout@v4
-    - run: nix develop -c just check
+      with:
+        persist-credentials: false
+    - run: just check
+      shell: bash .github/vorpal-shell.sh {0}
 
   plan:
     concurrency:
@@ -41,41 +35,48 @@ jobs:
       {{ $key }}: {{ $value }}
     {{- end }}
     {{- end }}
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
     needs: check
     permissions:
       contents: read
       id-token: write
     runs-on: {{ .GitHub.RunsOn }}
     steps:
-    {{- if .GitHub.Action.SetupNix }}
-    - uses: cachix/install-nix-action@v27
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    {{- end }}
-    - uses: cachix/cachix-action@v15
-      with:
-        authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-        name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
     {{- if .GitHub.Action.SetupDeployKey }}
-    - uses: shimataro/ssh-key-action@v2
+    - id: deploy-key
+      uses: shimataro/ssh-key-action@v2
       with:
         key: ${{"{{"}} secrets.ALTF4LLC_DEPLOY_KEY {{"}}"}}
         known_hosts: unnecessary
+        name: id_rsa
     {{- end }}
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         audience: sts.amazonaws.com
         aws-region: us-west-2
         role-to-assume: {{ .Role.PlanARN }}
-    - run: aws sts get-caller-identity
     - uses: actions/checkout@v4
-    - run: nix develop -c just init
-    - run: nix develop -c just validate
-    - run: nix develop -c just plan
+      with:
+        persist-credentials: false
+    - run: aws sts get-caller-identity
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just init
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just validate
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just plan
+      shell: bash .github/vorpal-shell.sh {0}
     - uses: actions/upload-artifact@v4
       with:
         name: tf-plan
         path: terraform.tfplan
+    {{- if .GitHub.Action.SetupDeployKey }}
+    - env:
+        KEY_OUTCOME: ${{"{{"}} steps.deploy-key.outcome {{"}}"}}
+      if: always()
+      run: if [ "$KEY_OUTCOME" = success ]; then rm -f "$HOME/.ssh/id_rsa"; fi
+      shell: bash
+    {{- end }}
 
   apply:
     concurrency:
@@ -89,37 +90,42 @@ jobs:
       {{ $key }}: {{ $value }}
     {{- end }}
     {{- end }}
-    if: github.ref == 'refs/heads/main'
+    if: ${{"{{"}} (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.ref == 'refs/heads/main') {{"}}"}}
     needs: plan
     permissions:
       contents: read
       id-token: write
     runs-on: {{ .GitHub.RunsOn }}
     steps:
-    {{- if .GitHub.Action.SetupNix }}
-    - uses: cachix/install-nix-action@v27
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    {{- end }}
-    - uses: cachix/cachix-action@v15
-      with:
-        authToken: ${{"{{"}} secrets.ALTF4LLC_CACHIX_AUTH_TOKEN {{"}}"}}
-        name: ${{"{{"}} env.CACHIX_BINARY_CACHE {{"}}"}}
     {{- if .GitHub.Action.SetupDeployKey }}
-    - uses: shimataro/ssh-key-action@v2
+    - id: deploy-key
+      uses: shimataro/ssh-key-action@v2
       with:
         key: ${{"{{"}} secrets.ALTF4LLC_DEPLOY_KEY {{"}}"}}
         known_hosts: unnecessary
+        name: id_rsa
     {{- end }}
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         audience: sts.amazonaws.com
         aws-region: us-west-2
         role-to-assume: {{ .Role.ApplyARN }}
-    - run: aws sts get-caller-identity
     - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
     - uses: actions/download-artifact@v4
       with:
         name: tf-plan
-    - run: nix develop -c just init
-    - run: nix develop -c just apply
+    - run: aws sts get-caller-identity
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just init
+      shell: bash .github/vorpal-shell.sh {0}
+    - run: just apply
+      shell: bash .github/vorpal-shell.sh {0}
+    {{- if .GitHub.Action.SetupDeployKey }}
+    - env:
+        KEY_OUTCOME: ${{"{{"}} steps.deploy-key.outcome {{"}}"}}
+      if: always()
+      run: if [ "$KEY_OUTCOME" = success ]; then rm -f "$HOME/.ssh/id_rsa"; fi
+      shell: bash
+    {{- end }}

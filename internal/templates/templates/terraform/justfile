@@ -1,5 +1,4 @@
 check:
-    nix flake check
     terraform fmt -check
 
 docs:

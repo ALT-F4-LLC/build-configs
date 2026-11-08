@@ -35,45 +35,88 @@ func terraformVorpalReadFile(t *testing.T, name string) string {
 }
 
 // terraformVorpalDevEnvironment parses the rendered Vorpal program and returns
-// the name passed to artifact.NewDevelopmentEnvironment and every alias passed
-// to FetchArtifactAlias.
-func terraformVorpalDevEnvironment(t *testing.T, src string) (string, []string) {
+// the name passed to artifact.NewDevelopmentEnvironment, every alias passed to
+// FetchArtifactAlias, and the aliases whose fetched variables are passed to
+// WithArtifacts.
+func terraformVorpalDevEnvironment(t *testing.T, src string) (string, []string, []string) {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), "cmd/vorpal/main.go", src, 0)
 	if err != nil {
 		t.Fatalf("rendered cmd/vorpal/main.go does not parse: %v\n%s", err, src)
 	}
 
+	stringArg := func(call *ast.CallExpr) (string, bool) {
+		if len(call.Args) == 0 {
+			return "", false
+		}
+		lit, ok := call.Args[0].(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return "", false
+		}
+		value, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			t.Fatalf("unquoting %s: %v", lit.Value, err)
+		}
+		return value, true
+	}
+
 	var envName string
 	var aliases []string
+	aliasByVar := map[string]string{}
+	var artifactVars []string
 	ast.Inspect(file, func(n ast.Node) bool {
+		if assign, ok := n.(*ast.AssignStmt); ok && len(assign.Lhs) > 0 && len(assign.Rhs) == 1 {
+			ident, isIdent := assign.Lhs[0].(*ast.Ident)
+			call, isCall := assign.Rhs[0].(*ast.CallExpr)
+			if isIdent && isCall {
+				if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "FetchArtifactAlias" {
+					if value, ok := stringArg(call); ok {
+						aliasByVar[ident.Name] = value
+					}
+				}
+			}
+			return true
+		}
 		call, ok := n.(*ast.CallExpr)
-		if !ok || len(call.Args) == 0 {
+		if !ok {
 			return true
 		}
 		sel, ok := call.Fun.(*ast.SelectorExpr)
 		if !ok {
 			return true
 		}
-		lit, ok := call.Args[0].(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
-		}
-		value, err := strconv.Unquote(lit.Value)
-		if err != nil {
-			t.Fatalf("unquoting %s: %v", lit.Value, err)
-		}
 		switch sel.Sel.Name {
 		case "NewDevelopmentEnvironment":
 			if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "artifact" {
-				envName = value
+				if value, ok := stringArg(call); ok {
+					envName = value
+				}
 			}
 		case "FetchArtifactAlias":
-			aliases = append(aliases, value)
+			if value, ok := stringArg(call); ok {
+				aliases = append(aliases, value)
+			}
+		case "WithArtifacts":
+			if len(call.Args) == 1 {
+				if list, ok := call.Args[0].(*ast.CompositeLit); ok {
+					for _, elt := range list.Elts {
+						if ident, ok := elt.(*ast.Ident); ok {
+							artifactVars = append(artifactVars, ident.Name)
+						}
+					}
+				}
+			}
 		}
 		return true
 	})
-	return envName, aliases
+
+	var envArtifacts []string
+	for _, name := range artifactVars {
+		if alias, ok := aliasByVar[name]; ok {
+			envArtifacts = append(envArtifacts, alias)
+		}
+	}
+	return envName, aliases, envArtifacts
 }
 
 func TestTerraformRenderWritesVorpalConfig(t *testing.T) {
@@ -95,13 +138,16 @@ func TestTerraformRenderWritesVorpalConfig(t *testing.T) {
 func TestTerraformRenderWritesVorpalDevEnvironment(t *testing.T) {
 	terraformVorpalRender(t, nil)
 
-	envName, aliases := terraformVorpalDevEnvironment(t, terraformVorpalReadFile(t, "cmd/vorpal/main.go"))
+	envName, aliases, envArtifacts := terraformVorpalDevEnvironment(t, terraformVorpalReadFile(t, "cmd/vorpal/main.go"))
 	if envName != "dev" {
 		t.Errorf("development environment name = %q, want %q", envName, "dev")
 	}
-	for _, want := range []string{"just:1.45.0", "terraform:1.13.1"} {
+	for _, want := range []string{"just:1.45.0", "terraform:1.13.1", "awscli2:2.33.1"} {
 		if !slices.Contains(aliases, want) {
 			t.Errorf("aliases %v missing %q", aliases, want)
+		}
+		if !slices.Contains(envArtifacts, want) {
+			t.Errorf("dev environment artifacts %v missing %q", envArtifacts, want)
 		}
 	}
 }
@@ -111,7 +157,7 @@ func TestTerraformRenderVorpalTerraformVersionOverride(t *testing.T) {
 		"vorpal": map[string]interface{}{"terraformVersion": "1.12.0"},
 	})
 
-	_, aliases := terraformVorpalDevEnvironment(t, terraformVorpalReadFile(t, "cmd/vorpal/main.go"))
+	_, aliases, _ := terraformVorpalDevEnvironment(t, terraformVorpalReadFile(t, "cmd/vorpal/main.go"))
 	if !slices.Contains(aliases, "terraform:1.12.0") {
 		t.Errorf("aliases %v missing %q", aliases, "terraform:1.12.0")
 	}

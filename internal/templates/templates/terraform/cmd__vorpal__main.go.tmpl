@@ -10,6 +10,11 @@ import (
 func main() {
 	ctx := config.GetContext()
 
+	awscli2, err := ctx.FetchArtifactAlias("awscli2:2.33.1")
+	if err != nil {
+		log.Fatalf("failed fetching awscli2 alias: %v", err)
+	}
+
 	just, err := ctx.FetchArtifactAlias("just:1.45.0")
 	if err != nil {
 		log.Fatalf("failed fetching just alias: %v", err)
@@ -21,7 +26,7 @@ func main() {
 	}
 
 	_, err = artifact.NewDevelopmentEnvironment("dev", config.SYSTEMS).
-		WithArtifacts([]*string{just, terraform}).
+		WithArtifacts([]*string{awscli2, just, terraform}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)

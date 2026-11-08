@@ -2,15 +2,20 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"slices"
 
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
-const TerraformName = "terraform"
+const (
+	TerraformName = "terraform"
+
+	terraformVorpalShell = ".github/vorpal-shell.sh"
+)
 
 type GitHubConfigAction struct {
 	SetupDeployKey bool `json:"setupDeployKey,omitempty" yaml:"setupDeployKey,omitempty"`
-	SetupNix       bool `json:"setupNix,omitempty" yaml:"setupNix,omitempty"`
 }
 
 type GitHubConfig struct {
@@ -26,13 +31,11 @@ type TerraformConfigRole struct {
 
 type TerraformConfig struct {
 	Config
-	GitHub    GitHubConfig          `json:"github,omitempty" yaml:"github,omitempty"`
-	Nix       NixConfig             `json:"nix,omitempty" yaml:"nix,omitempty"`
-	Region    string                `json:"region,omitempty" yaml:"region,omitempty"`
-	Role      TerraformConfigRole   `json:"role,omitempty" yaml:"role,omitempty"`
-	Schedule  *string               `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	Providers []string              `json:"providers,omitempty" yaml:"providers,omitempty"`
-	Vorpal    TerraformVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
+	GitHub   GitHubConfig          `json:"github,omitempty" yaml:"github,omitempty"`
+	Region   string                `json:"region,omitempty" yaml:"region,omitempty"`
+	Role     TerraformConfigRole   `json:"role,omitempty" yaml:"role,omitempty"`
+	Schedule *string               `json:"schedule,omitempty" yaml:"schedule,omitempty"`
+	Vorpal   TerraformVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
 }
 
 type TerraformVorpalConfig struct {
@@ -42,7 +45,6 @@ type TerraformVorpalConfig struct {
 func NewGitHubConfigAction() GitHubConfigAction {
 	return GitHubConfigAction{
 		SetupDeployKey: false,
-		SetupNix:       true,
 	}
 }
 
@@ -50,7 +52,7 @@ func NewGitHubConfig() GitHubConfig {
 	return GitHubConfig{
 		Action: NewGitHubConfigAction(),
 		Env:    map[string]string{},
-		RunsOn: "ubuntu-latest",
+		RunsOn: "altf4llc",
 	}
 }
 
@@ -65,7 +67,6 @@ func NewTerraformConfig(c Config) TerraformConfig {
 	return TerraformConfig{
 		Config:   c,
 		GitHub:   NewGitHubConfig(),
-		Nix:      NewNixConfig(),
 		Region:   "us-west-2",
 		Role:     NewTerraformConfigRole(c.Name),
 		Schedule: nil,
@@ -80,10 +81,10 @@ func (c TerraformConfig) renderMap() templates.RenderMap {
 		},
 		templates.TerraformTemplates: {
 			".envrc",
+			terraformVorpalShell,
 			".github/workflows/terraform.yaml",
 			".gitignore",
 			"Vorpal.toml",
-			"flake.nix",
 			"justfile",
 		},
 	}
@@ -101,5 +102,23 @@ func (c TerraformConfig) Render() error {
 	}
 	files["./cmd/vorpal/main.go"] = vorpalMain
 
-	return templates.WriteFiles(files)
+	if err := templates.WriteFiles(files); err != nil {
+		return err
+	}
+
+	return terraformMakeVorpalShellExecutable()
+}
+
+// terraformMakeVorpalShellExecutable sets the CI step shell to 0755, since
+// templates.WriteFiles writes every file 0644. A path listed in .bcignore is
+// left untouched, including any copy the repository keeps.
+func terraformMakeVorpalShellExecutable() error {
+	ignored, err := templates.GetIgnoredFiles(".")
+	if err != nil {
+		return fmt.Errorf("failed to get ignored files: %w", err)
+	}
+	if slices.Contains(ignored, terraformVorpalShell) {
+		return nil
+	}
+	return os.Chmod(terraformVorpalShell, 0o755) //nolint:gosec // CI runs this script directly, so it must be executable
 }
