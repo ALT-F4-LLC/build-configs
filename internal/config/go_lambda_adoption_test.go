@@ -335,7 +335,9 @@ func TestGoLambdaProgramGivesPrivateModuleBuildsASandboxCredential(t *testing.T)
 				`case "default":`,
 				"umask 077",
 				"HOME=$VORPAL_WORKSPACE",
-				`chmod 600 "$VORPAL_WORKSPACE/.netrc"`,
+				`chmod 600 \"$VORPAL_WORKSPACE/.netrc\"`,
+				"func splitSecret(",
+				"const secretChunk = 200",
 				`strings.HasSuffix(target, "-linux")`,
 			} {
 				if !strings.Contains(src, want) {
