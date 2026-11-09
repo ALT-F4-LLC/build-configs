@@ -15,7 +15,7 @@ generate:
     {{- end }}
 
 {{ end -}}
-check{{ if .Generate }}: generate{{ else }}:{{ end }}
+check{{ if or .Generate .OpenAPI.GenerateInCI }}:{{ if .Generate }} generate{{ end }}{{ if and .OpenAPI.Enable .OpenAPI.GenerateInCI }} build-client{{ end }}{{ else }}:{{ end }}
     golangci-lint run ./...
 
 package profile:
@@ -65,19 +65,22 @@ deploy-all environment:
 build-client:
     #!/usr/bin/env bash
     set -euxo pipefail
-    rm -rf pkg/client
+    rm -rf {{ .OpenAPI.Output }}
     openapi-generator-cli generate \
         -i api/{{ .OpenAPI.Filename }} \
         -g go \
-        -o pkg/client \
-        -p packageName=client
+        -o {{ .OpenAPI.Output }} \
+        -p packageName={{ .OpenAPI.PackageName }}
     rm -rf \
-        pkg/client/.gitignore \
-        pkg/client/.openapi-generator \
-        pkg/client/.openapi-generator-ignore \
-        pkg/client/.travis.yml \
-        pkg/client/README.md \
-        pkg/client/api \
-        pkg/client/docs \
-        pkg/client/git_push.sh
+        {{ .OpenAPI.Output }}/.gitignore \
+        {{ .OpenAPI.Output }}/.openapi-generator \
+        {{ .OpenAPI.Output }}/.openapi-generator-ignore \
+        {{ .OpenAPI.Output }}/.travis.yml \
+        {{ .OpenAPI.Output }}/README.md \
+        {{ .OpenAPI.Output }}/api \
+        {{ .OpenAPI.Output }}/docs \
+        {{ .OpenAPI.Output }}/git_push.sh \
+        {{ .OpenAPI.Output }}/go.mod \
+        {{ .OpenAPI.Output }}/go.sum \
+        {{ .OpenAPI.Output }}/test
 {{- end }}

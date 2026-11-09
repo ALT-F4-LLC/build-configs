@@ -55,6 +55,10 @@ jobs:
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
       - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
       {{- end }}
+      {{- if and .OpenAPI.Enable .OpenAPI.GenerateInCI }}
+      - run: just build-client
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
       - run: just build "${{"{{"}} matrix.service {{"}}"}}"
         shell: bash .github/vorpal-shell.sh {0}
       {{- if .PrivateModules }}
@@ -94,6 +98,10 @@ jobs:
           password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
       - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
+      {{- end }}
+      {{- if and .OpenAPI.Enable .OpenAPI.GenerateInCI }}
+      - run: just build-client
+        shell: bash .github/vorpal-shell.sh {0}
       {{- end }}
       - run: just build "${{"{{"}} matrix.profile {{"}}"}}"
         shell: bash .github/vorpal-shell.sh {0}

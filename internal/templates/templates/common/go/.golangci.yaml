@@ -13,6 +13,12 @@ linters:
     - gosec
     - misspell
     - revive
+{{- if .Lint.Disable }}
+  disable:
+{{- range .Lint.Disable }}
+    - {{ . }}
+{{- end }}
+{{- end }}
   exclusions:
     presets:
       # Internal CLI packages, not a public API: skip missing doc-comment findings.

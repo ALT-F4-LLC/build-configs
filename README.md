@@ -93,6 +93,38 @@ to `[<name>]`, so set `lambdas: []` for a services-only project. That project
 has no lambda `build` job, and `deploy` together with `services` and an empty
 `lambdas` is an error.
 
+#### OpenAPI Client
+
+`openapi.enable` adds a `build-client` recipe that generates a Go client from
+`api/<openapi.filename>` with `openapi-generator-cli`. Three options place and
+run it:
+
+```yaml
+parameters:
+  openapi:
+    enable: true
+    filename: ai.json
+    output: internal/client_ai   # default pkg/client; the recipe deletes it first
+    packageName: client_ai       # default client
+    generateInCI: true           # default false
+```
+
+With `generateInCI`, `just check` depends on `build-client` and the CI `build`
+and `build-services` jobs run `just build-client` before `just build`. Use it
+when the generated client is not committed. The generator needs a JDK, so add
+one to `vorpal.tools`.
+
+#### Lint and Deploy Options
+
+- `lint.disable` lists golangci-lint linters to turn off, such as `errcheck`.
+- A `deploy` entry that omits `roleArn` gets
+  `arn:aws:iam::<account>:role/altf4llc-gha-<name>-deploy-<environment>`, built
+  from the entry's own `environment` and `account`.
+- `deploy[].if` is joined to the fork guard with `&&`. Use
+  `github.event_name == 'push' && github.ref == 'refs/heads/main'` to deploy
+  only from pushes to `main`. `deploy[].githubEnvironment` runs the job in that
+  GitHub environment.
+
 #### `vorpal.extension`
 
 `vorpal.extension` is the full import path of a package in your own repository.
