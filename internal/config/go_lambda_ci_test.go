@@ -23,11 +23,17 @@ type goLambdaWorkflow struct {
 	Jobs map[string]goLambdaWorkflowJob `yaml:"jobs"`
 }
 
+type goLambdaWorkflowConcurrency struct {
+	Group            string `yaml:"group"`
+	CancelInProgress *bool  `yaml:"cancel-in-progress"`
+}
+
 type goLambdaWorkflowJob struct {
-	If          string                 `yaml:"if"`
-	Permissions map[string]string      `yaml:"permissions"`
-	RunsOn      string                 `yaml:"runs-on"`
-	Steps       []goLambdaWorkflowStep `yaml:"steps"`
+	Concurrency goLambdaWorkflowConcurrency `yaml:"concurrency"`
+	If          string                      `yaml:"if"`
+	Permissions map[string]string           `yaml:"permissions"`
+	RunsOn      string                      `yaml:"runs-on"`
+	Steps       []goLambdaWorkflowStep      `yaml:"steps"`
 }
 
 type goLambdaWorkflowStep struct {
@@ -246,6 +252,29 @@ func TestGoLambdaCIWithoutPrivateModulesWritesNoCredentials(t *testing.T) {
 	for _, banned := range []string{"netrc", "create-github-app-token"} {
 		if strings.Contains(got, banned) {
 			t.Errorf("%s contains %q without private modules:\n%s", goLambdaWorkflowPath, banned, got)
+		}
+	}
+}
+
+func TestGoLambdaCIDeployJobsQueueInsteadOfCancel(t *testing.T) {
+	goLambdaRenderCI(t, "")
+	wf := goLambdaParseWorkflow(t)
+
+	for _, env := range []string{"dev", "prod", "staging"} {
+		job, ok := wf.Jobs["deploy-"+env]
+		if !ok {
+			t.Fatalf("job deploy-%s missing", env)
+		}
+		if want := "deploy-" + env + "-${{ matrix.profile }}"; job.Concurrency.Group != want {
+			t.Errorf("deploy-%s concurrency.group = %q, want %q", env, job.Concurrency.Group, want)
+		}
+		if job.Concurrency.CancelInProgress == nil || *job.Concurrency.CancelInProgress {
+			t.Errorf("deploy-%s concurrency.cancel-in-progress = %v, want false", env, job.Concurrency.CancelInProgress)
+		}
+	}
+	for _, name := range []string{"build", "check"} {
+		if group := wf.Jobs[name].Concurrency.Group; group != "" {
+			t.Errorf("job %s concurrency.group = %q, want none", name, group)
 		}
 	}
 }

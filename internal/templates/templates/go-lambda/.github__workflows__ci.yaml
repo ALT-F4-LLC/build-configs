@@ -121,6 +121,9 @@ jobs:
       id-token: write
       contents: read
     needs: build
+    concurrency:
+      group: deploy-{{ .Environment }}-${{"{{"}} matrix.profile {{"}}"}}
+      cancel-in-progress: false
     runs-on: altf4llc
     strategy:
       matrix:
