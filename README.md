@@ -131,7 +131,7 @@ artifact in one chained call. Setting `vorpal.extension` does not change
 If you would rather hand-write `cmd/vorpal/main.go`, list it in `.bcignore`
 and the generator leaves it alone:
 
-```
+```text
 cmd/vorpal/main.go
 ```
 
