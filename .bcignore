@@ -1,0 +1,6 @@
+# Hand-maintained copies of files the go-cobra-cli template also renders.
+# `build-configs generate` skips every path listed here.
+justfile
+.github/vorpal-shell.sh
+.github/workflows/ci.yaml
+cmd/vorpal/main.go
