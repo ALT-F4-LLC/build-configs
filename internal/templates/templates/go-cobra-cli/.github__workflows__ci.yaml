@@ -27,12 +27,12 @@ jobs:
     steps:
       {{- if .PrivateModules }}
       - id: generate-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID {{"}}"}}
           owner: ${{"{{"}} github.repository_owner {{"}}"}}
           private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY {{"}}"}}
-      - uses: extractions/netrc@v2
+      - uses: extractions/netrc@v3
         with:
           machine: github.com
           password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}

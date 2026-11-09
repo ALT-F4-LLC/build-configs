@@ -19,7 +19,7 @@ jobs:
       contents: read
     runs-on: {{ .GitHub.RunsOn }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - run: just check
@@ -50,12 +50,12 @@ jobs:
         known_hosts: unnecessary
         name: id_rsa
     {{- end }}
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
         aws-region: us-west-2
         role-to-assume: {{ .Role.PlanARN }}
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - run: aws sts get-caller-identity
@@ -66,7 +66,7 @@ jobs:
       shell: bash .github/vorpal-shell.sh {0}
     - run: just plan
       shell: bash .github/vorpal-shell.sh {0}
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: tf-plan
         path: terraform.tfplan
@@ -105,15 +105,15 @@ jobs:
         known_hosts: unnecessary
         name: id_rsa
     {{- end }}
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
         aws-region: us-west-2
         role-to-assume: {{ .Role.ApplyARN }}
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: tf-plan
     - run: aws sts get-caller-identity

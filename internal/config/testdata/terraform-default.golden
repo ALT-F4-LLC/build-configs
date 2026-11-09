@@ -42,7 +42,7 @@ jobs:
       contents: read
     runs-on: altf4llc
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - run: just check
@@ -59,12 +59,12 @@ jobs:
       id-token: write
     runs-on: altf4llc
     steps:
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
         aws-region: us-west-2
         role-to-assume: arn:aws:iam::677459762413:role/altf4llc-gha-example-plan
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - run: aws sts get-caller-identity
@@ -75,7 +75,7 @@ jobs:
       shell: bash .github/vorpal-shell.sh {0}
     - run: just plan
       shell: bash .github/vorpal-shell.sh {0}
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: tf-plan
         path: terraform.tfplan
@@ -93,15 +93,15 @@ jobs:
       id-token: write
     runs-on: altf4llc
     steps:
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
         aws-region: us-west-2
         role-to-assume: arn:aws:iam::677459762413:role/altf4llc-gha-example-apply
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: tf-plan
     - run: aws sts get-caller-identity

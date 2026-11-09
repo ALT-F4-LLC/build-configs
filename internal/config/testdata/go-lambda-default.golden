@@ -61,7 +61,7 @@ jobs:
       contents: read
     runs-on: altf4llc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: just check
         shell: bash .github/vorpal-shell.sh {0}
 
@@ -77,14 +77,14 @@ jobs:
         profile:
           - example
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: generate-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.ALTF4LLC_GITHUB_APP_ID }}
           owner: ${{ github.repository_owner }}
           private-key: ${{ secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY }}
-      - uses: extractions/netrc@v2
+      - uses: extractions/netrc@v3
         with:
           machine: github.com
           password: ${{ steps.generate-token.outputs.token }}
@@ -94,7 +94,7 @@ jobs:
         shell: bash .github/vorpal-shell.sh {0}
       - run: just package "${{ matrix.profile }}"
         shell: bash .github/vorpal-shell.sh {0}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: "zip-${{ matrix.profile }}"
           path: "dist/${{ matrix.profile }}/lambda.zip"
