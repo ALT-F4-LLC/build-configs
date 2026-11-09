@@ -2,11 +2,12 @@ package templates
 
 import (
 	"os"
+	"path"
 	"strings"
 )
 
 func HasIgnoreFile(configDir string) bool {
-	_, err := os.Stat(configDir+"/.bcignore")
+	_, err := os.Stat(configDir + "/.bcignore")
 	return err == nil
 }
 
@@ -15,16 +16,17 @@ func GetIgnoredFiles(configDir string) (files []string, err error) {
 		return
 	}
 
-	b, err := os.ReadFile(configDir+"/.bcignore") //nolint:gosec // directory is chosen by the operator on the command line
+	b, err := os.ReadFile(configDir + "/.bcignore") //nolint:gosec // directory is chosen by the operator on the command line
 	if err != nil {
 		return
 	}
 
 	for _, line := range strings.Split(string(b), "\n") {
-		if strings.HasPrefix(line, "#") {
+		entry := strings.TrimSpace(line)
+		if entry == "" || strings.HasPrefix(entry, "#") {
 			continue
 		}
-		files = append(files, line)
+		files = append(files, path.Clean(entry))
 	}
 
 	return

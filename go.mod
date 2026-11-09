@@ -2,6 +2,8 @@ module github.com/ALT-F4-LLC/build-configs
 
 go 1.26.0
 
+toolchain go1.26.10
+
 require (
 	github.com/ALT-F4-LLC/vorpal/sdk/go v0.0.0-20260915234803-77ac6ad903ae
 	github.com/spf13/cobra v1.10.2

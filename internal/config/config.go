@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,6 +15,18 @@ type Config struct {
 	Name       string                 `json:"name" yaml:"name"`
 	Template   string                 `json:"template" yaml:"template"`
 	Parameters map[string]interface{} `json:"parameters" yaml:"parameters"`
+}
+
+// DevEnvironment returns the Vorpal development environment name, <name>-dev.
+func (c Config) DevEnvironment() string {
+	return c.Name + "-dev"
+}
+
+// ShellQuotedDevEnvironment returns DevEnvironment as one POSIX single-quoted
+// shell word, so generated scripts pass it to vorpal verbatim whatever
+// characters the name holds.
+func (c Config) ShellQuotedDevEnvironment() string {
+	return "'" + strings.ReplaceAll(c.DevEnvironment(), "'", `'\''`) + "'"
 }
 
 var (
@@ -64,6 +77,24 @@ func (c Config) GetTemplater() (Templater, error) {
 			fmt.Println("loading go-lambda templater")
 		}
 		tpl := NewGoLambdaConfig(c)
+
+		// Convert the parameters (map type) to JSON
+		b, err := json.Marshal(c.Parameters)
+		if err != nil {
+			return tpl, err
+		}
+
+		// Then convert them back into the type for the templater selected
+		if err := json.Unmarshal(b, &tpl); err != nil {
+			return tpl, err
+		}
+		return tpl, nil
+
+	case "go-library":
+		if Debug {
+			fmt.Println("loading go-library templater")
+		}
+		tpl := NewGoLibraryConfig(c)
 
 		// Convert the parameters (map type) to JSON
 		b, err := json.Marshal(c.Parameters)

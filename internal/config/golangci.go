@@ -1,6 +1,8 @@
 package config
 
 type GolangCILintConfig struct {
+	// Disable lists linters to turn off, by golangci-lint name.
+	Disable      []string `json:"disable,omitempty" yaml:"disable,omitempty"`
 	Exclude      []string `json:"exclude,omitempty" yaml:"exclude,omitempty"`
 	ExtraExclude []string `json:"extraExclude,omitempty" yaml:"extraExclude,omitempty"`
 }

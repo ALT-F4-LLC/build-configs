@@ -1,0 +1,18 @@
+[MD013]
+line-length = 80
+
+[MD060]
+enabled = true
+
+[MD063]
+enabled = true
+ignore-words = ["build-configs"]
+
+[MD072]
+enabled = true
+
+[MD073]
+enabled = true
+
+[MD096]
+enabled = true

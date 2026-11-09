@@ -27,28 +27,37 @@ type DeployConfig struct {
 	// If is the value of the `if` field for the GitHub Actions job that will
 	// deploy this application.
 	If string `json:"if,omitempty" yaml:"if,omitempty"`
+
+	// GithubEnvironment is the GitHub environment the deploy job runs in; empty
+	// leaves the job without an `environment:` key. A role that trusts only an
+	// environment's OIDC subject needs this set.
+	GithubEnvironment string `json:"githubEnvironment,omitempty" yaml:"githubEnvironment,omitempty"`
 }
 
 // UnmarshalJSON unmarshals the JSON blob while adding default values
 // contextually
 func (c *DeployConfig) UnmarshalJSON(data []byte) error {
-	defaultRole := fmt.Sprintf(
-		"arn:aws:iam::%s:role/altf4llc-gha-%s-deploy-%s",
-		DefaultAccount,
-		Cfg.Name,
-		DefaultEnvironment,
-	)
-
 	type Alias DeployConfig
 	deploy := Alias{
 		Environment: DefaultEnvironment,
 		Account:     DefaultAccount,
-		RoleARN:     defaultRole,
 		Region:      DefaultRegion,
 	}
 
 	if err := json.Unmarshal(data, &deploy); err != nil {
 		return err
+	}
+
+	// Build the default role from the configured environment and account, so
+	// an entry that sets `environment: dev` and omits roleArn gets the -dev
+	// role instead of one for the placeholder environment.
+	if deploy.RoleARN == "" {
+		deploy.RoleARN = fmt.Sprintf(
+			"arn:aws:iam::%s:role/altf4llc-gha-%s-deploy-%s",
+			deploy.Account,
+			Cfg.Name,
+			deploy.Environment,
+		)
 	}
 	*c = DeployConfig(deploy)
 

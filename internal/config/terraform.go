@@ -10,7 +10,6 @@ const TerraformName = "terraform"
 
 type GitHubConfigAction struct {
 	SetupDeployKey bool `json:"setupDeployKey,omitempty" yaml:"setupDeployKey,omitempty"`
-	SetupNix       bool `json:"setupNix,omitempty" yaml:"setupNix,omitempty"`
 }
 
 type GitHubConfig struct {
@@ -26,18 +25,21 @@ type TerraformConfigRole struct {
 
 type TerraformConfig struct {
 	Config
-	GitHub    GitHubConfig        `json:"github,omitempty" yaml:"github,omitempty"`
-	Nix       NixConfig           `json:"nix,omitempty" yaml:"nix,omitempty"`
-	Region    string              `json:"region,omitempty" yaml:"region,omitempty"`
-	Role      TerraformConfigRole `json:"role,omitempty" yaml:"role,omitempty"`
-	Schedule  *string             `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	Providers []string            `json:"providers,omitempty" yaml:"providers,omitempty"`
+	GitHub   GitHubConfig          `json:"github,omitempty" yaml:"github,omitempty"`
+	Region   string                `json:"region,omitempty" yaml:"region,omitempty"`
+	Role     TerraformConfigRole   `json:"role,omitempty" yaml:"role,omitempty"`
+	Schedule *string               `json:"schedule,omitempty" yaml:"schedule,omitempty"`
+	Vorpal   TerraformVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
+}
+
+type TerraformVorpalConfig struct {
+	Script           string `json:"script,omitempty" yaml:"script,omitempty"`
+	TerraformVersion string `json:"terraformVersion,omitempty" yaml:"terraformVersion,omitempty"`
 }
 
 func NewGitHubConfigAction() GitHubConfigAction {
 	return GitHubConfigAction{
 		SetupDeployKey: false,
-		SetupNix:       true,
 	}
 }
 
@@ -45,7 +47,7 @@ func NewGitHubConfig() GitHubConfig {
 	return GitHubConfig{
 		Action: NewGitHubConfigAction(),
 		Env:    map[string]string{},
-		RunsOn: "ubuntu-latest",
+		RunsOn: "altf4llc",
 	}
 }
 
@@ -60,31 +62,47 @@ func NewTerraformConfig(c Config) TerraformConfig {
 	return TerraformConfig{
 		Config:   c,
 		GitHub:   NewGitHubConfig(),
-		Nix:      NewNixConfig(),
 		Region:   "us-west-2",
 		Role:     NewTerraformConfigRole(c.Name),
 		Schedule: nil,
+		Vorpal: TerraformVorpalConfig{
+			TerraformVersion: "1.13.1",
+		},
+	}
+}
+
+func (c TerraformConfig) renderMap() templates.RenderMap {
+	return templates.RenderMap{
+		templates.AllCommonTemplates: {
+			".github/renovate.json",
+		},
+		templates.VorpalCommonTemplates: vorpalCommonFiles(),
+		templates.TerraformCommonTemplates: {
+			".gitignore",
+			"Vorpal.toml",
+		},
+		templates.TerraformTemplates: {
+			".github/workflows/terraform.yaml",
+			"justfile",
+		},
 	}
 }
 
 func (c TerraformConfig) Render() error {
-	renderMap := templates.RenderMap{
-		templates.AllCommonTemplates: {
-			".envrc",
-			".github/renovate.json",
-		},
-		templates.TerraformTemplates: {
-			".github/workflows/terraform.yaml",
-			".gitignore",
-			"flake.nix",
-			"justfile",
-		},
-	}
-
-	files, err := templates.RenderTemplates(renderMap, c)
+	files, err := templates.RenderTemplates(c.renderMap(), c)
 	if err != nil {
 		return err
 	}
 
-	return templates.WriteFiles(files)
+	vorpalMain, err := templates.RenderTemplate(templates.TerraformTemplates, "cmd/vorpal/main.go.tmpl", c)
+	if err != nil {
+		return err
+	}
+	files["./cmd/vorpal/main.go"] = vorpalMain
+
+	if err := templates.WriteFiles(files); err != nil {
+		return err
+	}
+
+	return makeVorpalShellExecutable()
 }
