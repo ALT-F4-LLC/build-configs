@@ -143,6 +143,15 @@ one to `vorpal.tools`.
   packages that import a private module. `just lint` runs the linter alone, so
   no generator runs with the token on disk. `just check` still runs the
   generators and the linter locally.
+- With `privateModules` set, `cmd/vorpal/main.go` also gives each lambda and
+  service build what the Vorpal sandbox needs to fetch the module over HTTPS:
+  `GOPRIVATE`, and on Linux targets the git CA bundle
+  `/etc/ssl/certs/ca-certificates.crt`. When the build host's `~/.netrc` has a
+  `github.com` entry, the program passes its login and password as secrets and
+  writes a `.netrc` into the sandbox workspace. The CI jobs write that file
+  before `just build`, and a local `vorpal build` reads the developer's own
+  `~/.netrc` the same way. Without the file the build runs with the other
+  settings only. A config with no lambdas and no services gets none of this.
 - `deploy[].if` is joined to the fork guard with `&&`. Use
   `github.event_name == 'push' && github.ref == 'refs/heads/main'` to deploy
   only from pushes to `main`. `deploy[].githubEnvironment` runs the job in that
@@ -181,7 +190,10 @@ func Go(ctx *config.ConfigContext, name string, b *language.Go) (*language.Go, e
 `github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact/language`. With the extension
 unset (the default), `cmd/vorpal/main.go` has no project import and builds each
 artifact in one chained call. Setting `vorpal.extension` does not change
-`vorpal.tools`.
+`vorpal.tools`. With `privateModules` set, `project.Go` receives a builder that
+already carries the sandbox environment and credential settings. Its
+`WithEnvironments` call replaces the environment list and drops them, so avoid
+it in the hook. `WithSecrets` and `WithSourceScript` merge safely.
 
 If you would rather hand-write `cmd/vorpal/main.go`, list it in `.bcignore`
 and the generator leaves it alone:

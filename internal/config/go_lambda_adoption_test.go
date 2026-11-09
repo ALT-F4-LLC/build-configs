@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"go/format"
 	"strings"
 	"testing"
 
@@ -258,6 +259,82 @@ func TestGoLambdaCheckJobWritesNetrcOnlyForPrivateModules(t *testing.T) {
 			}
 			if !strings.Contains(goLambdaReadFile(t, "justfile"), "\nlint:\n") {
 				t.Error("lint recipe has dependencies; it must run no generator")
+			}
+		})
+	}
+}
+
+func TestGoLambdaProgramGivesPrivateModuleBuildsASandboxCredential(t *testing.T) {
+	for name, tc := range map[string]struct {
+		private   string
+		artifacts bool
+		extension string
+		want      bool
+	}{
+		"private modules":           {private: "github.com/example/kit", want: true},
+		"private modules extension": {private: "github.com/example/kit", extension: "github.com/example/app/internal/vorpal", want: true},
+		"artifacts only":            {private: "github.com/example/kit", artifacts: true},
+		"none":                      {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+			cfg.Lambdas = []string{"api"}
+			cfg.Services = []string{"mcp"}
+			cfg.PrivateModules = tc.private
+			cfg.Vorpal.Extension = tc.extension
+			if tc.artifacts {
+				cfg.Lambdas, cfg.Services, cfg.Deploy = nil, nil, nil
+				cfg.Artifacts = []string{"client-go"}
+			}
+			if err := cfg.Render(); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+
+			src := goLambdaReadFile(t, "cmd/vorpal/main.go")
+			if _, err := format.Source([]byte(src)); err != nil {
+				t.Fatalf("cmd/vorpal/main.go does not parse: %v\n%s", err, src)
+			}
+
+			wired := strings.Contains(src, "newPrivateModuleSandbox")
+			if wired != tc.want {
+				t.Fatalf("sandbox wiring = %v, want %v:\n%s", wired, tc.want, src)
+			}
+			if !tc.want {
+				for _, absent := range []string{"NETRC_", "GIT_SSL_CAINFO", ".netrc"} {
+					if strings.Contains(src, absent) {
+						t.Errorf("program without private modules mentions %q", absent)
+					}
+				}
+				return
+			}
+
+			// Each lambda and service builder gets the sandbox settings, and none
+			// is left with a bare environment list.
+			if got := strings.Count(src, "WithSourceScript(sandbox.script)"); got != 2 {
+				t.Errorf("%d builders get the sandbox script, want 2:\n%s", got, src)
+			}
+			if got := strings.Count(src, `sandbox.environments("CGO_ENABLED=0")`); got != 2 {
+				t.Errorf("%d builders get the sandbox environment, want 2:\n%s", got, src)
+			}
+			if got := strings.Count(src, "WithSecrets(sandbox.secrets)"); got != 2 {
+				t.Errorf("%d builders get the sandbox secrets, want 2:\n%s", got, src)
+			}
+			if strings.Contains(src, `WithEnvironments([]string{"CGO_ENABLED=0"})`) {
+				t.Errorf("a builder keeps a bare environment list:\n%s", src)
+			}
+			for _, want := range []string{
+				"GIT_SSL_CAINFO=/etc/ssl/certs/ca-certificates.crt",
+				"GOPRIVATE=github.com/example/kit",
+				`case "default":`,
+				"umask 077",
+				"HOME=$VORPAL_WORKSPACE",
+				`chmod 600 "$VORPAL_WORKSPACE/.netrc"`,
+				`strings.HasSuffix(target, "-linux")`,
+			} {
+				if !strings.Contains(src, want) {
+					t.Errorf("program missing %q:\n%s", want, src)
+				}
 			}
 		})
 	}
