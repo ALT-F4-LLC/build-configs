@@ -38,9 +38,9 @@ package-native lambda:
     mkdir -p dist/{{"{{"}} lambda {{"}}"}}
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
         go build \
-            -ldflags="-s -w"
+            -ldflags="-s -w" \
             -o dist/{{"{{"}} lambda {{"}}"}}/bootstrap \
-            -tags lambda.norpc
+            -tags lambda.norpc \
             ./cmd/{{"{{"}} lambda {{"}}"}}
     (cd dist/{{"{{"}} lambda {{"}}"}} && zip lambda.zip bootstrap)
 

@@ -205,3 +205,41 @@ func TestGoLambdaVorpalProgramDefaultToolsIncludeDeployTools(t *testing.T) {
 		}
 	}
 }
+
+// A shell line that does not end in a backslash ends the command, so any
+// go build argument on a following line runs as its own command.
+func TestGoLambdaJustfilePackageNativeKeepsGoBuildOnOneCommand(t *testing.T) {
+	_, body := goLambdaJustfileRecipe(t, goLambdaRenderJustfile(t, ""), "package-native")
+
+	var commands []string
+	var current string
+	for _, line := range body {
+		if cont, ok := strings.CutSuffix(line, `\`); ok {
+			current += strings.TrimSpace(cont) + " "
+			continue
+		}
+		commands = append(commands, current+line)
+		current = ""
+	}
+	if current != "" {
+		t.Fatalf("package-native ends on a line continuation: %q", current)
+	}
+
+	var build string
+	for _, c := range commands {
+		if strings.Contains(c, "go build") {
+			build = c
+		}
+	}
+	if build == "" {
+		t.Fatalf("package-native has no go build command: %q", commands)
+	}
+	for _, want := range []string{
+		"CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64", `-ldflags="-s -w"`,
+		"-o dist/{{ lambda }}/bootstrap", "-tags lambda.norpc", "./cmd/{{ lambda }}",
+	} {
+		if !strings.Contains(build, want) {
+			t.Errorf("go build command %q does not contain %q", build, want)
+		}
+	}
+}
