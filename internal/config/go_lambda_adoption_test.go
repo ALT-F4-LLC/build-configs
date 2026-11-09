@@ -309,16 +309,22 @@ func TestGoLambdaProgramGivesPrivateModuleBuildsASandboxCredential(t *testing.T)
 				return
 			}
 
-			// Each lambda and service builder gets the sandbox settings, and none
-			// is left with a bare environment list.
-			if got := strings.Count(src, "WithSourceScript(sandbox.script)"); got != 2 {
-				t.Errorf("%d builders get the sandbox script, want 2:\n%s", got, src)
+			// Each lambda and service builder gets the sandbox settings keyed by
+			// its own name, so the credential reaches only the artifact being
+			// built, and none is left with a bare environment list.
+			for _, artifact := range []string{"api", "mcp"} {
+				for _, want := range []string{
+					`WithEnvironments(sandbox.environments("` + artifact + `", "CGO_ENABLED=0"))`,
+					`WithSecrets(sandbox.secretsFor("` + artifact + `"))`,
+					`WithSourceScript(sandbox.scriptFor("` + artifact + `"))`,
+				} {
+					if !strings.Contains(src, want) {
+						t.Errorf("program missing %q:\n%s", want, src)
+					}
+				}
 			}
-			if got := strings.Count(src, `sandbox.environments("CGO_ENABLED=0")`); got != 2 {
-				t.Errorf("%d builders get the sandbox environment, want 2:\n%s", got, src)
-			}
-			if got := strings.Count(src, "WithSecrets(sandbox.secrets)"); got != 2 {
-				t.Errorf("%d builders get the sandbox secrets, want 2:\n%s", got, src)
+			if !strings.Contains(src, "newPrivateModuleSandbox(ctx.GetTargetStr(), ctx.GetArtifactName())") {
+				t.Errorf("sandbox is not keyed to the artifact being built:\n%s", src)
 			}
 			if strings.Contains(src, `WithEnvironments([]string{"CGO_ENABLED=0"})`) {
 				t.Errorf("a builder keeps a bare environment list:\n%s", src)

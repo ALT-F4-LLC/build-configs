@@ -54,7 +54,7 @@ func main() {
 	}
 {{- if and .PrivateModules (or .Lambdas .Services) }}
 
-	sandbox := newPrivateModuleSandbox(ctx.GetTargetStr())
+	sandbox := newPrivateModuleSandbox(ctx.GetTargetStr(), ctx.GetArtifactName())
 {{- end }}
 {{- if .Vorpal.Extension }}
 
@@ -73,9 +73,9 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("CGO_ENABLED=0")).
-		WithSecrets(sandbox.secrets).
-		WithSourceScript(sandbox.script))
+		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithSecrets(sandbox.secretsFor("{{ . }}")).
+		WithSourceScript(sandbox.scriptFor("{{ . }}")))
 {{- else }}
 		WithEnvironments([]string{"CGO_ENABLED=0"}))
 {{- end }}
@@ -88,9 +88,9 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("CGO_ENABLED=0")).
-		WithSecrets(sandbox.secrets).
-		WithSourceScript(sandbox.script).
+		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithSecrets(sandbox.secretsFor("{{ . }}")).
+		WithSourceScript(sandbox.scriptFor("{{ . }}")).
 {{- else }}
 		WithEnvironments([]string{"CGO_ENABLED=0"}).
 {{- end }}
@@ -106,9 +106,9 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("CGO_ENABLED=0")).
-		WithSecrets(sandbox.secrets).
-		WithSourceScript(sandbox.script))
+		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithSecrets(sandbox.secretsFor("{{ . }}")).
+		WithSourceScript(sandbox.scriptFor("{{ . }}")))
 {{- else }}
 		WithEnvironments([]string{"CGO_ENABLED=0"}))
 {{- end }}
@@ -121,9 +121,9 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("CGO_ENABLED=0")).
-		WithSecrets(sandbox.secrets).
-		WithSourceScript(sandbox.script).
+		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithSecrets(sandbox.secretsFor("{{ . }}")).
+		WithSourceScript(sandbox.scriptFor("{{ . }}")).
 {{- else }}
 		WithEnvironments([]string{"CGO_ENABLED=0"}).
 {{- end }}
@@ -141,19 +141,25 @@ func main() {
 
 // privateModuleSandbox holds what a sandboxed build needs to fetch private Go
 // modules over HTTPS: the system CA bundle for git, and the runner's github.com
-// credential from ~/.netrc, written to a .netrc inside the sandbox.
+// credential from ~/.netrc, written to a .netrc inside the sandbox. The
+// credential goes only to the artifact the invocation builds, because the
+// Vorpal agent encrypts every secret in the config it runs, and a build of
+// another artifact, such as the development environment, has no use for one.
 type privateModuleSandbox struct {
-	base    []string
-	script  string
-	secrets map[string]string
+	base      []string
+	netrcEnv  []string
+	requested string
+	script    string
+	secrets   map[string]string
 }
 
-func newPrivateModuleSandbox(target string) privateModuleSandbox {
+func newPrivateModuleSandbox(target, requested string) privateModuleSandbox {
 	// The sandbox builds with GOPRIVATE so Go never asks the module proxy or
 	// the checksum database about the private modules.
 	s := privateModuleSandbox{
-		base:    []string{"GOPRIVATE={{ .PrivateModules }}"},
-		secrets: map[string]string{},
+		base:      []string{"GOPRIVATE={{ .PrivateModules }}"},
+		requested: requested,
+		secrets:   map[string]string{},
 	}
 
 	linux := strings.HasSuffix(target, "-linux")
@@ -173,13 +179,13 @@ func newPrivateModuleSandbox(target string) privateModuleSandbox {
 		return s
 	}
 
-	s.base = append(s.base, "HOME=$VORPAL_WORKSPACE")
+	s.netrcEnv = []string{"HOME=$VORPAL_WORKSPACE"}
 
 	// A Linux sandbox clears its environment, so the secrets are passed through
 	// by name. Elsewhere the secrets are already in the environment, and a
 	// passthrough line could shadow a short login.
 	if linux {
-		s.base = append(s.base,
+		s.netrcEnv = append(s.netrcEnv,
 			"NETRC_PASSWORD=$NETRC_PASSWORD",
 			"NETRC_USERNAME=$NETRC_USERNAME",
 		)
@@ -194,10 +200,36 @@ chmod 600 "$VORPAL_WORKSPACE/.netrc"`
 	return s
 }
 
-// environments returns the sandbox settings followed by extra, because
-// WithEnvironments replaces the existing list rather than appending to it.
-func (s privateModuleSandbox) environments(extra ...string) []string {
-	return append(append([]string{}, s.base...), extra...)
+// environments returns the sandbox settings for the artifact called name,
+// followed by extra, because WithEnvironments replaces the existing list
+// rather than appending to it.
+func (s privateModuleSandbox) environments(name string, extra ...string) []string {
+	env := append([]string{}, s.base...)
+	if name == s.requested {
+		env = append(env, s.netrcEnv...)
+	}
+
+	return append(env, extra...)
+}
+
+// secretsFor returns the credential secrets for the artifact called name, or
+// none when another artifact is the one being built.
+func (s privateModuleSandbox) secretsFor(name string) map[string]string {
+	if name != s.requested {
+		return nil
+	}
+
+	return s.secrets
+}
+
+// scriptFor returns the script that writes the sandbox .netrc for the artifact
+// called name, or an empty script when another artifact is the one being built.
+func (s privateModuleSandbox) scriptFor(name string) string {
+	if name != s.requested {
+		return ""
+	}
+
+	return s.script
 }
 
 // readNetrc returns the login and password the runner's ~/.netrc holds for
