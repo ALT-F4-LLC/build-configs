@@ -173,8 +173,8 @@ func TestGoLambdaGenerateInCIOrdersClientBeforeTokenAndKeepsGenerateDependency(t
 	}
 
 	ci := goLambdaReadFile(t, ".github/workflows/ci.yaml")
-	if got := strings.Count(ci, "just build-client"); got != 2 {
-		t.Errorf("CI runs build-client %d times, want 2 (build-services and build)", got)
+	if got := strings.Count(ci, "just build-client"); got != 3 {
+		t.Errorf("CI runs build-client %d times, want 3 (check, build-services and build)", got)
 	}
 	// Each build job must generate the client before it writes the App token to disk.
 	for _, job := range strings.Split(ci, "\n\n  ")[1:] {
@@ -197,5 +197,45 @@ func TestGoLambdaGenerateInCIWithoutOpenAPIAddsNothing(t *testing.T) {
 	}
 	if !strings.Contains(goLambdaReadFile(t, "justfile"), "\ncheck:\n") || strings.Contains(goLambdaReadFile(t, ".github/workflows/ci.yaml"), "build-client") {
 		t.Error("generateInCI without openapi.enable changed the output")
+	}
+}
+
+func TestGoLambdaCheckJobWritesNetrcOnlyForPrivateModules(t *testing.T) {
+	for name, tc := range map[string]struct {
+		private string
+		want    bool
+	}{
+		"private modules": {private: "github.com/example/kit", want: true},
+		"none":            {private: "", want: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+			cfg.Lambdas = []string{"api"}
+			cfg.PrivateModules = tc.private
+			cfg.OpenAPI.Enable = true
+			cfg.OpenAPI.GenerateInCI = true
+			if err := cfg.Render(); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+
+			ci := goLambdaReadFile(t, ".github/workflows/ci.yaml")
+			start := strings.Index(ci, "\n  check:\n")
+			end := strings.Index(ci, "\n  build:\n")
+			if start < 0 || end < start {
+				t.Fatalf("check job not found:\n%s", ci)
+			}
+			check := ci[start:end]
+
+			if got := strings.Contains(check, "generate-token") && strings.Contains(check, "extractions/netrc") && strings.Contains(check, "rm -f ~/.netrc"); got != tc.want {
+				t.Errorf("check job has netrc steps = %v, want %v:\n%s", got, tc.want, check)
+			}
+			if tc.want {
+				client, token, run := strings.Index(check, "just build-client"), strings.Index(check, "generate-token"), strings.Index(check, "just check")
+				if client < 0 || client > token || token > run {
+					t.Errorf("want build-client, then token, then just check; got %d, %d, %d:\n%s", client, token, run, check)
+				}
+			}
+		})
 	}
 }

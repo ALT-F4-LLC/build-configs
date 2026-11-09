@@ -85,8 +85,21 @@ jobs:
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
+      - id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.ALTF4LLC_GITHUB_APP_ID }}
+          owner: ${{ github.repository_owner }}
+          private-key: ${{ secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY }}
+      - uses: extractions/netrc@v3
+        with:
+          machine: github.com
+          password: ${{ steps.generate-token.outputs.token }}
+          username: ${{ secrets.ALTF4LLC_GITHUB_APP_USER }}
       - run: just check
         shell: bash .github/vorpal-shell.sh {0}
+      - run: rm -f ~/.netrc
+        if: always()
 
   build:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
