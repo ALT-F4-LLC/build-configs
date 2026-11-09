@@ -93,6 +93,14 @@ to `[<name>]`, so set `lambdas: []` for a services-only project. That project
 has no lambda `build` job, and `deploy` together with `services` and an empty
 `lambdas` is an error.
 
+#### Vorpal SDK Floor
+
+The generated `cmd/vorpal/main.go` calls `config.SYSTEMS`, which the Vorpal Go
+SDK (`github.com/ALT-F4-LLC/vorpal/sdk/go`) exports from
+`v0.0.0-20260915234803-77ac6ad903ae`. A repository on an older SDK fails to
+compile the generated program, so bump the SDK in `go.mod` when adopting
+`go-lambda`.
+
 #### OpenAPI Client
 
 `openapi.enable` adds a `build-client` recipe that generates a Go client from
