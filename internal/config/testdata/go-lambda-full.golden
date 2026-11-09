@@ -134,7 +134,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    needs: build
+    needs:
+      - build
     concurrency:
       group: deploy-dev-${{ matrix.profile }}
       cancel-in-progress: false
@@ -161,7 +162,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    needs: build
+    needs:
+      - build
     concurrency:
       group: deploy-prod-${{ matrix.profile }}
       cancel-in-progress: false

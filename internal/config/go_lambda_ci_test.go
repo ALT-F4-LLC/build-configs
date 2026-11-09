@@ -278,3 +278,48 @@ func TestGoLambdaCIDeployJobsQueueInsteadOfCancel(t *testing.T) {
 		}
 	}
 }
+
+func TestGoLambdaCIDeployNeedsEveryBuildJob(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		services  []string
+		artifacts []string
+		want      []string
+	}{
+		{name: "lambdas only", want: []string{"build"}},
+		{name: "services", services: []string{"mcp"}, want: []string{"build", "build-services"}},
+		{name: "artifacts", artifacts: []string{"client"}, want: []string{"build", "build-services"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+			cfg.Lambdas = []string{"api"}
+			cfg.Services = tc.services
+			cfg.Artifacts = tc.artifacts
+			cfg.Deploy = []DeployConfig{{Environment: "prod", Region: "us-west-2", RoleARN: "arn:aws:iam::111111111111:role/prod"}}
+			if err := cfg.Render(); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+
+			var wf struct {
+				Jobs map[string]struct {
+					Needs []string `yaml:"needs"`
+				} `yaml:"jobs"`
+			}
+			src := goLambdaReadFile(t, goLambdaWorkflowPath)
+			if err := yaml.Unmarshal([]byte(src), &wf); err != nil {
+				t.Fatalf("workflow does not parse: %v\n%s", err, src)
+			}
+			got := slices.Clone(wf.Jobs["deploy-prod"].Needs)
+			slices.Sort(got)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("deploy-prod needs = %q, want %q", got, tc.want)
+			}
+			for _, need := range got {
+				if _, ok := wf.Jobs[need]; !ok {
+					t.Errorf("deploy-prod needs %q, which is not a job", need)
+				}
+			}
+		})
+	}
+}

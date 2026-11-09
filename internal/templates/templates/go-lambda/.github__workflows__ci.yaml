@@ -120,7 +120,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    needs: build
+    needs:
+      {{- if or $.Lambdas (not (or $.Services $.Artifacts)) }}
+      - build
+      {{- end }}
+      {{- if or $.Services $.Artifacts }}
+      - build-services
+      {{- end }}
     concurrency:
       group: deploy-{{ .Environment }}-${{"{{"}} matrix.profile {{"}}"}}
       cancel-in-progress: false
