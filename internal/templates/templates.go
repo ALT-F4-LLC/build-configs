@@ -29,6 +29,9 @@ var (
 	//go:embed all:templates/go-lambda/*
 	goLambdaFS embed.FS
 
+	//go:embed all:templates/go-library/*
+	goLibraryFS embed.FS
+
 	//go:embed all:templates/terraform/*
 	terraformFS embed.FS
 
@@ -41,6 +44,7 @@ var (
 	VorpalCommonTemplates    *template.Template
 	GoCobraCliTemplates      *template.Template
 	GoLambdaTemplates        *template.Template
+	GoLibraryTemplates       *template.Template
 	TerraformTemplates       *template.Template
 	TerraformModuleTemplates *template.Template
 )
@@ -57,6 +61,7 @@ func init() {
 	VorpalCommonTemplates = template.Must(template.ParseFS(vorpalCommonFS, "templates/common/vorpal/*"))
 	GoCobraCliTemplates = template.Must(template.ParseFS(goCobraCliFS, "templates/go-cobra-cli/*"))
 	GoLambdaTemplates = template.Must(template.ParseFS(goLambdaFS, "templates/go-lambda/*"))
+	GoLibraryTemplates = template.Must(template.ParseFS(goLibraryFS, "templates/go-library/*"))
 	TerraformTemplates = template.Must(template.ParseFS(terraformFS, "templates/terraform/*"))
 	TerraformModuleTemplates = template.Must(template.ParseFS(terraformModuleFS, "templates/terraform-module/*"))
 }

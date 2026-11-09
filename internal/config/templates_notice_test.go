@@ -35,6 +35,7 @@ const (
 var vorpalMainTemplates = []string{
 	"go-cobra-cli/cmd__vorpal__main.go.tmpl",
 	"go-lambda/cmd__vorpal__main.go.tmpl",
+	"go-library/cmd__vorpal__main.go.tmpl",
 	"terraform/cmd__vorpal__main.go.tmpl",
 	"terraform-module/cmd__vorpal__main.go.tmpl",
 }
@@ -68,7 +69,7 @@ func TestTemplatesCarryGeneratedNotice(t *testing.T) {
 func checkTemplateNotice(t *testing.T, p, content string) {
 	t.Helper()
 
-	// Only the four vorpal programs carry the Go generated-code marker; the
+	// Only the five vorpal programs carry the Go generated-code marker; the
 	// scaffold stub never does, because it is edited by hand.
 	wantMarker := slices.Contains(vorpalMainTemplates, p)
 	if got := strings.Contains(content, "Code generated"); got != wantMarker {

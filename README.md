@@ -135,6 +135,34 @@ and the generator leaves it alone:
 cmd/vorpal/main.go
 ```
 
+### `go-library`
+
+`go-library` scaffolds the Vorpal development environment and CI for a Go
+library. A library produces no binary, so `cmd/vorpal/main.go` builds only the
+development environment, and CI runs a `check` job and then a `test` job. The
+`justfile` has two recipes:
+
+- `check` runs `golangci-lint run ./...`.
+- `test` runs `go test -count=1 ./...`, so Go's test cache never reuses a
+  result.
+
+The development environment carries `golangci-lint`, `govulncheck`, `gitleaks`
+and `rumdl`. Set `vorpal.tools` to replace that list with other Vorpal artifact
+aliases:
+
+```yaml
+parameters:
+  vorpal:
+    tools:
+      - golangci-lint:2.11.4
+      - just:1.45.0
+```
+
+The linter configuration is the one every Go template shares. Silence a finding
+for one repository with `lint.exclude` rather than editing `.golangci.yaml`.
+That shared configuration skips missing doc-comment findings, which also
+applies to the exported API of a library.
+
 ## Examples
 
 Some example configurations for our template types exist in the

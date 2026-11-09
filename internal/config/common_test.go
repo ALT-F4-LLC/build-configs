@@ -34,6 +34,11 @@ func TestRenderMapsListEveryFileOnceFromItsOwningSet(t *testing.T) {
 			owners:   map[*template.Template][]string{templates.VorpalCommonTemplates: vorpal},
 		},
 		{
+			template: GoLibraryName,
+			rm:       NewGoLibraryConfig(name).renderMap(),
+			owners:   map[*template.Template][]string{templates.VorpalCommonTemplates: vorpal},
+		},
+		{
 			template: TerraformName,
 			rm:       NewTerraformConfig(name).renderMap(),
 			owners: map[*template.Template][]string{
