@@ -139,6 +139,7 @@ jobs:
     concurrency:
       group: deploy-dev-${{ matrix.profile }}
       cancel-in-progress: false
+      queue: max
     runs-on: altf4llc
     strategy:
       matrix:
@@ -167,6 +168,7 @@ jobs:
     concurrency:
       group: deploy-prod-${{ matrix.profile }}
       cancel-in-progress: false
+      queue: max
     runs-on: altf4llc
     strategy:
       matrix:

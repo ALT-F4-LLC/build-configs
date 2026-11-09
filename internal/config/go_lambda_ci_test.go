@@ -26,6 +26,7 @@ type goLambdaWorkflow struct {
 type goLambdaWorkflowConcurrency struct {
 	Group            string `yaml:"group"`
 	CancelInProgress *bool  `yaml:"cancel-in-progress"`
+	Queue            string `yaml:"queue"`
 }
 
 type goLambdaWorkflowJob struct {
@@ -270,6 +271,11 @@ func TestGoLambdaCIDeployJobsQueueInsteadOfCancel(t *testing.T) {
 		}
 		if job.Concurrency.CancelInProgress == nil || *job.Concurrency.CancelInProgress {
 			t.Errorf("deploy-%s concurrency.cancel-in-progress = %v, want false", env, job.Concurrency.CancelInProgress)
+		}
+		// The default queue keeps one pending job and cancels the older one
+		// when a third arrives; max queues every push.
+		if job.Concurrency.Queue != "max" {
+			t.Errorf("deploy-%s concurrency.queue = %q, want %q", env, job.Concurrency.Queue, "max")
 		}
 	}
 	for _, name := range []string{"build", "check"} {
