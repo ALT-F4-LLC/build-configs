@@ -119,3 +119,83 @@ func TestGolangciConfigDisableRendersLinterList(t *testing.T) {
 		t.Errorf("linters.disable = %q, want [errcheck]\n%s", doc.Linters.Disable, out)
 	}
 }
+
+func TestGoLambdaOpenAPIRejectsUnsafeOutputAndPackageName(t *testing.T) {
+	for name, mutate := range map[string]func(*OpenAPIConfig){
+		"empty output":      func(o *OpenAPIConfig) { o.Output = "" },
+		"absolute output":   func(o *OpenAPIConfig) { o.Output = "/tmp/client" },
+		"parent output":     func(o *OpenAPIConfig) { o.Output = "../client" },
+		"nested parent":     func(o *OpenAPIConfig) { o.Output = "a/../../client" },
+		"shell output":      func(o *OpenAPIConfig) { o.Output = "client; rm -rf x" },
+		"spaced output":     func(o *OpenAPIConfig) { o.Output = "my client" },
+		"empty package":     func(o *OpenAPIConfig) { o.PackageName = "" },
+		"dashed package":    func(o *OpenAPIConfig) { o.PackageName = "client-ai" },
+		"numbered package":  func(o *OpenAPIConfig) { o.PackageName = "1client" },
+		"injecting package": func(o *OpenAPIConfig) { o.PackageName = "client;ls" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+			cfg.Lambdas = []string{"api"}
+			cfg.OpenAPI.Enable = true
+			mutate(&cfg.OpenAPI)
+			if err := cfg.Render(); err == nil {
+				t.Error("Render accepted an unsafe openapi setting")
+			}
+		})
+	}
+}
+
+func TestGoLambdaOpenAPIDisabledSkipsOutputValidation(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+	cfg.Lambdas = []string{"api"}
+	cfg.OpenAPI.Output = ""
+	if err := cfg.Render(); err != nil {
+		t.Errorf("Render with openapi disabled: %v", err)
+	}
+}
+
+func TestGoLambdaGenerateInCIOrdersClientBeforeTokenAndKeepsGenerateDependency(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+	cfg.Lambdas = []string{"api"}
+	cfg.Services = []string{"mcp"}
+	cfg.Generate = []string{"echo hi"}
+	cfg.OpenAPI.Enable = true
+	cfg.OpenAPI.GenerateInCI = true
+	if err := cfg.Render(); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if !strings.Contains(goLambdaReadFile(t, "justfile"), "\ncheck: generate build-client\n") {
+		t.Errorf("check dependencies wrong:\n%s", goLambdaReadFile(t, "justfile"))
+	}
+
+	ci := goLambdaReadFile(t, ".github/workflows/ci.yaml")
+	if got := strings.Count(ci, "just build-client"); got != 2 {
+		t.Errorf("CI runs build-client %d times, want 2 (build-services and build)", got)
+	}
+	// Each build job must generate the client before it writes the App token to disk.
+	for _, job := range strings.Split(ci, "\n\n  ")[1:] {
+		if !strings.Contains(job, "just build-client") {
+			continue
+		}
+		if strings.Index(job, "just build-client") > strings.Index(job, "generate-token") {
+			t.Errorf("build-client runs after the App token step:\n%s", job)
+		}
+	}
+}
+
+func TestGoLambdaGenerateInCIWithoutOpenAPIAddsNothing(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+	cfg.Lambdas = []string{"api"}
+	cfg.OpenAPI.GenerateInCI = true
+	if err := cfg.Render(); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !strings.Contains(goLambdaReadFile(t, "justfile"), "\ncheck:\n") || strings.Contains(goLambdaReadFile(t, ".github/workflows/ci.yaml"), "build-client") {
+		t.Error("generateInCI without openapi.enable changed the output")
+	}
+}

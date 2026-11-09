@@ -109,8 +109,11 @@ parameters:
     generateInCI: true           # default false
 ```
 
+`output` must be a relative path of letters, digits, `_`, `.`, `/` and `-` with
+no `..`, and `packageName` a Go identifier; anything else fails generation.
 With `generateInCI`, `just check` depends on `build-client` and the CI `build`
-and `build-services` jobs run `just build-client` before `just build`. Use it
+and `build-services` jobs run `just build-client` right after checkout, before
+the GitHub App token is written, then `just build`. Use it
 when the generated client is not committed. The generator needs a JDK, so add
 one to `vorpal.tools`.
 
@@ -119,7 +122,13 @@ one to `vorpal.tools`.
 - `lint.disable` lists golangci-lint linters to turn off, such as `errcheck`.
 - A `deploy` entry that omits `roleArn` gets
   `arn:aws:iam::<account>:role/altf4llc-gha-<name>-deploy-<environment>`, built
-  from the entry's own `environment` and `account`.
+  from the entry's own `environment` and `account`. Earlier versions built it
+  from the placeholder environment `unspecified`, which named no real role.
+  An entry with no `roleArn` and no `if` therefore now tries a real role on
+  every same-repository pull request, so set `if` on every deploy entry. The
+  `if` is not a security boundary against a pull request that edits the
+  workflow: restrict the role's trust policy to the GitHub environment and
+  limit that environment to `main`.
 - `deploy[].if` is joined to the fork guard with `&&`. Use
   `github.event_name == 'push' && github.ref == 'refs/heads/main'` to deploy
   only from pushes to `main`. `deploy[].githubEnvironment` runs the job in that

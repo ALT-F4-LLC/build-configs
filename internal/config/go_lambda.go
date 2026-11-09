@@ -101,6 +101,12 @@ func (c GoLambdaConfig) Render() error {
 		}
 	}
 
+	if c.OpenAPI.Enable {
+		if err := c.OpenAPI.validate(); err != nil {
+			return err
+		}
+	}
+
 	for _, line := range c.Generate {
 		if strings.ContainsAny(line, "\r\n") {
 			return fmt.Errorf("generate line %q contains a newline; list one shell line per entry", line)
