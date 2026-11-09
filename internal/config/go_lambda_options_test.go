@@ -50,7 +50,7 @@ func goLambdaRenderOptions(t *testing.T, mutate func(*GoLambdaConfig)) (justfile
 func TestGoLambdaGenerate(t *testing.T) {
 	t.Run("off", func(t *testing.T) {
 		just, _ := goLambdaRenderOptions(t, func(*GoLambdaConfig) {})
-		if strings.Contains(just, "generate") {
+		if strings.Contains(strings.TrimPrefix(just, hashNoticeLines), "generate") {
 			t.Errorf("justfile mentions generate with it unset:\n%s", just)
 		}
 		if !strings.Contains(just, "\ncheck:\n    golangci-lint run ./...\n") {

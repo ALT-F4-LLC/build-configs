@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const terraformModuleEnvrcWant = `use_vorpal() {
+const terraformModuleEnvrcWant = hashNoticeLines + `use_vorpal() {
     source "$(vorpal build --path 'demo-module-dev')/bin/activate"
 }
 

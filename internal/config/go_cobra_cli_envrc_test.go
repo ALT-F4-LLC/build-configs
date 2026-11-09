@@ -8,7 +8,7 @@ import (
 func TestGoCobraCliRendersVorpalEnvrc(t *testing.T) {
 	goCobraCliRenderTemp(t, nil)
 
-	want := `use_vorpal() {
+	want := hashNoticeLines + `use_vorpal() {
     source "$(vorpal build --path 'demo-dev')/bin/activate"
 }
 

@@ -55,7 +55,7 @@ func terraformModuleJustfileRecipes(src string) map[string][]string {
 	var current string
 	for line := range strings.SplitSeq(src, "\n") {
 		switch {
-		case strings.TrimSpace(line) == "":
+		case strings.TrimSpace(line) == "", line[0] == '#':
 		case line[0] != ' ' && line[0] != '\t':
 			current = strings.TrimSuffix(strings.TrimSpace(line), ":")
 			recipes[current] = nil

@@ -139,7 +139,7 @@ func goCobraCliAssertStrings(t *testing.T, what string, got, want []string) {
 func TestGoCobraCliRendersDefaultVorpalToml(t *testing.T) {
 	goCobraCliRenderTemp(t, nil)
 
-	want := `language = "go"
+	want := hashNoticeLines + `language = "go"
 
 [source]
 includes = [
@@ -182,7 +182,7 @@ func TestGoCobraCliVorpalOptionsChangeOutputIndependently(t *testing.T) {
 		},
 	})
 
-	wantToml := `language = "go"
+	wantToml := hashNoticeLines + `language = "go"
 
 [source]
 includes = [

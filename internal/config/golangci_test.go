@@ -42,7 +42,9 @@ func TestGolangciConfigWithoutExcludesMatchesRepositoryConfig(t *testing.T) {
 		Lint: GolangCILintConfig{Exclude: []string{}},
 	})
 
-	if got != string(want) {
+	// The repository copy may or may not carry the notice yet; compare the
+	// configuration alone.
+	if strings.Replace(got, hashNoticeLines, "", 1) != strings.Replace(string(want), hashNoticeLines, "", 1) {
 		t.Errorf("rendered .golangci.yaml differs from repository .golangci.yaml\ngot:\n%s\nwant:\n%s", got, want)
 	}
 	if _, ok := golangciParse(t, got)["issues"]; ok {
