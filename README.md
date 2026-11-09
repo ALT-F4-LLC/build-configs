@@ -151,8 +151,8 @@ one to `vorpal.tools`.
   the artifact being built, and to no other, in pieces of at most 200 bytes
   because the agent cannot encrypt a longer secret. It writes a `.netrc` into
   the sandbox workspace from them. The Vorpal agent encrypts every secret in
-  the config it runs, so building the development environment, as the `check` job does,
-  attaches none. The CI jobs write that file before `just build`, and a local
+  the config it runs, so building the development environment, as the
+  `check` job does, attaches none. The CI jobs write that file before `just build`, and a local
   `vorpal build` reads the developer's own `~/.netrc` the same way. Without the
   file the build runs with the other settings only. A config with no lambdas
   and no services gets none of this.
