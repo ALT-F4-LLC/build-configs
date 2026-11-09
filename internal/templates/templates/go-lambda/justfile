@@ -18,6 +18,11 @@ generate:
 check{{ if or .Generate .OpenAPI.GenerateInCI }}:{{ if .Generate }} generate{{ end }}{{ if and .OpenAPI.Enable .OpenAPI.GenerateInCI }} build-client{{ end }}{{ else }}:{{ end }}
     golangci-lint run ./...
 
+# lint runs the linter alone: CI runs it after the generators, with a private
+# module token on disk, so it must not depend on them.
+lint:
+    golangci-lint run ./...
+
 package profile:
     #!/usr/bin/env bash
     set -euxo pipefail

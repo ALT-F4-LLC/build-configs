@@ -213,6 +213,8 @@ func TestGoLambdaCheckJobWritesNetrcOnlyForPrivateModules(t *testing.T) {
 			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
 			cfg.Lambdas = []string{"api"}
 			cfg.PrivateModules = tc.private
+			cfg.Services = []string{"mcp"}
+			cfg.Generate = []string{"echo hi"}
 			cfg.OpenAPI.Enable = true
 			cfg.OpenAPI.GenerateInCI = true
 			if err := cfg.Render(); err != nil {
@@ -221,20 +223,41 @@ func TestGoLambdaCheckJobWritesNetrcOnlyForPrivateModules(t *testing.T) {
 
 			ci := goLambdaReadFile(t, ".github/workflows/ci.yaml")
 			start := strings.Index(ci, "\n  check:\n")
-			end := strings.Index(ci, "\n  build:\n")
-			if start < 0 || end < start {
+			if start < 0 {
 				t.Fatalf("check job not found:\n%s", ci)
 			}
-			check := ci[start:end]
+			check := ci[start+1:]
+			if end := strings.Index(check, "\n\n  "); end >= 0 {
+				check = check[:end]
+			}
 
 			if got := strings.Contains(check, "generate-token") && strings.Contains(check, "extractions/netrc") && strings.Contains(check, "rm -f ~/.netrc"); got != tc.want {
 				t.Errorf("check job has netrc steps = %v, want %v:\n%s", got, tc.want, check)
 			}
-			if tc.want {
-				client, token, run := strings.Index(check, "just build-client"), strings.Index(check, "generate-token"), strings.Index(check, "just check")
-				if client < 0 || client > token || token > run {
-					t.Errorf("want build-client, then token, then just check; got %d, %d, %d:\n%s", client, token, run, check)
+			if !tc.want {
+				if !strings.Contains(check, "just check") || strings.Contains(check, "just lint") {
+					t.Errorf("without private modules the check job runs just check only:\n%s", check)
 				}
+				return
+			}
+
+			// Everything that reads the repository's inputs runs before the token
+			// is on disk; only the linter runs after it.
+			generate, client := strings.Index(check, "just generate"), strings.Index(check, "just build-client")
+			token, lint := strings.Index(check, "generate-token"), strings.Index(check, "just lint")
+			if generate < 0 || client < generate || token < client || lint < token {
+				t.Errorf("want generate, build-client, token, lint; got %d, %d, %d, %d:\n%s", generate, client, token, lint, check)
+			}
+			if strings.Contains(check, "just check") {
+				t.Errorf("check job runs just check after the token, which re-runs generate and build-client:\n%s", check)
+			}
+
+			_, body := goLambdaJustfileRecipe(t, goLambdaReadFile(t, "justfile"), "lint")
+			if !strings.Contains(strings.Join(body, "\n"), "golangci-lint run ./...") {
+				t.Errorf("lint recipe does not run golangci-lint: %q", body)
+			}
+			if !strings.Contains(goLambdaReadFile(t, "justfile"), "\nlint:\n") {
+				t.Error("lint recipe has dependencies; it must run no generator")
 			}
 		})
 	}

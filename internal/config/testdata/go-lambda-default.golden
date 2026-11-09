@@ -96,7 +96,7 @@ jobs:
           machine: github.com
           password: ${{ steps.generate-token.outputs.token }}
           username: ${{ secrets.ALTF4LLC_GITHUB_APP_USER }}
-      - run: just check
+      - run: just lint
         shell: bash .github/vorpal-shell.sh {0}
       - run: rm -f ~/.netrc
         if: always()
@@ -282,6 +282,11 @@ build profile:
     vorpal build '{{ profile }}'
 
 check:
+    golangci-lint run ./...
+
+# lint runs the linter alone: CI runs it after the generators, with a private
+# module token on disk, so it must not depend on them.
+lint:
     golangci-lint run ./...
 
 package profile:

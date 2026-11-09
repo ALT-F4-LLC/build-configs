@@ -137,9 +137,12 @@ one to `vorpal.tools`.
   `if` is not a security boundary against a pull request that edits the
   workflow: restrict the role's trust policy to the GitHub environment and
   limit that environment to `main`.
-- With `privateModules` set, the `check` job writes the GitHub App token to
-  `~/.netrc` before `just check`, as the build jobs do, and removes it after,
-  because lint type-checks packages that import a private module.
+- With `privateModules` set, the `check` job runs `just generate` and
+  `just build-client` (when configured) first, writes the GitHub App token to
+  `~/.netrc`, runs `just lint`, and removes the token, because lint type-checks
+  packages that import a private module. `just lint` runs the linter alone, so
+  no generator runs with the token on disk. `just check` still runs the
+  generators and the linter locally.
 - `deploy[].if` is joined to the fork guard with `&&`. Use
   `github.event_name == 'push' && github.ref == 'refs/heads/main'` to deploy
   only from pushes to `main`. `deploy[].githubEnvironment` runs the job in that

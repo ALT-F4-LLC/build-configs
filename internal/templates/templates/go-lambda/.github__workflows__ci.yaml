@@ -19,11 +19,15 @@ jobs:
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
+      {{- if .PrivateModules }}
+      {{- if .Generate }}
+      - run: just generate
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
       {{- if and .OpenAPI.Enable .OpenAPI.GenerateInCI }}
       - run: just build-client
         shell: bash .github/vorpal-shell.sh {0}
       {{- end }}
-      {{- if .PrivateModules }}
       - id: generate-token
         uses: actions/create-github-app-token@v3
         with:
@@ -35,12 +39,13 @@ jobs:
           machine: github.com
           password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
-      {{- end }}
-      - run: just check
+      - run: just lint
         shell: bash .github/vorpal-shell.sh {0}
-      {{- if .PrivateModules }}
       - run: rm -f ~/.netrc
         if: always()
+      {{- else }}
+      - run: just check
+        shell: bash .github/vorpal-shell.sh {0}
       {{- end }}
 {{- if or .Services .Artifacts }}
 
