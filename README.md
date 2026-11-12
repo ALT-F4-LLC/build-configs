@@ -161,7 +161,8 @@ one to `vorpal.tools`.
   so building the development environment, as the `check` job does, attaches
   none. The CI jobs write `~/.netrc` before `just build`, and a local
   `vorpal build` reads the developer's own `~/.netrc` the same way. Without
-  the file the build runs with the other settings only. A config with no lambdas and no services gets none of this.
+  the file the build runs with the other settings only. A config with no
+  lambdas and no services gets none of this.
 - `deploy[].if` is joined to the fork guard with `&&`. Use
   `github.event_name == 'push' && github.ref == 'refs/heads/main'` to deploy
   only from pushes to `main`. `deploy[].githubEnvironment` runs the job in that
