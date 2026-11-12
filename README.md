@@ -147,12 +147,19 @@ one to `vorpal.tools`.
   service build what the Vorpal sandbox needs to fetch the module over HTTPS:
   `GOPRIVATE`, and on Linux targets the git CA bundle
   `/etc/ssl/certs/ca-certificates.crt`. When the build host's `~/.netrc` has a
-  `github.com` entry, the program passes its login and password as secrets to
-  the artifact being built, and to no other, in pieces of at most 200 bytes
-  because the agent cannot encrypt a longer secret. It writes a `.netrc` into
-  the sandbox workspace from them. The Vorpal agent encrypts every secret in
-  the config it runs, so building the development environment, as the
-  `check` job does, attaches none. The CI jobs write that file before
+  `github.com` entry, the program passes its login and password as the
+  secrets `NETRC_USERNAME` and `NETRC_PASSWORD` to the artifact being built,
+  and to no other. The build script reads them from
+  `$VORPAL_SECRET_DIR/NETRC_USERNAME` and `$VORPAL_SECRET_DIR/NETRC_PASSWORD`
+  and writes a `.netrc` into the sandbox workspace; no step names a secret in
+  its arguments or environment, which the Vorpal worker refuses. A build that
+  attaches the credential needs the Vorpal Go SDK in `go.mod` and the Vorpal
+  agent and worker at or after
+  `v0.0.0-20261112004409-56d9bfe3f08b`, which seal step secrets and deliver
+  them as files; an older SDK cannot read the sealed secrets back. The Vorpal
+  agent encrypts every secret in the config it runs, so building the
+  development environment, as the `check` job does, attaches none. The CI
+  jobs write that file before
   `just build`, and a local `vorpal build` reads the developer's own
   `~/.netrc` the same way. Without the file the build runs with the other
   settings only. A config with no lambdas and no services gets none of this.

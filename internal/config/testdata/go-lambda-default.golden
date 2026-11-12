@@ -228,7 +228,6 @@ func main() {
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -323,34 +322,20 @@ func newPrivateModuleSandbox(target, requested string) privateModuleSandbox {
 
 	s.netrcEnv = []string{"HOME=$VORPAL_WORKSPACE"}
 
-	// The agent encrypts each secret with RSA PKCS#1 v1.5, which cannot take a
-	// value over 245 bytes for the 2048-bit key Vorpal generates. A GitHub App
-	// token can be long, so each credential travels as several short secrets
-	// that the script joins again. A Linux sandbox clears its environment, so
-	// the secrets are passed through by name. Elsewhere they are already in the
-	// environment, and a passthrough line could shadow a short value.
-	var login, password strings.Builder
-	for _, credential := range []struct {
-		name  string
-		value string
-		ref   *strings.Builder
-	}{
-		{"NETRC_USERNAME", user, &login},
-		{"NETRC_PASSWORD", token, &password},
-	} {
-		for i, part := range splitSecret(credential.value) {
-			key := fmt.Sprintf("%s_%d", credential.name, i)
-			s.secrets[key] = part
-			credential.ref.WriteString("${" + key + "}")
-
-			if linux {
-				s.netrcEnv = append(s.netrcEnv, key+"=$"+key)
-			}
-		}
-	}
+	// The worker writes each secret to its own file under $VORPAL_SECRET_DIR,
+	// named after the secret, and refuses a step whose arguments or environment
+	// reference a secret, so the script reads the files rather than variables.
+	// $(<file) and printf are shell builtins, so no value appears in a
+	// process's arguments, and a failed read stops the script before it writes
+	// an empty credential.
+	s.secrets["NETRC_USERNAME"] = user
+	s.secrets["NETRC_PASSWORD"] = token
 
 	s.script = "umask 077\n" +
-		"printf 'machine github.com login %s password %s\\n' \"" + login.String() + "\" \"" + password.String() + "\" > \"$VORPAL_WORKSPACE/.netrc\"\n" +
+		"netrc_login=\"$(<\"$VORPAL_SECRET_DIR/NETRC_USERNAME\")\" || exit 1\n" +
+		"netrc_password=\"$(<\"$VORPAL_SECRET_DIR/NETRC_PASSWORD\")\" || exit 1\n" +
+		"printf 'machine github.com login %s password %s\\n' \"$netrc_login\" \"$netrc_password\" > \"$VORPAL_WORKSPACE/.netrc\"\n" +
+		"unset netrc_login netrc_password\n" +
 		"chmod 600 \"$VORPAL_WORKSPACE/.netrc\""
 
 	return s
@@ -386,21 +371,6 @@ func (s privateModuleSandbox) scriptFor(name string) string {
 	}
 
 	return s.script
-}
-
-// secretChunk is the longest value passed as one Vorpal secret.
-const secretChunk = 200
-
-// splitSecret cuts value into parts of at most secretChunk bytes, and returns
-// one empty part for an empty value.
-func splitSecret(value string) []string {
-	var parts []string
-	for len(value) > secretChunk {
-		parts = append(parts, value[:secretChunk])
-		value = value[secretChunk:]
-	}
-
-	return append(parts, value)
 }
 
 // readNetrc returns the login and password the runner's ~/.netrc holds for

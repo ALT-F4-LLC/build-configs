@@ -336,12 +336,32 @@ func TestGoLambdaProgramGivesPrivateModuleBuildsASandboxCredential(t *testing.T)
 				"umask 077",
 				"HOME=$VORPAL_WORKSPACE",
 				`chmod 600 \"$VORPAL_WORKSPACE/.netrc\"`,
-				"func splitSecret(",
-				"const secretChunk = 200",
+				`s.secrets["NETRC_USERNAME"] = user`,
+				`s.secrets["NETRC_PASSWORD"] = token`,
+				`netrc_login=\"$(<\"$VORPAL_SECRET_DIR/NETRC_USERNAME\")\" || exit 1`,
+				`netrc_password=\"$(<\"$VORPAL_SECRET_DIR/NETRC_PASSWORD\")\" || exit 1`,
+				`unset netrc_login netrc_password`,
 				`strings.HasSuffix(target, "-linux")`,
 			} {
 				if !strings.Contains(src, want) {
 					t.Errorf("program missing %q:\n%s", want, src)
+				}
+			}
+
+			// The worker refuses a step whose arguments or environment
+			// reference a secret as $NAME or ${NAME}, so the program must
+			// never build one: no passthrough, no expansion in the script.
+			for _, absent := range []string{"$NETRC_", "${NETRC_", "=$\"+", "\"${\" +"} {
+				if strings.Contains(src, absent) {
+					t.Errorf("program references a secret by name with %q:\n%s", absent, src)
+				}
+			}
+
+			// The worker seals each secret whole, so the program no longer
+			// splits a credential into chunks.
+			for _, absent := range []string{"splitSecret", "secretChunk"} {
+				if strings.Contains(src, absent) {
+					t.Errorf("program still chunks secrets with %q:\n%s", absent, src)
 				}
 			}
 		})
