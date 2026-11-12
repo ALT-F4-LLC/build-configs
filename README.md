@@ -153,16 +153,15 @@ one to `vorpal.tools`.
   `$VORPAL_SECRET_DIR/NETRC_USERNAME` and `$VORPAL_SECRET_DIR/NETRC_PASSWORD`
   and writes a `.netrc` into the sandbox workspace; no step names a secret in
   its arguments or environment, which the Vorpal worker refuses. A build that
-  attaches the credential needs the Vorpal Go SDK in `go.mod` and the Vorpal
-  agent and worker at or after
-  `v0.0.0-20261112004409-56d9bfe3f08b`, which seal step secrets and deliver
-  them as files; an older SDK cannot read the sealed secrets back. The Vorpal
-  agent encrypts every secret in the config it runs, so building the
-  development environment, as the `check` job does, attaches none. The CI
-  jobs write that file before
-  `just build`, and a local `vorpal build` reads the developer's own
-  `~/.netrc` the same way. Without the file the build runs with the other
-  settings only. A config with no lambdas and no services gets none of this.
+  attaches the credential needs the Vorpal Go SDK in `go.mod` at or after
+  `v0.0.0-20261112004409-56d9bfe3f08b`, and a Vorpal agent and worker at
+  0.5.0 or later, which seal step secrets and deliver them as files. An older
+  SDK carries secret values as strings and is not expected to read the sealed
+  values back. The Vorpal agent encrypts every secret in the config it runs,
+  so building the development environment, as the `check` job does, attaches
+  none. The CI jobs write `~/.netrc` before `just build`, and a local
+  `vorpal build` reads the developer's own `~/.netrc` the same way. Without
+  the file the build runs with the other settings only. A config with no lambdas and no services gets none of this.
 - `deploy[].if` is joined to the fork guard with `&&`. Use
   `github.event_name == 'push' && github.ref == 'refs/heads/main'` to deploy
   only from pushes to `main`. `deploy[].githubEnvironment` runs the job in that
