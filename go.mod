@@ -3,7 +3,7 @@ module github.com/ALT-F4-LLC/build-configs
 go 1.26.0
 
 require (
-	github.com/ALT-F4-LLC/vorpal/sdk/go v0.0.0-20260915234803-77ac6ad903ae
+	github.com/ALT-F4-LLC/vorpal/sdk/go v0.0.0-20261114073422-fde783eca749
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )
