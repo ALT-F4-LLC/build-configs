@@ -1,11 +1,9 @@
 module github.com/ALT-F4-LLC/build-configs
 
-go 1.26.0
-
-toolchain go1.26.10
+go 1.27.4
 
 require (
-	github.com/ALT-F4-LLC/vorpal/sdk/go v0.0.0-20261113003933-40816dd62aeb
+	github.com/ALT-F4-LLC/vorpal/sdk/go v0.0.0-20261114235254-95265af60172
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )
