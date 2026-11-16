@@ -3,4 +3,4 @@
 justfile
 .github/vorpal-shell.sh
 .github/workflows/ci.yaml
-cmd/vorpal/main.go
+# cmd/vorpal/main.go
