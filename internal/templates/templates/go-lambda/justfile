@@ -4,7 +4,20 @@
 # out of generation.
 
 build profile:
-    vorpal build '{{"{{"}} profile {{"}}"}}'
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    tags=""
+    {{- if .Lambdas }}
+    case '{{"{{"}} profile {{"}}"}}' in
+        {{ range $i, $l := .Lambdas }}{{ if $i }}|{{ end }}{{ $l }}{{ end }}) tags="lambda.norpc" ;;
+    esac
+    {{- end }}
+    mkdir -p 'dist/{{"{{"}} profile {{"}}"}}'
+    CGO_ENABLED=0 go build \
+        -ldflags='-s -w' \
+        -tags="$tags" \
+        -o 'dist/{{"{{"}} profile {{"}}"}}/{{"{{"}} profile {{"}}"}}' \
+        './cmd/{{"{{"}} profile {{"}}"}}'
 
 {{ if .Generate -}}
 generate:
@@ -23,6 +36,18 @@ check{{ if or .Generate .OpenAPI.GenerateInCI }}:{{ if .Generate }} generate{{ e
 lint:
     golangci-lint run ./...
 
+doc-validate:
+    rumdl check --no-cache --deny-config-warnings .
+
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
+
+test:
+    go test -count=1 ./...
+
+vuln-scan:
+    govulncheck ./...
+
 package profile:
     #!/usr/bin/env bash
     set -euxo pipefail
@@ -32,26 +57,14 @@ package profile:
     rm -f dist/{{"{{"}} profile {{"}}"}}/lambda.zip
     (cd dist/{{"{{"}} profile {{"}}"}} && zip lambda.zip bootstrap)
 
+{{ if or .Services .Artifacts -}}
+package-artifact name:
+    vorpal build --path '{{"{{"}} name {{"}}"}}'
+
+{{ end -}}
 package-all:
     {{- range .Lambdas }}
     just package "{{.}}"
-    {{- end }}
-
-package-native lambda:
-    #!/usr/bin/env bash
-    set -euxo pipefail
-    mkdir -p dist/{{"{{"}} lambda {{"}}"}}
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-        go build \
-            -ldflags="-s -w" \
-            -o dist/{{"{{"}} lambda {{"}}"}}/bootstrap \
-            -tags lambda.norpc \
-            ./cmd/{{"{{"}} lambda {{"}}"}}
-    (cd dist/{{"{{"}} lambda {{"}}"}} && zip lambda.zip bootstrap)
-
-package-native-all:
-    {{- range .Lambdas }}
-    just package-native "{{.}}"
     {{- end }}
 
 deploy environment lambda:

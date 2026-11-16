@@ -141,7 +141,7 @@ func TestTerraformRenderWritesVorpalDevEnvironment(t *testing.T) {
 	if envName != "demo-dev" {
 		t.Errorf("development environment name = %q, want %q", envName, "demo-dev")
 	}
-	for _, want := range []string{"just:1.45.0", "rumdl:0.3.2", "terraform:1.13.1", "awscli2:2.33.1"} {
+	for _, want := range []string{"gitleaks:8.30.1", "just:1.45.0", "rumdl:0.3.2", "terraform:1.13.1", "awscli2:2.33.1"} {
 		if !slices.Contains(aliases, want) {
 			t.Errorf("aliases %v missing %q", aliases, want)
 		}

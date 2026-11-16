@@ -41,7 +41,7 @@ type GoLambdaConfig struct {
 	// `quirk-{{ environment }}-<quirk.service>-{{ lambda }}`.
 	FunctionName string `json:"functionName,omitempty" yaml:"functionName,omitempty"`
 	// Artifacts are extra Vorpal artifact names that CI builds with
-	// `just build <name>`, in the build-services matrix. Unlike services they
+	// `just package-artifact <name>`, in the build-services matrix. Unlike services they
 	// do not pass through the generated vorpal program's Go() hook.
 	Artifacts []string             `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
 	OpenAPI   OpenAPIConfig        `json:"openapi,omitempty" yaml:"openapi,omitempty"`
@@ -73,6 +73,7 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 		Vorpal: GoLambdaVorpalConfig{
 			Tools: []string{
 				"awscli2:2.33.1",
+				"gitleaks:8.30.1",
 				"golangci-lint:2.15.0",
 				"govulncheck:1.9.0",
 				"jq:1.8.1",

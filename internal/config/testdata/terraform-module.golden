@@ -156,6 +156,11 @@ import (
 func main() {
 	ctx := config.GetContext()
 
+	gitleaks, err := ctx.FetchArtifactAlias("gitleaks:8.30.1")
+	if err != nil {
+		log.Fatalf("failed fetching gitleaks alias: %v", err)
+	}
+
 	just, err := ctx.FetchArtifactAlias("just:1.45.0")
 	if err != nil {
 		log.Fatalf("failed fetching just alias: %v", err)
@@ -172,7 +177,7 @@ func main() {
 	}
 
 	_, err = artifact.NewDevelopmentEnvironment("example-module-dev", config.SYSTEMS).
-		WithArtifacts([]*string{just, rumdl, terraform}).
+		WithArtifacts([]*string{gitleaks, just, rumdl, terraform}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
@@ -191,6 +196,10 @@ func main() {
 _default:
     just --list
 
+build:
+    terraform init -backend=false
+    terraform validate
+
 check:
     terraform fmt -check
 
@@ -202,6 +211,9 @@ init:
 
 package:
     vorpal build --path 'example-module-dev'
+
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
 
 validate:
     terraform validate

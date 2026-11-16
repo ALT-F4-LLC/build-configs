@@ -3,8 +3,26 @@
 # Do not edit it by hand. Listing a path in .bcignore opts that file
 # out of generation.
 
+build:
+    go build ./...
+
 check:
     golangci-lint run ./...
 
+doc-validate:
+    rumdl check --no-cache --deny-config-warnings .
+
+lint:
+    golangci-lint run ./...
+
+package:
+    vorpal build --path {{ .ShellQuotedDevEnvironment }}
+
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
+
 test:
     go test -count=1 ./...
+
+vuln-scan:
+    govulncheck ./...

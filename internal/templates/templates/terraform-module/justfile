@@ -6,6 +6,10 @@
 _default:
     just --list
 
+build:
+    terraform init -backend=false
+    terraform validate
+
 check:
     terraform fmt -check
 
@@ -17,6 +21,9 @@ init:
 
 package:
     vorpal build --path {{ .ShellQuotedDevEnvironment }}
+
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
 
 validate:
     terraform validate

@@ -3,6 +3,10 @@
 # Do not edit it by hand. Listing a path in .bcignore opts that file
 # out of generation.
 
+build:
+    terraform init -backend=false
+    terraform validate
+
 check:
     terraform fmt -check
 
@@ -17,8 +21,14 @@ format:
 init:
     terraform init
 
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
+
 validate:
     terraform validate
+
+package:
+    vorpal build --path {{ .ShellQuotedDevEnvironment }}
 
 plan:
     terraform plan -out "terraform.tfplan"

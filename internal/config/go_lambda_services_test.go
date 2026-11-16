@@ -123,11 +123,13 @@ func TestGoLambdaServiceCI(t *testing.T) {
 			t.Error("build-services uploads an artifact")
 		}
 	}
-	if !slices.Contains(runs, `just build "${{ matrix.service }}"`) {
-		t.Errorf("build-services runs %q, want just build", runs)
+	build := slices.Index(runs, `just build "${{ matrix.service }}"`)
+	pkg := slices.Index(runs, `just package-artifact "${{ matrix.service }}"`)
+	if build < 0 || pkg < 0 || build > pkg {
+		t.Errorf("build-services runs %q, want just build then just package-artifact", runs)
 	}
 	for _, run := range runs {
-		if strings.Contains(run, "just package") || strings.Contains(run, "just deploy") {
+		if strings.Contains(run, "just package ") || strings.Contains(run, "just deploy") {
 			t.Errorf("build-services runs %q", run)
 		}
 	}

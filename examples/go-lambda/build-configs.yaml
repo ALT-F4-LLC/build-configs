@@ -18,7 +18,7 @@ parameters:
   #   - just build-data
   # Optional: Lambda function name as a just string (default quirk-{{ environment }}-<service>-{{ lambda }}).
   # functionName: "example-{{ lambda }}"
-  # Optional: extra Vorpal artifacts CI builds with `just build <name>`.
+  # Optional: extra Vorpal artifacts CI builds with `just package-artifact <name>`.
   # artifacts:
   #   - example-client
   # Per deploy entry, `githubEnvironment: prod` runs that job in a GitHub environment.

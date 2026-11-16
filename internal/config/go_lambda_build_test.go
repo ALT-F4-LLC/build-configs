@@ -65,15 +65,52 @@ func TestGoLambdaJustfileOmitsNixCachixFlake(t *testing.T) {
 	}
 }
 
-func TestGoLambdaJustfileBuildRunsVorpalBuildForProfile(t *testing.T) {
+func TestGoLambdaJustfileBuildRunsGoBuildForProfile(t *testing.T) {
 	justfile := goLambdaRenderJustfile(t, "github.com/ALT-F4-LLC/quirk-service-kit")
 
 	header, body := goLambdaJustfileRecipe(t, justfile, "build")
 	if header != "build profile:" {
 		t.Errorf("build header = %q, want %q", header, "build profile:")
 	}
-	if want := []string{"vorpal build '{{ profile }}'"}; !slices.Equal(body, want) {
+	want := []string{
+		"#!/usr/bin/env bash",
+		"set -euxo pipefail",
+		`tags=""`,
+		"case '{{ profile }}' in",
+		`api|worker) tags="lambda.norpc" ;;`,
+		"esac",
+		"mkdir -p 'dist/{{ profile }}'",
+		`CGO_ENABLED=0 go build \`,
+		`-ldflags='-s -w' \`,
+		`-tags="$tags" \`,
+		`-o 'dist/{{ profile }}/{{ profile }}' \`,
+		"'./cmd/{{ profile }}'",
+	}
+	if !slices.Equal(body, want) {
 		t.Errorf("build body = %q, want %q", body, want)
+	}
+	if strings.Contains(strings.Join(body, "\n"), "vorpal") {
+		t.Errorf("build runs vorpal: %q", body)
+	}
+}
+
+// Services build without the lambda tag, as the Vorpal program builds them.
+func TestGoLambdaJustfileBuildWithoutLambdasHasNoTagCase(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+	cfg.Lambdas = nil
+	cfg.Deploy = nil
+	cfg.Services = []string{"svc"}
+	if err := cfg.Render(); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	_, body := goLambdaJustfileRecipe(t, goLambdaReadFile(t, "justfile"), "build")
+	if slices.Contains(body, "case '{{ profile }}' in") {
+		t.Errorf("build with no lambdas has a tag case: %q", body)
+	}
+	_, pkg := goLambdaJustfileRecipe(t, goLambdaReadFile(t, "justfile"), "package-artifact")
+	if want := []string{"vorpal build --path '{{ name }}'"}; !slices.Equal(pkg, want) {
+		t.Errorf("package-artifact body = %q, want %q", pkg, want)
 	}
 }
 
@@ -202,44 +239,6 @@ func TestGoLambdaVorpalProgramDefaultToolsIncludeDeployTools(t *testing.T) {
 	for _, want := range []string{"jq:1.8.1", "awscli2:2.33.1"} {
 		if !slices.Contains(lits, want) {
 			t.Errorf("rendered Vorpal program has no tool alias %q", want)
-		}
-	}
-}
-
-// A shell line that does not end in a backslash ends the command, so any
-// go build argument on a following line runs as its own command.
-func TestGoLambdaJustfilePackageNativeKeepsGoBuildOnOneCommand(t *testing.T) {
-	_, body := goLambdaJustfileRecipe(t, goLambdaRenderJustfile(t, ""), "package-native")
-
-	var commands []string
-	var current string
-	for _, line := range body {
-		if cont, ok := strings.CutSuffix(line, `\`); ok {
-			current += strings.TrimSpace(cont) + " "
-			continue
-		}
-		commands = append(commands, current+line)
-		current = ""
-	}
-	if current != "" {
-		t.Fatalf("package-native ends on a line continuation: %q", current)
-	}
-
-	var build string
-	for _, c := range commands {
-		if strings.Contains(c, "go build") {
-			build = c
-		}
-	}
-	if build == "" {
-		t.Fatalf("package-native has no go build command: %q", commands)
-	}
-	for _, want := range []string{
-		"CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64", `-ldflags="-s -w"`,
-		"-o dist/{{ lambda }}/bootstrap", "-tags lambda.norpc", "./cmd/{{ lambda }}",
-	} {
-		if !strings.Contains(build, want) {
-			t.Errorf("go build command %q does not contain %q", build, want)
 		}
 	}
 }

@@ -243,6 +243,7 @@ func main() {
 	var tools []*string
 	for _, alias := range []string{
 		"awscli2:2.33.1",
+		"gitleaks:8.30.1",
 		"golangci-lint:2.15.0",
 		"govulncheck:1.9.0",
 		"jq:1.8.1",
@@ -432,7 +433,18 @@ func readNetrc(host string) (string, string) {
 # out of generation.
 
 build profile:
-    vorpal build '{{ profile }}'
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    tags=""
+    case '{{ profile }}' in
+        example) tags="lambda.norpc" ;;
+    esac
+    mkdir -p 'dist/{{ profile }}'
+    CGO_ENABLED=0 go build \
+        -ldflags='-s -w' \
+        -tags="$tags" \
+        -o 'dist/{{ profile }}/{{ profile }}' \
+        './cmd/{{ profile }}'
 
 check:
     golangci-lint run ./...
@@ -441,6 +453,18 @@ check:
 # module token on disk, so it must not depend on them.
 lint:
     golangci-lint run ./...
+
+doc-validate:
+    rumdl check --no-cache --deny-config-warnings .
+
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
+
+test:
+    go test -count=1 ./...
+
+vuln-scan:
+    govulncheck ./...
 
 package profile:
     #!/usr/bin/env bash
@@ -453,21 +477,6 @@ package profile:
 
 package-all:
     just package "example"
-
-package-native lambda:
-    #!/usr/bin/env bash
-    set -euxo pipefail
-    mkdir -p dist/{{ lambda }}
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-        go build \
-            -ldflags="-s -w" \
-            -o dist/{{ lambda }}/bootstrap \
-            -tags lambda.norpc \
-            ./cmd/{{ lambda }}
-    (cd dist/{{ lambda }} && zip lambda.zip bootstrap)
-
-package-native-all:
-    just package-native "example"
 
 deploy environment lambda:
     aws lambda update-function-code \

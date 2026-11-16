@@ -60,6 +60,45 @@ just build
 
 ## Templates
 
+Every Go template's `justfile` carries the recipes this repository's own
+`justfile` defines, by name:
+
+- `doc-validate` runs `rumdl check --no-cache --deny-config-warnings .`.
+- `lint` runs `golangci-lint run ./...`.
+- `secret-scan` runs `gitleaks` over the history up to `HEAD`.
+- `test` runs `go test -count=1 ./...`, so Go's test cache never reuses a
+  result.
+- `vuln-scan` runs `govulncheck ./...`.
+- `build` runs the language's own build tool, and `package` runs Vorpal. In
+  `go-cobra-cli`, `build` runs `go build` on the build directory into
+  `dist/<name>`, `package` runs `vorpal build --path <name>`, and `install`
+  runs `go install` on the build directory. In `go-library`, `build` is a
+  `go build ./...` compile check, `package` runs `vorpal build --path` on its
+  development environment, and there is no `install`. In
+  `go-lambda`, `build` and `package` take a `profile` argument, and there is
+  no `install`: `build` runs `go build` on `cmd/<profile>` into
+  `dist/<profile>/<profile>`, with `-tags lambda.norpc` for lambdas only,
+  `package` builds the Vorpal artifact and zips it as `bootstrap`, and
+  `package-all` packages every lambda. There is no native packaging recipe.
+  Generated Go CI runs `build` and then `package`. Add `dist/` to the project's
+  `.gitignore`. The `go-lambda` Vorpal program sends the whole tree as source
+  and Vorpal does not read `.gitignore`, so files under `dist/` from an earlier
+  `build` or `package` change the lambda and service artifact digests. With
+  `privateModules` set, the `go-cobra-cli` justfile exports `GOPRIVATE` to
+  every recipe.
+- The `terraform` and `terraform-module` justfiles have a `build` recipe that
+  runs `terraform init -backend=false` and `terraform validate`, and a
+  `package` recipe that runs `vorpal build --path` on the development
+  environment. Their development environments carry `gitleaks`, and their
+  `secret-scan` recipe matches the Go templates'. Generated CI does not run
+  `build` or `secret-scan`, or `package` in `terraform`.
+
+The default development environments carry `golangci-lint`, `govulncheck`,
+`gitleaks` and `rumdl`. A `vorpal.tools` list replaces the defaults, so keep
+those tools in it to keep the recipes working. Generated CI does not run
+`doc-validate`, `secret-scan` or `vuln-scan`, and runs `test` only for
+`go-library`.
+
 ### `go-cobra-cli`
 
 `go-cobra-cli` scaffolds a Cobra CLI tool with Go that can be used to build out
@@ -85,9 +124,14 @@ parameters:
 
 A service is added to `cmd/vorpal/main.go` with build directory `cmd/<name>`,
 `-ldflags='-s -w'` and `CGO_ENABLED=0`, as a lambda is, but without
-`-tags='lambda.norpc'`. CI builds it in a `build-services` job with `just build`
-only: there is no package, upload or deploy step, and the `*-all` recipes in the
-`justfile` leave it out. The template does not scaffold `cmd/<name>/main.go`.
+`-tags='lambda.norpc'`. CI builds it in a `build-services` job with
+`just build`, then builds its Vorpal artifact with `just package-artifact`:
+there is no zip, upload or deploy step, and the `*-all` recipes in the
+`justfile` leave it out. Each `artifacts` entry, an extra Vorpal artifact name,
+runs in the same job with `just package-artifact` only. `just build <artifact>`
+no longer builds it, because `build` runs `go build` on `cmd/<name>`.
+`vorpal.extension`'s `Go` hook changes only the Vorpal build, so `just build`
+does not see it. The template does not scaffold `cmd/<name>/main.go`.
 A name listed in both `lambdas` and `services` is an error. `lambdas` defaults
 to `[<name>]`, so set `lambdas: []` for a services-only project. That project
 has no lambda `build` job, and `deploy` together with `services` and an empty
@@ -121,7 +165,8 @@ parameters:
 no `..`, and `packageName` a Go identifier; anything else fails generation.
 With `generateInCI`, `just check` depends on `build-client` and the CI `build`
 and `build-services` jobs run `just build-client` right after checkout, before
-the GitHub App token is written, then `just build`. Use it
+the GitHub App token is written, then `just build`. With `generate` set, those
+jobs also run `just generate` right after checkout. Use it
 when the generated client is not committed. The generator needs a JDK, so add
 one to `vorpal.tools`.
 
@@ -159,7 +204,8 @@ one to `vorpal.tools`.
   SDK carries secret values as strings and is not expected to read the sealed
   values back. The Vorpal agent encrypts every secret in the config it runs,
   so building the development environment, as the `check` job does, attaches
-  none. The CI jobs write `~/.netrc` before `just build`, and a local
+  none. The CI jobs write `~/.netrc` before `just build` and the Vorpal
+  `package` recipes, and a local
   `vorpal build` reads the developer's own `~/.netrc` the same way. Without
   the file the build runs with the other settings only. A config with no
   lambdas and no services gets none of this.
@@ -218,11 +264,12 @@ cmd/vorpal/main.go
 `go-library` scaffolds the Vorpal development environment and CI for a Go
 library. A library produces no binary, so `cmd/vorpal/main.go` builds only the
 development environment, and CI runs a `check` job and then a `test` job. The
-`justfile` has two recipes:
+`justfile` carries the shared Go recipes except `install`, `package` builds the
+development environment with Vorpal, and the bodies of `build` and `check` are
+these:
 
+- `build` runs `go build ./...` as a compile check.
 - `check` runs `golangci-lint run ./...`.
-- `test` runs `go test -count=1 ./...`, so Go's test cache never reuses a
-  result.
 
 The development environment carries `golangci-lint`, `govulncheck`, `gitleaks`
 and `rumdl`. Set `vorpal.tools` to replace that list with other Vorpal artifact

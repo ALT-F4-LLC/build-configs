@@ -124,12 +124,14 @@ func TestTerraformModuleJustfileRecipes(t *testing.T) {
 	got := terraformModuleJustfileRecipes(terraformModuleReadFile(t, "justfile"))
 
 	want := map[string][]string{
-		"_default": {"just --list"},
-		"check":    {"terraform fmt -check"},
-		"docs":     {"terraform-docs markdown table --output-file README.md --output-mode inject ."},
-		"init":     {"terraform init"},
-		"package":  {"vorpal build --path 'demo-module-dev'"},
-		"validate": {"terraform validate"},
+		"_default":    {"just --list"},
+		"build":       {"terraform init -backend=false", "terraform validate"},
+		"check":       {"terraform fmt -check"},
+		"docs":        {"terraform-docs markdown table --output-file README.md --output-mode inject ."},
+		"init":        {"terraform init"},
+		"package":     {"vorpal build --path 'demo-module-dev'"},
+		"secret-scan": {"gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD ."},
+		"validate":    {"terraform validate"},
 	}
 	if !maps.EqualFunc(got, want, slices.Equal) {
 		t.Errorf("justfile recipes = %q, want %q", got, want)

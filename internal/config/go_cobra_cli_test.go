@@ -280,11 +280,11 @@ func TestGoCobraCliJustfileIsNixFree(t *testing.T) {
 			if check := recipes["check"]; !slices.Equal(check, []string{"golangci-lint run ./..."}) {
 				t.Errorf("check recipe = %q, want [golangci-lint run ./...]:\n%s", check, got)
 			}
-			for _, recipe := range []string{"build", "package"} {
-				body := recipes[recipe]
-				if len(body) == 0 || !strings.HasPrefix(body[0], "vorpal build ") {
-					t.Errorf("%s recipe = %q, want a vorpal build:\n%s", recipe, body, got)
-				}
+			if body := recipes["build"]; len(body) != 1 || !strings.Contains(body[0], "go build -o 'dist/demo' './cmd/demo'") || strings.Contains(body[0], "vorpal") {
+				t.Errorf("build recipe = %q, want a native go build:\n%s", body, got)
+			}
+			if body := recipes["package"]; len(body) == 0 || !strings.HasPrefix(body[0], "vorpal build ") {
+				t.Errorf("package recipe = %q, want a vorpal build:\n%s", body, got)
 			}
 		})
 	}

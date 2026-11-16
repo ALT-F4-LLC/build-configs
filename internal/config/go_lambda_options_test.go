@@ -127,14 +127,18 @@ func TestGoLambdaArtifacts(t *testing.T) {
 		if got := job.Strategy.Matrix["service"]; !slices.Equal(got, []string{"client-go", "docs"}) {
 			t.Errorf("matrix = %q, want [client-go docs]", got)
 		}
-		var built bool
+		// Artifacts are Vorpal artifacts, not Go packages: no native build.
+		var packaged bool
 		for _, step := range job.Steps {
 			if step.Run == `just build "${{ matrix.service }}"` {
-				built = true
+				t.Errorf("artifacts-only build-services runs a native build: %+v", job.Steps)
+			}
+			if step.Run == `just package-artifact "${{ matrix.service }}"` {
+				packaged = true
 			}
 		}
-		if !built {
-			t.Errorf("build-services does not run just build on the matrix entry: %+v", job.Steps)
+		if !packaged {
+			t.Errorf("build-services does not run just package-artifact on the matrix entry: %+v", job.Steps)
 		}
 		if got := wf.Jobs["build"].Strategy.Matrix["profile"]; !slices.Equal(got, []string{"api"}) {
 			t.Errorf("lambda build matrix = %q, want [api]", got)

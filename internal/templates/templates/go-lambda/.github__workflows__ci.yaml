@@ -67,6 +67,10 @@ jobs:
           {{- end }}
     steps:
       - uses: actions/checkout@v7
+      {{- if .Generate }}
+      - run: just generate
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
       {{- if and .OpenAPI.Enable .OpenAPI.GenerateInCI }}
       - run: just build-client
         shell: bash .github/vorpal-shell.sh {0}
@@ -85,7 +89,14 @@ jobs:
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
       - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
       {{- end }}
+      {{- if .Services }}
       - run: just build "${{"{{"}} matrix.service {{"}}"}}"
+        {{- if .Artifacts }}
+        if: contains(fromJSON('[{{ range $i, $s := .Services }}{{ if $i }},{{ end }}"{{ $s }}"{{ end }}]'), matrix.service)
+        {{- end }}
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
+      - run: just package-artifact "${{"{{"}} matrix.service {{"}}"}}"
         shell: bash .github/vorpal-shell.sh {0}
       {{- if .PrivateModules }}
       - run: rm -f /tmp/.netrc
@@ -111,6 +122,10 @@ jobs:
           {{- end }}
     steps:
       - uses: actions/checkout@v7
+      {{- if .Generate }}
+      - run: just generate
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
       {{- if and .OpenAPI.Enable .OpenAPI.GenerateInCI }}
       - run: just build-client
         shell: bash .github/vorpal-shell.sh {0}

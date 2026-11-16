@@ -50,6 +50,8 @@ jobs:
       {{- end }}
       - run: just build
         shell: bash .github/vorpal-shell.sh {0}
+      - run: just package
+        shell: bash .github/vorpal-shell.sh {0}
       {{- if .PrivateModules }}
       - if: always()
         run: rm -f /tmp/.netrc

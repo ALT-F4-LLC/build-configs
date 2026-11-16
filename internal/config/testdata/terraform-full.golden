@@ -242,6 +242,11 @@ func main() {
 		log.Fatalf("failed fetching awscli2 alias: %v", err)
 	}
 
+	gitleaks, err := ctx.FetchArtifactAlias("gitleaks:8.30.1")
+	if err != nil {
+		log.Fatalf("failed fetching gitleaks alias: %v", err)
+	}
+
 	just, err := ctx.FetchArtifactAlias("just:1.45.0")
 	if err != nil {
 		log.Fatalf("failed fetching just alias: %v", err)
@@ -258,7 +263,7 @@ func main() {
 	}
 
 	_, err = artifact.NewDevelopmentEnvironment("example-dev", config.SYSTEMS).
-		WithArtifacts([]*string{awscli2, just, rumdl, terraform}).
+		WithArtifacts([]*string{awscli2, gitleaks, just, rumdl, terraform}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
@@ -274,6 +279,10 @@ func main() {
 # Do not edit it by hand. Listing a path in .bcignore opts that file
 # out of generation.
 
+build:
+    terraform init -backend=false
+    terraform validate
+
 check:
     terraform fmt -check
 
@@ -288,8 +297,14 @@ format:
 init:
     terraform init
 
+secret-scan:
+    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .
+
 validate:
     terraform validate
+
+package:
+    vorpal build --path 'example-dev'
 
 plan:
     terraform plan -out "terraform.tfplan"

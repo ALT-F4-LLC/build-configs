@@ -81,10 +81,10 @@ func TestGoLibraryRegisteredAsTemplate(t *testing.T) {
 	}
 }
 
-func TestGoLibraryRendersCheckAndTestRecipes(t *testing.T) {
+func TestGoLibraryRendersJustfileRecipes(t *testing.T) {
 	goLibraryRenderTemp(t, nil)
 
-	want := hashNoticeLines + "check:\n    golangci-lint run ./...\n\ntest:\n    go test -count=1 ./...\n"
+	want := hashNoticeLines + "build:\n    go build ./...\n\ncheck:\n    golangci-lint run ./...\n\ndoc-validate:\n    rumdl check --no-cache --deny-config-warnings .\n\nlint:\n    golangci-lint run ./...\n\npackage:\n    vorpal build --path 'demo-dev'\n\nsecret-scan:\n    gitleaks git --no-banner --redact --exit-code 1 --log-opts=HEAD .\n\ntest:\n    go test -count=1 ./...\n\nvuln-scan:\n    govulncheck ./...\n"
 	if got := goCobraCliReadFile(t, "justfile"); got != want {
 		t.Errorf("justfile =\n%s\nwant\n%s", got, want)
 	}
