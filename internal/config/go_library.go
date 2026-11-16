@@ -32,7 +32,7 @@ func NewGoLibraryConfig(c Config) GoLibraryConfig {
 		Vorpal: GoLibraryVorpalConfig{
 			SourceIncludes: []string{"cmd/vorpal", "go.mod", "go.sum"},
 			Tools: []string{
-				"golangci-lint:2.11.4",
+				"golangci-lint:2.15.0",
 				"govulncheck:1.9.0",
 				"gitleaks:8.30.1",
 				"rumdl:0.3.2",

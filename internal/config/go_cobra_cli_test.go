@@ -161,7 +161,7 @@ func TestGoCobraCliRendersDefaultVorpalProgram(t *testing.T) {
 	file := goCobraCliParseProgram(t)
 
 	goCobraCliAssertStrings(t, "FetchArtifactAlias aliases", goCobraCliFetchedAliases(t, file),
-		[]string{"golangci-lint:2.11.4", "govulncheck:1.9.0", "gitleaks:8.30.1", "rumdl:0.3.2"})
+		[]string{"golangci-lint:2.15.0", "govulncheck:1.9.0", "gitleaks:8.30.1", "rumdl:0.3.2"})
 	goCobraCliAssertStrings(t, "dev environment name", goCobraCliCallStrings(t, file, "NewGoDevelopmentEnvironment"),
 		[]string{"demo-dev"})
 	goCobraCliAssertStrings(t, "artifact name", goCobraCliCallStrings(t, file, "NewGo"),

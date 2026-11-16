@@ -278,7 +278,7 @@ func TestGoLibraryVorpalToolsReplaceTheDefaults(t *testing.T) {
 	if !slices.Contains(got, "just:1.45.0") {
 		t.Errorf("cmd/vorpal/main.go does not fetch the configured tool:\n%s", src)
 	}
-	if slices.Contains(got, "golangci-lint:2.11.4") {
+	if slices.Contains(got, "golangci-lint:2.15.0") {
 		t.Errorf("cmd/vorpal/main.go still fetches a default tool after vorpal.tools was set:\n%s", src)
 	}
 }
