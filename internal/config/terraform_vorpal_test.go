@@ -64,6 +64,7 @@ func terraformVorpalDevEnvironment(t *testing.T, src string) (string, []string, 
 	var aliases []string
 	aliasByVar := map[string]string{}
 	var artifactVars []string
+	withLoopTools := false
 	ast.Inspect(file, func(n ast.Node) bool {
 		if assign, ok := n.(*ast.AssignStmt); ok && len(assign.Lhs) > 0 && len(assign.Rhs) == 1 {
 			ident, isIdent := assign.Lhs[0].(*ast.Ident)
@@ -98,6 +99,9 @@ func terraformVorpalDevEnvironment(t *testing.T, src string) (string, []string, 
 			}
 		case "WithArtifacts":
 			if len(call.Args) == 1 {
+				if ident, ok := call.Args[0].(*ast.Ident); ok && ident.Name == "tools" {
+					withLoopTools = true
+				}
 				if list, ok := call.Args[0].(*ast.CompositeLit); ok {
 					for _, elt := range list.Elts {
 						if ident, ok := elt.(*ast.Ident); ok {
@@ -115,6 +119,14 @@ func terraformVorpalDevEnvironment(t *testing.T, src string) (string, []string, 
 		if alias, ok := aliasByVar[name]; ok {
 			envArtifacts = append(envArtifacts, alias)
 		}
+	}
+
+	// Aliases listed in a `for _, alias := range []string{...}` loop that
+	// fetches each one into `tools`, which WithArtifacts receives.
+	loopAliases := goCobraCliFetchedAliases(t, file)
+	aliases = append(aliases, loopAliases...)
+	if withLoopTools {
+		envArtifacts = append(envArtifacts, loopAliases...)
 	}
 	return envName, aliases, envArtifacts
 }

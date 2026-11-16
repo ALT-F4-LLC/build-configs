@@ -68,6 +68,19 @@ jobs:
     - run: just check
       shell: bash .github/vorpal-shell.sh {0}
 
+  secret-scan:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - run: just secret-scan
+      shell: bash .github/vorpal-shell.sh {0}
+
   plan:
     concurrency:
       cancel-in-progress: false
@@ -237,33 +250,23 @@ import (
 func main() {
 	ctx := config.GetContext()
 
-	awscli2, err := ctx.FetchArtifactAlias("awscli2:2.33.1")
-	if err != nil {
-		log.Fatalf("failed fetching awscli2 alias: %v", err)
+	var tools []*string
+	for _, alias := range []string{
+		"awscli2:2.33.1",
+		"gitleaks:8.30.1",
+		"just:1.45.0",
+		"rumdl:0.3.2",
+		"terraform:1.13.1",
+	} {
+		tool, err := ctx.FetchArtifactAlias(alias)
+		if err != nil {
+			log.Fatalf("failed fetching %s alias: %v", alias, err)
+		}
+		tools = append(tools, tool)
 	}
 
-	gitleaks, err := ctx.FetchArtifactAlias("gitleaks:8.30.1")
-	if err != nil {
-		log.Fatalf("failed fetching gitleaks alias: %v", err)
-	}
-
-	just, err := ctx.FetchArtifactAlias("just:1.45.0")
-	if err != nil {
-		log.Fatalf("failed fetching just alias: %v", err)
-	}
-
-	rumdl, err := ctx.FetchArtifactAlias("rumdl:0.3.2")
-	if err != nil {
-		log.Fatalf("failed fetching rumdl alias: %v", err)
-	}
-
-	terraform, err := ctx.FetchArtifactAlias("terraform:1.13.1")
-	if err != nil {
-		log.Fatalf("failed fetching terraform alias: %v", err)
-	}
-
-	_, err = artifact.NewDevelopmentEnvironment("example-dev", config.SYSTEMS).
-		WithArtifacts([]*string{awscli2, gitleaks, just, rumdl, terraform}).
+	_, err := artifact.NewDevelopmentEnvironment("example-dev", config.SYSTEMS).
+		WithArtifacts(tools).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)

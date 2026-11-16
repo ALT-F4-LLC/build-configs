@@ -1,0 +1,10 @@
+# Extends the default gitleaks rules. Golden files under
+# internal/config/testdata are rendered template output that earlier commits
+# recorded; they hold no credentials.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Rendered template snapshots"
+paths = ['''^internal/config/testdata/''']

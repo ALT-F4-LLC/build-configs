@@ -33,3 +33,41 @@ jobs:
       - uses: actions/checkout@v7
       - run: just test
         shell: bash .github/vorpal-shell.sh {0}
+{{- if .HasDevTool "rumdl" }}
+
+  doc-validate:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+      - run: just doc-validate
+        shell: bash .github/vorpal-shell.sh {0}
+{{- end }}
+{{- if .HasDevTool "gitleaks" }}
+
+  secret-scan:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: just secret-scan
+        shell: bash .github/vorpal-shell.sh {0}
+{{- end }}
+{{- if .HasDevTool "govulncheck" }}
+
+  vuln-scan:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+      - run: just vuln-scan
+        shell: bash .github/vorpal-shell.sh {0}
+{{- end }}

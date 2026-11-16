@@ -18,8 +18,8 @@ func main() {
 
 	var tools []*string
 	for _, alias := range []string{
-{{- if .Vorpal.Tools }}
-{{- range .Vorpal.Tools }}
+{{- if .DevTools }}
+{{- range .DevTools }}
 		{{ printf "%q" . }},
 {{- end }}
 	{{ end -}}

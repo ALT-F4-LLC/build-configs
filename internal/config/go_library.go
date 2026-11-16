@@ -15,11 +15,18 @@ type GoLibraryConfig struct {
 // GoLibraryVorpalConfig drives the generated Vorpal.toml and cmd/vorpal
 // program. A library produces no binary, so cmd/vorpal builds only the
 // development environment. SourceIncludes feeds the Vorpal.toml source table
-// that builds the Vorpal program itself. Tools replaces the default list when
-// set.
+// that builds the Vorpal program itself. Tools adds Vorpal artifact aliases to
+// the default list; ExcludeTools removes defaults by name or full alias.
 type GoLibraryVorpalConfig struct {
 	SourceIncludes []string `json:"sourceIncludes,omitempty" yaml:"sourceIncludes,omitempty"`
 	Tools          []string `json:"tools,omitempty" yaml:"tools,omitempty"`
+	ExcludeTools   []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
+}
+
+// DevTools returns the Vorpal artifact aliases the development environment
+// fetches: the defaults plus Tools, minus ExcludeTools.
+func (c GoLibraryConfig) DevTools() []string {
+	return resolveTools(goDefaultTools, c.Vorpal.Tools, c.Vorpal.ExcludeTools)
 }
 
 func NewGoLibraryConfig(c Config) GoLibraryConfig {
@@ -31,12 +38,6 @@ func NewGoLibraryConfig(c Config) GoLibraryConfig {
 		Lint:   lint,
 		Vorpal: GoLibraryVorpalConfig{
 			SourceIncludes: []string{"cmd/vorpal", "go.mod", "go.sum"},
-			Tools: []string{
-				"golangci-lint:2.15.0",
-				"govulncheck:1.9.0",
-				"gitleaks:8.30.1",
-				"rumdl:0.3.2",
-			},
 		},
 	}
 }
@@ -76,4 +77,10 @@ func (c GoLibraryConfig) Render() error {
 	}
 
 	return makeVorpalShellExecutable()
+}
+
+// HasDevTool reports whether the development environment carries the named
+// tool at any version.
+func (c GoLibraryConfig) HasDevTool(name string) bool {
+	return hasTool(c.DevTools(), name)
 }

@@ -74,6 +74,7 @@ func terraformModuleParseVorpalProgram(t *testing.T) terraformModuleVorpalProgra
 		}
 		return true
 	})
+	program.aliases = append(program.aliases, goCobraCliFetchedAliases(t, file)...)
 	return program
 }
 

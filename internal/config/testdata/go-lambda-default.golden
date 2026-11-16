@@ -101,6 +101,51 @@ jobs:
       - run: rm -f ~/.netrc
         if: always()
 
+  doc-validate:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+      - run: just doc-validate
+        shell: bash .github/vorpal-shell.sh {0}
+
+  secret-scan:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: just secret-scan
+        shell: bash .github/vorpal-shell.sh {0}
+
+  vuln-scan:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+      - id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.ALTF4LLC_GITHUB_APP_ID }}
+          owner: ${{ github.repository_owner }}
+          private-key: ${{ secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY }}
+      - uses: extractions/netrc@v3
+        with:
+          machine: github.com
+          password: ${{ steps.generate-token.outputs.token }}
+          username: ${{ secrets.ALTF4LLC_GITHUB_APP_USER }}
+      - run: just vuln-scan
+        shell: bash .github/vorpal-shell.sh {0}
+      - run: rm -f ~/.netrc
+        if: always()
+
   build:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     needs:
@@ -237,6 +282,9 @@ import (
 	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/config"
 )
 
+// cgoDisabled builds every Go binary without cgo.
+const cgoDisabled = "CGO_ENABLED=0"
+
 func main() {
 	ctx := config.GetContext()
 
@@ -270,7 +318,7 @@ func main() {
 	_, err = language.NewGo("example", config.SYSTEMS).
 		WithBuildDirectory("cmd/example").
 		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
-		WithEnvironments(sandbox.environments("example", "CGO_ENABLED=0")).
+		WithEnvironments(sandbox.environments("example", cgoDisabled)).
 		WithSecrets(sandbox.secretsFor("example")).
 		WithSourceScript(sandbox.scriptFor("example")).
 		Build(ctx)

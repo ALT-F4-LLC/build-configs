@@ -90,14 +90,45 @@ Every Go template's `justfile` carries the recipes this repository's own
   runs `terraform init -backend=false` and `terraform validate`, and a
   `package` recipe that runs `vorpal build --path` on the development
   environment. Their development environments carry `gitleaks`, and their
-  `secret-scan` recipe matches the Go templates'. Generated CI does not run
-  `build` or `secret-scan`, or `package` in `terraform`.
+  `secret-scan` recipe matches the Go templates'. Generated CI runs
+  `secret-scan` in its own job while `gitleaks` is in the development
+  environment, and does not run `build`, or `package` in
+  `terraform`.
 
 The default development environments carry `golangci-lint`, `govulncheck`,
-`gitleaks` and `rumdl`. A `vorpal.tools` list replaces the defaults, so keep
-those tools in it to keep the recipes working. Generated CI does not run
-`doc-validate`, `secret-scan` or `vuln-scan`, and runs `test` only for
-`go-library`.
+`gitleaks` and `rumdl`; `go-lambda` adds `awscli2`, `jq` and `just`, and
+`openapi-generator-cli` with `openapi.enable`. The `terraform` defaults are
+`awscli2`, `gitleaks`, `just`, `rumdl` and `terraform` at
+`vorpal.terraformVersion`; `terraform-module` drops `awscli2`. Every template
+always includes its defaults. `vorpal.tools` only appends Vorpal artifact
+aliases to them and never replaces or removes a default.
+`vorpal.excludeTools` opts out of defaults by name (`jq`) or full alias
+(`jq:1.8.1`) and never drops an alias listed in `vorpal.tools`; the recipes
+that use an excluded tool stop working. Names match the literal text before
+`:`. To change a default's version, exclude it and add the new alias.
+Earlier versions treated `vorpal.tools` as a replacement list, so a
+configuration that left defaults out of it now gets them back unless it lists
+them in `vorpal.excludeTools`:
+
+```yaml
+parameters:
+  vorpal:
+    tools:
+      - protoc:31.1
+    excludeTools:
+      - govulncheck
+```
+
+Generated Go CI runs `doc-validate`, `secret-scan` and `vuln-scan`, each in its
+own job. Each job renders only while the development environment carries its
+tool (`rumdl`, `gitleaks` or `govulncheck`) at any version, so excluding one in
+`vorpal.excludeTools` also drops its job. The `secret-scan` job checks out the
+full history so `gitleaks` scans every commit; allowlist a false positive in a
+`.gitleaks.toml` or `.gitleaksignore` at the repository root. With
+`privateModules` set, the `vuln-scan` job writes the GitHub App token to
+`~/.netrc` around `just vuln-scan` and removes it afterward; in `go-lambda` it
+runs `just generate` and `just build-client` (when configured) first.
+Generated CI runs `test` only for `go-library`.
 
 ### `go-cobra-cli`
 
@@ -272,15 +303,19 @@ these:
 - `check` runs `golangci-lint run ./...`.
 
 The development environment carries `golangci-lint`, `govulncheck`, `gitleaks`
-and `rumdl`. Set `vorpal.tools` to replace that list with other Vorpal artifact
-aliases:
+and `rumdl`. `vorpal.tools` appends Vorpal artifact aliases to that list, and
+`vorpal.excludeTools` drops a default. Together they pin a default to another
+version:
 
 ```yaml
 parameters:
   vorpal:
     tools:
-      - golangci-lint:2.11.4
-      - just:1.45.0
+      - golangci-lint:2.11.4 # added
+      - just:1.45.0          # added
+    excludeTools:
+      - golangci-lint        # drops golangci-lint:2.15.0
+      - rumdl
 ```
 
 The linter configuration is the one every Go template shares. Silence a finding

@@ -51,14 +51,9 @@ func TestGoLambdaServiceVorpalProgram(t *testing.T) {
 	if got := goLambdaMethodStringArgs(t, file, "WithBuildFlags"); !slices.Equal(got, wantFlags) {
 		t.Errorf("build flags = %q, want %q", got, wantFlags)
 	}
-	cgo := 0
-	for _, lit := range goLambdaStringLits(t, file) {
-		if lit == "CGO_ENABLED=0" {
-			cgo++
-		}
-	}
+	cgo := goLambdaCgoDisabledUses(t, file)
 	if cgo != 2 {
-		t.Errorf("CGO_ENABLED=0 appears %d times, want 2", cgo)
+		t.Errorf("cgoDisabled is used %d times, want 2", cgo)
 	}
 }
 
@@ -370,8 +365,8 @@ parameters:
 			if got.Vorpal.Extension != goLambdaTestExtension {
 				t.Errorf("Vorpal.Extension = %q", got.Vorpal.Extension)
 			}
-			if want := NewGoLambdaConfig(Config{}).Vorpal.Tools; !slices.Equal(got.Vorpal.Tools, want) {
-				t.Errorf("Vorpal.Tools = %q, want default %q", got.Vorpal.Tools, want)
+			if want := NewGoLambdaConfig(Config{}).DevTools(); !slices.Equal(got.DevTools(), want) {
+				t.Errorf("DevTools() = %q, want default %q", got.DevTools(), want)
 			}
 			if !slices.Equal(got.Lambdas, []string{"example"}) {
 				t.Errorf("Lambdas = %q, want default [example]", got.Lambdas)

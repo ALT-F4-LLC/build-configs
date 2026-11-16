@@ -115,8 +115,8 @@ func TestGoCobraCliWorkflowJobsRunOnAltf4llcThroughVorpalShell(t *testing.T) {
 			goCobraCliRenderTemp(t, parameters)
 			wf := goCobraCliParseWorkflow(t)
 
-			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"build", "check"}) {
-				t.Fatalf("jobs = %q, want [build check]", got)
+			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"build", "check", "doc-validate", "secret-scan", "vuln-scan"}) {
+				t.Fatalf("jobs = %q, want [build check doc-validate secret-scan vuln-scan]", got)
 			}
 			wantIf := "${{ " + goCobraCliForkGuard + " }}"
 			for jobName, job := range wf.Jobs {

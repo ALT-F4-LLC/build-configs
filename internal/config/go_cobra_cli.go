@@ -18,12 +18,21 @@ type GoCobraCliConfig struct {
 
 // GoCobraCliVorpalConfig drives the generated Vorpal.toml and cmd/vorpal
 // program. Includes feeds the CLI artifact build; SourceIncludes feeds the
-// Vorpal.toml source table that builds the Vorpal program itself.
+// Vorpal.toml source table that builds the Vorpal program itself. Tools adds
+// Vorpal artifact aliases to the default list; ExcludeTools removes defaults
+// by name or full alias.
 type GoCobraCliVorpalConfig struct {
 	BuildDirectory string   `json:"buildDirectory,omitempty" yaml:"buildDirectory,omitempty"`
 	Includes       []string `json:"includes,omitempty" yaml:"includes,omitempty"`
 	SourceIncludes []string `json:"sourceIncludes,omitempty" yaml:"sourceIncludes,omitempty"`
 	Tools          []string `json:"tools,omitempty" yaml:"tools,omitempty"`
+	ExcludeTools   []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
+}
+
+// DevTools returns the Vorpal artifact aliases the development environment
+// fetches: the defaults plus Tools, minus ExcludeTools.
+func (c GoCobraCliConfig) DevTools() []string {
+	return resolveTools(goDefaultTools, c.Vorpal.Tools, c.Vorpal.ExcludeTools)
 }
 
 func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
@@ -40,12 +49,6 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 			BuildDirectory: "cmd/" + c.Name,
 			Includes:       []string{"cmd/" + c.Name, "go.mod", "go.sum", "internal"},
 			SourceIncludes: []string{"cmd/vorpal", "go.mod", "go.sum"},
-			Tools: []string{
-				"golangci-lint:2.15.0",
-				"govulncheck:1.9.0",
-				"gitleaks:8.30.1",
-				"rumdl:0.3.2",
-			},
 		},
 	}
 }
@@ -85,4 +88,10 @@ func (c GoCobraCliConfig) Render() error {
 	}
 
 	return makeVorpalShellExecutable()
+}
+
+// HasDevTool reports whether the development environment carries the named
+// tool at any version.
+func (c GoCobraCliConfig) HasDevTool(name string) bool {
+	return hasTool(c.DevTools(), name)
 }

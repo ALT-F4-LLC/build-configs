@@ -174,8 +174,8 @@ func TestGoLambdaGenerateInCIOrdersClientBeforeTokenAndKeepsGenerateDependency(t
 	}
 
 	ci := goLambdaReadFile(t, ".github/workflows/ci.yaml")
-	if got := strings.Count(ci, "just build-client"); got != 3 {
-		t.Errorf("CI runs build-client %d times, want 3 (check, build-services and build)", got)
+	if got := strings.Count(ci, "just build-client"); got != 4 {
+		t.Errorf("CI runs build-client %d times, want 4 (check, vuln-scan, build-services and build)", got)
 	}
 	// Each build job must generate the client before it writes the App token to disk.
 	for _, job := range strings.Split(ci, "\n\n  ")[1:] {
@@ -314,7 +314,7 @@ func TestGoLambdaProgramGivesPrivateModuleBuildsASandboxCredential(t *testing.T)
 			// built, and none is left with a bare environment list.
 			for _, artifact := range []string{"api", "mcp"} {
 				for _, want := range []string{
-					`WithEnvironments(sandbox.environments("` + artifact + `", "CGO_ENABLED=0"))`,
+					`WithEnvironments(sandbox.environments("` + artifact + `", cgoDisabled))`,
 					`WithSecrets(sandbox.secretsFor("` + artifact + `"))`,
 					`WithSourceScript(sandbox.scriptFor("` + artifact + `"))`,
 				} {
@@ -326,7 +326,7 @@ func TestGoLambdaProgramGivesPrivateModuleBuildsASandboxCredential(t *testing.T)
 			if !strings.Contains(src, "newPrivateModuleSandbox(ctx.GetTargetStr(), ctx.GetArtifactName())") {
 				t.Errorf("sandbox is not keyed to the artifact being built:\n%s", src)
 			}
-			if strings.Contains(src, `WithEnvironments([]string{"CGO_ENABLED=0"})`) {
+			if strings.Contains(src, `WithEnvironments([]string{cgoDisabled})`) {
 				t.Errorf("a builder keeps a bare environment list:\n%s", src)
 			}
 			for _, want := range []string{

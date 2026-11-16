@@ -29,6 +29,21 @@ jobs:
         persist-credentials: false
     - run: just check
       shell: bash .github/vorpal-shell.sh {0}
+{{- if .HasDevTool "gitleaks" }}
+
+  secret-scan:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
+    runs-on: {{ .GitHub.RunsOn }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - run: just secret-scan
+      shell: bash .github/vorpal-shell.sh {0}
+{{- end }}
 
   plan:
     concurrency:

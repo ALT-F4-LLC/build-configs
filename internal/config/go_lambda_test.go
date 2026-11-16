@@ -114,6 +114,34 @@ func goLambdaStringLits(t *testing.T, file *ast.File) []string {
 	return lits
 }
 
+// goLambdaCgoDisabledUses counts references to the cgoDisabled constant,
+// excluding its declaration, and fails unless the constant is "CGO_ENABLED=0".
+func goLambdaCgoDisabledUses(t *testing.T, file *ast.File) int {
+	t.Helper()
+	uses := 0
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.ValueSpec:
+			for i, name := range n.Names {
+				if name.Name != "cgoDisabled" {
+					continue
+				}
+				lit, ok := n.Values[i].(*ast.BasicLit)
+				if !ok || goLambdaStringLit(t, lit) != "CGO_ENABLED=0" {
+					t.Errorf("cgoDisabled is not the literal \"CGO_ENABLED=0\"")
+				}
+			}
+			return false
+		case *ast.Ident:
+			if n.Name == "cgoDisabled" {
+				uses++
+			}
+		}
+		return true
+	})
+	return uses
+}
+
 func TestGoLambdaRenderVorpalToml(t *testing.T) {
 	goLambdaRenderTemp(t, []string{"api", "worker"})
 
@@ -215,14 +243,9 @@ func TestGoLambdaRenderVorpalProgramArtifactPerLambda(t *testing.T) {
 			if len(flags) != len(tc.lambdas) {
 				t.Errorf("got %d build-flag calls, want %d", len(flags), len(tc.lambdas))
 			}
-			cgo := 0
-			for _, lit := range goLambdaStringLits(t, file) {
-				if lit == "CGO_ENABLED=0" {
-					cgo++
-				}
-			}
+			cgo := goLambdaCgoDisabledUses(t, file)
 			if cgo != len(tc.lambdas) {
-				t.Errorf("CGO_ENABLED=0 appears %d times, want %d", cgo, len(tc.lambdas))
+				t.Errorf("cgoDisabled is used %d times, want %d", cgo, len(tc.lambdas))
 			}
 		})
 	}
@@ -232,19 +255,21 @@ func TestGoLambdaRenderVorpalProgramGofmtCleanForAnyTools(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		tools   []string
+		exclude []string
 		openAPI bool
 	}{
-		{name: "default", tools: NewGoLambdaConfig(Config{}).Vorpal.Tools},
+		{name: "default"},
 		{name: "one", tools: []string{"just:1.45.0"}},
-		{name: "empty", tools: []string{}},
-		{name: "default with openapi", tools: NewGoLambdaConfig(Config{}).Vorpal.Tools, openAPI: true},
-		{name: "empty with openapi", tools: []string{}, openAPI: true},
+		{name: "default with openapi", openAPI: true},
+		{name: "none", exclude: goLambdaDefaultTools},
+		{name: "none with openapi excluded", exclude: append(slices.Clone(goLambdaDefaultTools), "openapi-generator-cli"), openAPI: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
 			cfg.Lambdas = []string{"api"}
 			cfg.Vorpal.Tools = tc.tools
+			cfg.Vorpal.ExcludeTools = tc.exclude
 			cfg.OpenAPI.Enable = tc.openAPI
 			if err := cfg.Render(); err != nil {
 				t.Fatalf("Render: %v", err)

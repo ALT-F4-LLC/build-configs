@@ -29,6 +29,18 @@ jobs:
 
       - run: just doc-validate
 
+  secret-scan:
+    defaults:
+      run:
+        shell: bash .github/vorpal-shell.sh {0}
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - run: just secret-scan
+
   vuln-scan:
     defaults:
       run:

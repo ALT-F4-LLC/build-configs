@@ -122,7 +122,7 @@ func TestGoLambdaCIJobsRunOnAltf4llcThroughVorpalShell(t *testing.T) {
 			goLambdaRenderCI(t, privateModules)
 			wf := goLambdaParseWorkflow(t)
 
-			want := []string{"build", "check", "deploy-dev", "deploy-prod", "deploy-staging"}
+			want := []string{"build", "check", "deploy-dev", "deploy-prod", "deploy-staging", "doc-validate", "secret-scan", "vuln-scan"}
 			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, want) {
 				t.Fatalf("jobs = %q, want %q", got, want)
 			}
@@ -172,6 +172,9 @@ func TestGoLambdaCIJobIfJoinsForkGuard(t *testing.T) {
 	joined := "${{ (" + goLambdaTestForkGuard + ") && (" + goLambdaTestDeployIf + ") }}"
 	for name, want := range map[string]string{
 		"check":          guardOnly,
+		"doc-validate":   guardOnly,
+		"secret-scan":    guardOnly,
+		"vuln-scan":      guardOnly,
 		"build":          guardOnly,
 		"deploy-dev":     joined,
 		"deploy-prod":    joined,
@@ -191,6 +194,9 @@ func TestGoLambdaCIJobPermissions(t *testing.T) {
 	deploy := map[string]string{"id-token": "write", "contents": "read"}
 	for name, want := range map[string]map[string]string{
 		"check":          readOnly,
+		"doc-validate":   readOnly,
+		"secret-scan":    readOnly,
+		"vuln-scan":      readOnly,
 		"build":          readOnly,
 		"deploy-dev":     deploy,
 		"deploy-prod":    deploy,

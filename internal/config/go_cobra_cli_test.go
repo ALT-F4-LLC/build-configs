@@ -201,7 +201,7 @@ directory = "cmd/vorpal"
 
 	file := goCobraCliParseProgram(t)
 	goCobraCliAssertStrings(t, "FetchArtifactAlias aliases", goCobraCliFetchedAliases(t, file),
-		[]string{"just:1.0.0"})
+		append(slices.Clone(goDefaultTools), "just:1.0.0"))
 	goCobraCliAssertStrings(t, "build directory", goCobraCliCallStrings(t, file, "WithBuildDirectory"),
 		[]string{"cmd/other"})
 	goCobraCliAssertStrings(t, "artifact includes", goCobraCliCallStrings(t, file, "WithIncludes"),
@@ -211,8 +211,9 @@ directory = "cmd/vorpal"
 func TestGoCobraCliRendersEmptyVorpalLists(t *testing.T) {
 	goCobraCliRenderTemp(t, map[string]interface{}{
 		"vorpal": map[string]interface{}{
-			"tools":    []string{},
-			"includes": []string{},
+			"tools":        []string{},
+			"excludeTools": []string{"golangci-lint", "govulncheck", "gitleaks", "rumdl"},
+			"includes":     []string{},
 		},
 	})
 

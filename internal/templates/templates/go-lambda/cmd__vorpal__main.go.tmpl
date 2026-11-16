@@ -21,18 +21,20 @@ import (
 	project {{ printf "%q" .Vorpal.Extension }}
 {{- end }}
 )
+{{- if or .Lambdas .Services }}
+
+// cgoDisabled builds every Go binary without cgo.
+const cgoDisabled = "CGO_ENABLED=0"
+{{- end }}
 
 func main() {
 	ctx := config.GetContext()
 
 	var tools []*string
 	for _, alias := range []string{
-{{- if or .Vorpal.Tools .OpenAPI.Enable }}
-{{- range .Vorpal.Tools }}
-		"{{ . }}",
-{{- end }}
-{{- if .OpenAPI.Enable }}
-		"openapi-generator-cli:7.18.0",
+{{- if .DevTools }}
+{{- range .DevTools }}
+		{{ printf "%q" . }},
 {{- end }}
 	{{ end -}}
 	} {
@@ -73,11 +75,11 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithEnvironments(sandbox.environments("{{ . }}", cgoDisabled)).
 		WithSecrets(sandbox.secretsFor("{{ . }}")).
 		WithSourceScript(sandbox.scriptFor("{{ . }}")))
 {{- else }}
-		WithEnvironments([]string{"CGO_ENABLED=0"}))
+		WithEnvironments([]string{cgoDisabled}))
 {{- end }}
 	if err != nil {
 		log.Fatalf("failed preparing {{ . }}: %v", err)
@@ -88,11 +90,11 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithEnvironments(sandbox.environments("{{ . }}", cgoDisabled)).
 		WithSecrets(sandbox.secretsFor("{{ . }}")).
 		WithSourceScript(sandbox.scriptFor("{{ . }}")).
 {{- else }}
-		WithEnvironments([]string{"CGO_ENABLED=0"}).
+		WithEnvironments([]string{cgoDisabled}).
 {{- end }}
 		Build(ctx)
 {{- end }}
@@ -106,11 +108,11 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithEnvironments(sandbox.environments("{{ . }}", cgoDisabled)).
 		WithSecrets(sandbox.secretsFor("{{ . }}")).
 		WithSourceScript(sandbox.scriptFor("{{ . }}")))
 {{- else }}
-		WithEnvironments([]string{"CGO_ENABLED=0"}))
+		WithEnvironments([]string{cgoDisabled}))
 {{- end }}
 	if err != nil {
 		log.Fatalf("failed preparing {{ . }}: %v", err)
@@ -121,11 +123,11 @@ func main() {
 		WithBuildDirectory("cmd/{{ . }}").
 		WithBuildFlags("-ldflags='-s -w'").
 {{- if $.PrivateModules }}
-		WithEnvironments(sandbox.environments("{{ . }}", "CGO_ENABLED=0")).
+		WithEnvironments(sandbox.environments("{{ . }}", cgoDisabled)).
 		WithSecrets(sandbox.secretsFor("{{ . }}")).
 		WithSourceScript(sandbox.scriptFor("{{ . }}")).
 {{- else }}
-		WithEnvironments([]string{"CGO_ENABLED=0"}).
+		WithEnvironments([]string{cgoDisabled}).
 {{- end }}
 		Build(ctx)
 {{- end }}

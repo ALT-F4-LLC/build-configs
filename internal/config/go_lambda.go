@@ -56,8 +56,23 @@ type GoLambdaVorpalConfig struct {
 	Extension string `json:"extension,omitempty" yaml:"extension,omitempty"`
 	// Script is the `script` command in Vorpal.toml; unset omits the line.
 	Script string `json:"script,omitempty" yaml:"script,omitempty"`
-	// Tools are Vorpal artifact aliases added to the `dev` environment.
+	// Tools are Vorpal artifact aliases added to the default `dev`
+	// environment tools.
 	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty"`
+	// ExcludeTools removes default tools by name (`jq`) or full alias
+	// (`jq:1.8.1`).
+	ExcludeTools []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
+}
+
+// DevTools returns the Vorpal artifact aliases the development environment
+// fetches: the defaults (with openapi-generator-cli when OpenAPI is enabled)
+// plus Tools, minus ExcludeTools.
+func (c GoLambdaConfig) DevTools() []string {
+	defaults := goLambdaDefaultTools
+	if c.OpenAPI.Enable {
+		defaults = append(slices.Clone(defaults), goLambdaOpenAPITool)
+	}
+	return resolveTools(defaults, c.Vorpal.Tools, c.Vorpal.ExcludeTools)
 }
 
 func NewGoLambdaConfig(c Config) GoLambdaConfig {
@@ -70,17 +85,6 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 		Deploy:         []DeployConfig{},
 		Lambdas:        []string{c.Name},
 		OpenAPI:        NewOpenAPIConfig(),
-		Vorpal: GoLambdaVorpalConfig{
-			Tools: []string{
-				"awscli2:2.33.1",
-				"gitleaks:8.30.1",
-				"golangci-lint:2.15.0",
-				"govulncheck:1.9.0",
-				"jq:1.8.1",
-				"just:1.45.0",
-				"rumdl:0.3.2",
-			},
-		},
 	}
 }
 
@@ -199,4 +203,10 @@ func (c GoLambdaConfig) ForkGuardedIf(condition string) string {
 		return "${{ " + goLambdaForkGuard + " }}"
 	}
 	return "${{ (" + goLambdaForkGuard + ") && (" + condition + ") }}"
+}
+
+// HasDevTool reports whether the development environment carries the named
+// tool at any version.
+func (c GoLambdaConfig) HasDevTool(name string) bool {
+	return hasTool(c.DevTools(), name)
 }

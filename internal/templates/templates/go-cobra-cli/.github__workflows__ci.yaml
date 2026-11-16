@@ -58,3 +58,58 @@ jobs:
       - if: always()
         run: rm -f ~/.netrc
       {{- end }}
+{{- if .HasDevTool "rumdl" }}
+
+  doc-validate:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+      - run: just doc-validate
+        shell: bash .github/vorpal-shell.sh {0}
+{{- end }}
+{{- if .HasDevTool "gitleaks" }}
+
+  secret-scan:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: just secret-scan
+        shell: bash .github/vorpal-shell.sh {0}
+{{- end }}
+{{- if .HasDevTool "govulncheck" }}
+
+  vuln-scan:
+    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
+    permissions:
+      contents: read
+    runs-on: altf4llc
+    steps:
+      {{- if .PrivateModules }}
+      - id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID {{"}}"}}
+          owner: ${{"{{"}} github.repository_owner {{"}}"}}
+          private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY {{"}}"}}
+      - uses: extractions/netrc@v3
+        with:
+          machine: github.com
+          password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
+          username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
+      {{- end }}
+      - uses: actions/checkout@v7
+      - run: just vuln-scan
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- if .PrivateModules }}
+      - if: always()
+        run: rm -f ~/.netrc
+      {{- end }}
+{{- end }}

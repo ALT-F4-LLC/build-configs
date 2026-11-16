@@ -137,11 +137,11 @@ func TestGoLibraryCIRunsCheckThenTestOnVorpalShell(t *testing.T) {
 		jobs = append(jobs, name)
 	}
 	slices.Sort(jobs)
-	if want := []string{"check", "test"}; !slices.Equal(jobs, want) {
+	if want := []string{"check", "doc-validate", "secret-scan", "test", "vuln-scan"}; !slices.Equal(jobs, want) {
 		t.Fatalf("jobs = %q, want %q (a library has no build job)", jobs, want)
 	}
 
-	for name, run := range map[string]string{"check": "just check", "test": "just test"} {
+	for name, run := range map[string]string{"check": "just check", "doc-validate": "just doc-validate", "secret-scan": "just secret-scan", "test": "just test", "vuln-scan": "just vuln-scan"} {
 		job := wf.Jobs[name]
 		if job.RunsOn != "altf4llc" {
 			t.Errorf("job %s runs-on = %q, want altf4llc", name, job.RunsOn)
@@ -258,17 +258,17 @@ func TestGoLibraryVorpalProgramFetchesTheDefaultTools(t *testing.T) {
 
 	file, _ := goLibraryVorpalProgram(t)
 	got := goCobraCliStrings(t, file)
-	for _, tool := range NewGoCobraCliConfig(Config{Name: "demo"}).Vorpal.Tools {
+	for _, tool := range NewGoCobraCliConfig(Config{Name: "demo"}).DevTools() {
 		if !slices.Contains(got, tool) {
 			t.Errorf("cmd/vorpal/main.go does not fetch the go-cobra-cli default tool %q", tool)
 		}
 	}
-	if want := NewGoCobraCliConfig(Config{Name: "demo"}).Vorpal.Tools; !slices.Equal(NewGoLibraryConfig(Config{Name: "demo"}).Vorpal.Tools, want) {
-		t.Errorf("go-library tools = %q, want go-cobra-cli's %q", NewGoLibraryConfig(Config{Name: "demo"}).Vorpal.Tools, want)
+	if want := NewGoCobraCliConfig(Config{Name: "demo"}).DevTools(); !slices.Equal(NewGoLibraryConfig(Config{Name: "demo"}).DevTools(), want) {
+		t.Errorf("go-library tools = %q, want go-cobra-cli's %q", NewGoLibraryConfig(Config{Name: "demo"}).DevTools(), want)
 	}
 }
 
-func TestGoLibraryVorpalToolsReplaceTheDefaults(t *testing.T) {
+func TestGoLibraryVorpalToolsAddToTheDefaults(t *testing.T) {
 	goLibraryRenderTemp(t, map[string]any{
 		"vorpal": map[string]any{"tools": []string{"just:1.45.0"}},
 	})
@@ -278,8 +278,29 @@ func TestGoLibraryVorpalToolsReplaceTheDefaults(t *testing.T) {
 	if !slices.Contains(got, "just:1.45.0") {
 		t.Errorf("cmd/vorpal/main.go does not fetch the configured tool:\n%s", src)
 	}
-	if slices.Contains(got, "golangci-lint:2.15.0") {
-		t.Errorf("cmd/vorpal/main.go still fetches a default tool after vorpal.tools was set:\n%s", src)
+	for _, tool := range goDefaultTools {
+		if !slices.Contains(got, tool) {
+			t.Errorf("cmd/vorpal/main.go dropped default tool %q after vorpal.tools was set:\n%s", tool, src)
+		}
+	}
+}
+
+func TestGoLibraryVorpalExcludeToolsOptsOutOfDefaults(t *testing.T) {
+	goLibraryRenderTemp(t, map[string]any{
+		"vorpal": map[string]any{"excludeTools": []string{"golangci-lint", "rumdl:0.3.2"}},
+	})
+
+	file, src := goLibraryVorpalProgram(t)
+	got := goCobraCliStrings(t, file)
+	for _, tool := range []string{"golangci-lint:2.15.0", "rumdl:0.3.2"} {
+		if slices.Contains(got, tool) {
+			t.Errorf("cmd/vorpal/main.go still fetches excluded tool %q:\n%s", tool, src)
+		}
+	}
+	for _, tool := range []string{"govulncheck:1.9.0", "gitleaks:8.30.1"} {
+		if !slices.Contains(got, tool) {
+			t.Errorf("cmd/vorpal/main.go dropped tool %q that was not excluded:\n%s", tool, src)
+		}
 	}
 }
 

@@ -71,8 +71,8 @@ func TestTerraformModuleWorkflowJobsRunOnAltf4llcThroughVorpalShell(t *testing.T
 
 	wf := terraformModuleParseWorkflow(t)
 
-	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"check", "package"}) {
-		t.Fatalf("jobs = %q, want [check package]", got)
+	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"check", "package", "secret-scan"}) {
+		t.Fatalf("jobs = %q, want [check package secret-scan]", got)
 	}
 	wantShell := "bash " + terraformModuleShellPath + " {0}"
 	for name, job := range wf.Jobs {
