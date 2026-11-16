@@ -10,7 +10,7 @@ import (
 func main() {
 	ctx := config.GetContext()
 
-	golangciLint, err := ctx.FetchArtifactAlias("golangci-lint:2.11.4")
+	golangciLint, err := ctx.FetchArtifactAlias("golangci-lint:2.15.0")
 	if err != nil {
 		log.Fatalf("failed fetching golangci-lint alias: %v", err)
 	}
