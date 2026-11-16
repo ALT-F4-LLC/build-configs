@@ -71,7 +71,14 @@ func NewGoLambdaConfig(c Config) GoLambdaConfig {
 		Lambdas:        []string{c.Name},
 		OpenAPI:        NewOpenAPIConfig(),
 		Vorpal: GoLambdaVorpalConfig{
-			Tools: []string{"awscli2:2.33.1", "golangci-lint:2.15.0", "jq:1.8.1", "just:1.45.0"},
+			Tools: []string{
+				"awscli2:2.33.1",
+				"golangci-lint:2.15.0",
+				"govulncheck:1.9.0",
+				"jq:1.8.1",
+				"just:1.45.0",
+				"rumdl:0.3.2",
+			},
 		},
 	}
 }

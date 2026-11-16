@@ -156,6 +156,8 @@ func TestGoLambdaRenderVorpalProgramDevEnvironment(t *testing.T) {
 	lits := goLambdaStringLits(t, file)
 	for _, want := range []string{
 		"golangci-lint:2.15.0",
+		"govulncheck:1.9.0",
+		"rumdl:0.3.2",
 		"just:1.45.0",
 		"GOPRIVATE=github.com/ALT-F4-LLC/quirk-service-kit",
 	} {
