@@ -105,7 +105,7 @@ func TestTerraformModuleVorpalProgramDefaults(t *testing.T) {
 	if !slices.Equal(program.environmentNames, []string{"demo-module-dev"}) {
 		t.Errorf("development environments = %q, want [\"demo-module-dev\"]", program.environmentNames)
 	}
-	for _, alias := range []string{"just:1.45.0", "terraform:1.13.1"} {
+	for _, alias := range []string{"just:1.45.0", "rumdl:0.3.2", "terraform:1.13.1"} {
 		if !slices.Contains(program.aliases, alias) {
 			t.Errorf("aliases %q do not include %q", program.aliases, alias)
 		}

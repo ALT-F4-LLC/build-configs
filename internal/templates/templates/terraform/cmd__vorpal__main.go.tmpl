@@ -26,13 +26,18 @@ func main() {
 		log.Fatalf("failed fetching just alias: %v", err)
 	}
 
+	rumdl, err := ctx.FetchArtifactAlias("rumdl:0.3.2")
+	if err != nil {
+		log.Fatalf("failed fetching rumdl alias: %v", err)
+	}
+
 	terraform, err := ctx.FetchArtifactAlias("terraform:{{ .Vorpal.TerraformVersion }}")
 	if err != nil {
 		log.Fatalf("failed fetching terraform alias: %v", err)
 	}
 
 	_, err = artifact.NewDevelopmentEnvironment({{ printf "%q" .DevEnvironment }}, config.SYSTEMS).
-		WithArtifacts([]*string{awscli2, just, terraform}).
+		WithArtifacts([]*string{awscli2, just, rumdl, terraform}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
