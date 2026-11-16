@@ -167,7 +167,7 @@ func TestGoLibraryCIRunsCheckThenTestOnVorpalShell(t *testing.T) {
 		}
 	}
 
-	if got, want := wf.Jobs["test"].Needs, []string{"check"}; !slices.Equal(got, want) {
+	if got, want := wf.Jobs["test"].Needs, []string{"check", "doc-validate", "secret-scan", "vuln-scan"}; !slices.Equal(got, want) {
 		t.Errorf("job test needs = %q, want %q", got, want)
 	}
 	if got := wf.Jobs["check"].Needs; len(got) != 0 {

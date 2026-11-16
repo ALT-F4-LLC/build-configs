@@ -56,7 +56,11 @@ jobs:
     {{- end }}
     {{- end }}
     if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
-    needs: check
+    needs:
+    - check
+    {{- if .HasDevTool "gitleaks" }}
+    - secret-scan
+    {{- end }}
     permissions:
       contents: read
       id-token: write

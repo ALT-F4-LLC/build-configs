@@ -84,7 +84,9 @@ jobs:
       cancel-in-progress: false
       group: tf-lock
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    needs: check
+    needs:
+    - check
+    - secret-scan
     permissions:
       contents: read
       id-token: write

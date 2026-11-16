@@ -130,6 +130,12 @@ full history so `gitleaks` scans every commit; allowlist a false positive in a
 runs `just generate` and `just build-client` (when configured) first.
 Generated CI runs `test` only for `go-library`.
 
+The job after `check` in every generated workflow also needs each scan job
+that renders, so a failed scan blocks it: `build` in `go-cobra-cli`, `build`
+and `build-services` in `go-lambda`, `test` in `go-library`, `plan` in
+`terraform`, and `package` in `terraform-module`. Deploy and apply jobs follow
+those jobs, so they wait on the scans too.
+
 ### `go-cobra-cli`
 
 `go-cobra-cli` scaffolds a Cobra CLI tool with Go that can be used to build out

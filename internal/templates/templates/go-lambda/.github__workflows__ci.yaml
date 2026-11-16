@@ -116,6 +116,15 @@ jobs:
     if: {{ .ForkGuardedIf "" }}
     needs:
       - check
+      {{- if .HasDevTool "rumdl" }}
+      - doc-validate
+      {{- end }}
+      {{- if .HasDevTool "gitleaks" }}
+      - secret-scan
+      {{- end }}
+      {{- if .HasDevTool "govulncheck" }}
+      - vuln-scan
+      {{- end }}
     permissions:
       contents: read
     runs-on: altf4llc
@@ -174,6 +183,15 @@ jobs:
     if: {{ .ForkGuardedIf "" }}
     needs:
       - check
+      {{- if .HasDevTool "rumdl" }}
+      - doc-validate
+      {{- end }}
+      {{- if .HasDevTool "gitleaks" }}
+      - secret-scan
+      {{- end }}
+      {{- if .HasDevTool "govulncheck" }}
+      - vuln-scan
+      {{- end }}
     permissions:
       contents: read
     runs-on: altf4llc

@@ -150,6 +150,9 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     needs:
       - check
+      - doc-validate
+      - secret-scan
+      - vuln-scan
     permissions:
       contents: read
     runs-on: altf4llc

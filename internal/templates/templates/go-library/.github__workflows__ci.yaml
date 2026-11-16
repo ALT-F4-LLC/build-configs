@@ -26,6 +26,15 @@ jobs:
     if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
     needs:
       - check
+      {{- if .HasDevTool "rumdl" }}
+      - doc-validate
+      {{- end }}
+      {{- if .HasDevTool "gitleaks" }}
+      - secret-scan
+      {{- end }}
+      {{- if .HasDevTool "govulncheck" }}
+      - vuln-scan
+      {{- end }}
     permissions:
       contents: read
     runs-on: altf4llc
