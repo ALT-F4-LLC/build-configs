@@ -36,6 +36,16 @@ func TestGoLambdaSnapshot(t *testing.T) {
 				return cfg
 			},
 		},
+		{
+			name:   "openapi",
+			golden: "go-lambda-openapi.golden",
+			config: func() GoLambdaConfig {
+				cfg := NewGoLambdaConfig(Config{Name: "example", Template: GoLambdaName})
+				cfg.OpenAPI.Enable = true
+				cfg.OpenAPI.GenerateInCI = true
+				return cfg
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			golden, err := filepath.Abs(filepath.Join("testdata", tc.golden))
