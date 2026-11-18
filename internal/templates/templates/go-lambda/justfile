@@ -101,4 +101,17 @@ build-client:
         {{ .OpenAPI.Output }}/go.mod \
         {{ .OpenAPI.Output }}/go.sum \
         {{ .OpenAPI.Output }}/test
+    {{- if .OpenAPI.Module }}
+    printf 'module %s\n\ngo %s\n' '{{ .OpenAPI.Module }}' '{{ .GoVersion }}' > {{ .OpenAPI.Output }}/go.mod
+
+check-client: build-client
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git ls-files --error-unmatch {{ .OpenAPI.Output }}/go.mod >/dev/null || { echo "{{ .OpenAPI.Output }}/go.mod is not committed (is the output gitignored?)" >&2; exit 1; }
+    if [ -n "$(git status --porcelain -- {{ .OpenAPI.Output }})" ]; then
+        git status --short -- {{ .OpenAPI.Output }}
+        echo "{{ .OpenAPI.Output }} is stale: run just build-client and commit it" >&2
+        exit 1
+    fi
+    {{- end }}
 {{- end }}

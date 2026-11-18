@@ -118,6 +118,9 @@ func (c GoLambdaConfig) Render() error {
 			return err
 		}
 	}
+	if !c.OpenAPI.Enable && c.OpenAPI.Module != "" {
+		return errors.New("openapi.module is set but openapi.enable is false; build-client publishes the module")
+	}
 
 	for _, line := range c.Generate {
 		if strings.ContainsAny(line, "\r\n") {

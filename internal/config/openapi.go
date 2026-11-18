@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -21,6 +22,12 @@ type OpenAPIConfig struct {
 	// GenerateInCI runs `just build-client` before `just check` and before the
 	// CI build jobs, for repositories that do not commit the generated client.
 	GenerateInCI bool `json:"generateInCI,omitempty" yaml:"generateInCI,omitempty"`
+
+	// Module, when set, publishes the client as its own Go module with this
+	// path: build-client writes <output>/go.mod, the client is committed, and
+	// CI fails when it is stale (`just check-client`). Empty keeps today's
+	// behavior.
+	Module string `json:"module,omitempty" yaml:"module,omitempty"`
 }
 
 var (
@@ -36,6 +43,18 @@ func (c OpenAPIConfig) validate() error {
 	}
 	if !openAPIPackagePattern.MatchString(c.PackageName) {
 		return fmt.Errorf("openapi.packageName %q must be a Go identifier", c.PackageName)
+	}
+	if c.Module != "" {
+		out := path.Clean(c.Output)
+		if c.GenerateInCI {
+			return fmt.Errorf("openapi.module needs a committed client; unset openapi.generateInCI")
+		}
+		if slices.Contains(strings.Split(out, "/"), "internal") || slices.Contains(strings.Split(c.Module, "/"), "internal") {
+			return fmt.Errorf("openapi.module %q: an internal path cannot be imported by other repositories", c.Module)
+		}
+		if !strings.HasSuffix(c.Module, "/"+out) || strings.ContainsAny(c.Module, " \t'\"$`\\") {
+			return fmt.Errorf("openapi.module %q must end with /%s", c.Module, out)
+		}
 	}
 	return nil
 }

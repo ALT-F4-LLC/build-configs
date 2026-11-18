@@ -13,6 +13,9 @@ parameters:
       if: github.ref == 'refs/heads/main'
   openapi:
     enable: true
+    # Optional: publish the client as a Go module other repositories import.
+    # output: client/lambdatest
+    # module: github.com/ALT-F4-LLC/project-name/client/lambdatest
   # Optional: shell lines for a `generate` recipe that `check` depends on.
   # generate:
   #   - just build-data

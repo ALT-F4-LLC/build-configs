@@ -207,6 +207,34 @@ jobs also run `just generate` right after checkout. Use it
 when the generated client is not committed. The generator needs a JDK, so add
 one to `vorpal.tools`.
 
+To share a client with other repositories, set `openapi.module` in the
+repository that owns the spec. The output must sit outside `internal/`, and
+the module path must end with `/<output>`:
+
+```yaml
+parameters:
+  openapi:
+    enable: true
+    filename: ai.json
+    output: client/ai
+    module: github.com/ALT-F4-LLC/quirk-lambda-ai/client/ai
+    packageName: client_ai
+```
+
+`build-client` then writes `<output>/go.mod`, and the client is committed.
+`openapi.module` cannot be combined with `generateInCI`, and needs
+`openapi.enable`. The CI `check` job runs `just check-client` before the
+GitHub App token is written. It fails when `<output>/go.mod` is not committed,
+or when regeneration changes the committed client. `Vorpal.toml` includes the
+output, so the owner can import its own client with
+`replace <module> => ./<output>`. The client's `go` directive is `goVersion`.
+
+A consuming repository imports the module and adds it to `privateModules`,
+for example
+`privateModules: github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai/client/ai`.
+It then runs `go get <module>@main`. The existing GitHub App token reads the
+module in CI, so the App installation must include the owning repository.
+
 #### Lint and Deploy Options
 
 - `lint.disable` lists golangci-lint linters to turn off, such as `errcheck`.
