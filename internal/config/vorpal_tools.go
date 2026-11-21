@@ -12,6 +12,8 @@ var (
 	goDefaultTools = []string{
 		"golangci-lint:2.15.0",
 		"govulncheck:1.9.0",
+		"jq:1.8.1",
+		"just:1.45.0",
 		"gitleaks:8.30.1",
 		"rumdl:0.3.2",
 	}
@@ -23,6 +25,7 @@ var (
 		"govulncheck:1.9.0",
 		"jq:1.8.1",
 		"just:1.45.0",
+		"openjdk:25.0.1",
 		"rumdl:0.3.2",
 	}
 
@@ -31,12 +34,14 @@ var (
 	terraformDefaultTools = []string{
 		"awscli2:2.33.1",
 		"gitleaks:8.30.1",
+		"jq:1.8.1",
 		"just:1.45.0",
 		"rumdl:0.3.2",
 	}
 
 	terraformModuleDefaultTools = []string{
 		"gitleaks:8.30.1",
+		"jq:1.8.1",
 		"just:1.45.0",
 		"rumdl:0.3.2",
 	}
@@ -73,7 +78,7 @@ func resolveTools(defaults, added, exclude []string) []string {
 }
 
 // hasTool reports whether tools carries an alias for the artifact name, at
-// any version. Generated CI uses it to skip a job whose tool was excluded.
+// any version. Generated CI uses it to skip a check step whose tool was excluded.
 func hasTool(tools []string, name string) bool {
 	return slices.ContainsFunc(tools, func(alias string) bool { return toolName(alias) == name })
 }

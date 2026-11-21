@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"go/format"
+	"slices"
 	"strings"
 	"testing"
 
@@ -58,9 +59,9 @@ func TestGoLambdaOpenAPIGenerateInCIRunsClientBeforeCheckAndBuild(t *testing.T) 
 
 	ci := goLambdaReadFile(t, ".github/workflows/ci.yaml")
 	client := strings.Index(ci, "just build-client")
-	build := strings.Index(ci, "just build \"")
-	if client < 0 || build < 0 || client > build {
-		t.Errorf("CI runs build-client at %d and build at %d; want build-client first:\n%s", client, build, ci)
+	pkg := strings.Index(ci, "just package \"")
+	if client < 0 || pkg < 0 || client > pkg {
+		t.Errorf("CI runs build-client at %d and package at %d; want build-client first:\n%s", client, pkg, ci)
 	}
 }
 
@@ -174,10 +175,10 @@ func TestGoLambdaGenerateInCIOrdersClientBeforeTokenAndKeepsGenerateDependency(t
 	}
 
 	ci := goLambdaReadFile(t, ".github/workflows/ci.yaml")
-	if got := strings.Count(ci, "just build-client"); got != 4 {
-		t.Errorf("CI runs build-client %d times, want 4 (check, vuln-scan, build-services and build)", got)
+	if got := strings.Count(ci, "just build-client"); got != 2 {
+		t.Errorf("CI runs build-client %d times, want 2 (check and build)", got)
 	}
-	// Each build job must generate the client before it writes the App token to disk.
+	// Each job must generate the client before it writes the App token to disk.
 	for _, job := range strings.Split(ci, "\n\n  ")[1:] {
 		if !strings.Contains(job, "just build-client") {
 			continue
@@ -312,14 +313,18 @@ func TestGoLambdaProgramGivesPrivateModuleBuildsASandboxCredential(t *testing.T)
 			// Each lambda and service builder gets the sandbox settings keyed by
 			// its own name, so the credential reaches only the artifact being
 			// built, and none is left with a bare environment list.
-			for _, artifact := range []string{"api", "mcp"} {
-				for _, want := range []string{
-					`WithEnvironments(sandbox.environments("` + artifact + `", cgoDisabled))`,
-					`WithSecrets(sandbox.secretsFor("` + artifact + `"))`,
-					`WithSourceScript(sandbox.scriptFor("` + artifact + `"))`,
+			loops := goLambdaBuildLoops(t, goLambdaParseVorpalProgram(t))
+			if got := goLambdaLoopNames(loops); !slices.Equal(got, []string{"api", "mcp"}) {
+				t.Errorf("build loop names = %q, want [api mcp]", got)
+			}
+			for _, loop := range loops {
+				for method, want := range map[string]string{
+					"WithEnvironments": "sandbox.environments(" + loop.Var + ", cgoDisabled)",
+					"WithSecrets":      "sandbox.secretsFor(" + loop.Var + ")",
+					"WithSourceScript": "sandbox.scriptFor(" + loop.Var + ")",
 				} {
-					if !strings.Contains(src, want) {
-						t.Errorf("program missing %q:\n%s", want, src)
+					if got := loop.Calls[method]; got != want {
+						t.Errorf("loop over %s: %s(%s), want %s(%s)", loop.Var, method, got, method, want)
 					}
 				}
 			}

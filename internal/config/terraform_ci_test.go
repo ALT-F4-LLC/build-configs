@@ -104,8 +104,8 @@ func TestTerraformWorkflowJobsRunOnAltf4llc(t *testing.T) {
 
 	wf := terraformCIParseWorkflow(t)
 
-	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"apply", "check", "plan", "secret-scan"}) {
-		t.Fatalf("jobs = %q, want [apply check plan secret-scan]", got)
+	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"apply", "check", "plan"}) {
+		t.Fatalf("jobs = %q, want [apply check plan]", got)
 	}
 	for name, job := range wf.Jobs {
 		if job.RunsOn != "altf4llc" {
@@ -125,8 +125,8 @@ func TestTerraformWorkflowJobsRunOnConfiguredRunner(t *testing.T) {
 
 	wf := terraformCIParseWorkflow(t)
 
-	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"apply", "check", "plan", "secret-scan"}) {
-		t.Fatalf("jobs = %q, want [apply check plan secret-scan]", got)
+	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"apply", "check", "plan"}) {
+		t.Fatalf("jobs = %q, want [apply check plan]", got)
 	}
 	for name, job := range wf.Jobs {
 		if job.RunsOn != "custom-runner" {
@@ -150,10 +150,9 @@ func TestTerraformWorkflowJobConditionsCarryForkGuard(t *testing.T) {
 	wf := terraformCIParseWorkflow(t)
 
 	want := map[string]string{
-		"check":       "${{ " + terraformCIForkGuard + " }}",
-		"secret-scan": "${{ " + terraformCIForkGuard + " }}",
-		"plan":        "${{ " + terraformCIForkGuard + " }}",
-		"apply":       "${{ (" + terraformCIForkGuard + ") && (github.ref == 'refs/heads/main') }}",
+		"check": "${{ " + terraformCIForkGuard + " }}",
+		"plan":  "${{ " + terraformCIForkGuard + " }}",
+		"apply": "${{ (" + terraformCIForkGuard + ") && (github.ref == 'refs/heads/main') }}",
 	}
 	for name, cond := range want {
 		if got := wf.Jobs[name].If; got != cond {
@@ -170,10 +169,9 @@ func TestTerraformWorkflowJobPermissionsDoNotWiden(t *testing.T) {
 	readOnly := map[string]string{"contents": "read"}
 	assumesRole := map[string]string{"contents": "read", "id-token": "write"}
 	want := map[string]map[string]string{
-		"check":       readOnly,
-		"secret-scan": readOnly,
-		"plan":        assumesRole,
-		"apply":       assumesRole,
+		"check": readOnly,
+		"plan":  assumesRole,
+		"apply": assumesRole,
 	}
 	for name, perms := range want {
 		if got := wf.Jobs[name].Permissions; !maps.Equal(got, perms) {
@@ -192,10 +190,9 @@ func TestTerraformWorkflowRunsJustThroughVorpalShellAfterCheckout(t *testing.T) 
 			wf := terraformCIParseWorkflow(t)
 
 			wantRuns := map[string][]string{
-				"check":       {"just check"},
-				"secret-scan": {"just secret-scan"},
-				"plan":        {"aws sts get-caller-identity", "just init", "just validate", "just plan"},
-				"apply":       {"aws sts get-caller-identity", "just init", "just apply"},
+				"check": {"just secret-scan", "just check"},
+				"plan":  {"aws sts get-caller-identity", "just init", "just validate", "just plan"},
+				"apply": {"aws sts get-caller-identity", "just init", "just apply"},
 			}
 			for name, want := range wantRuns {
 				job := wf.Jobs[name]

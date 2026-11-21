@@ -19,54 +19,25 @@ jobs:
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: just secret-scan
+        shell: bash .github/vorpal-shell.sh {0}
+      - run: just doc-validate
+        shell: bash .github/vorpal-shell.sh {0}
       - run: just check
+        shell: bash .github/vorpal-shell.sh {0}
+      - run: just vuln-scan
         shell: bash .github/vorpal-shell.sh {0}
 
   build:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     needs:
       - check
-      - doc-validate
-      - secret-scan
-      - vuln-scan
     permissions:
       contents: read
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
-      - run: just build
-        shell: bash .github/vorpal-shell.sh {0}
       - run: just package
-        shell: bash .github/vorpal-shell.sh {0}
-
-  doc-validate:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-      - run: just doc-validate
-        shell: bash .github/vorpal-shell.sh {0}
-
-  secret-scan:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - run: just secret-scan
-        shell: bash .github/vorpal-shell.sh {0}
-
-  vuln-scan:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-      - run: just vuln-scan
         shell: bash .github/vorpal-shell.sh {0}

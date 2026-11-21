@@ -19,30 +19,19 @@ jobs:
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
-      - run: just check
-        shell: bash .github/vorpal-shell.sh {0}
-{{- if .HasDevTool "gitleaks" }}
-
-  secret-scan:
-    if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
+      {{- if .HasDevTool "gitleaks" }}
         with:
           fetch-depth: 0
       - run: just secret-scan
         shell: bash .github/vorpal-shell.sh {0}
-{{- end }}
+      {{- end }}
+      - run: just check
+        shell: bash .github/vorpal-shell.sh {0}
 
   package:
     if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
     needs:
       - check
-      {{- if .HasDevTool "gitleaks" }}
-      - secret-scan
-      {{- end }}
     permissions:
       contents: read
     runs-on: altf4llc

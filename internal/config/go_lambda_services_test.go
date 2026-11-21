@@ -38,18 +38,28 @@ func TestGoLambdaServiceVorpalProgram(t *testing.T) {
 	goLambdaRenderServices(t, []string{"api"}, []string{"svc"}, "")
 	file := goLambdaParseVorpalProgram(t)
 
-	if got, want := goLambdaCallStringArgs(t, file, "language", "NewGo"), []string{"api", "svc"}; !slices.Equal(got, want) {
-		t.Errorf("NewGo artifacts = %q, want %q", got, want)
+	loops := goLambdaBuildLoops(t, file)
+	if len(loops) != 2 {
+		t.Fatalf("got %d build loops, want a lambda loop and a service loop", len(loops))
 	}
-	if got, want := goLambdaMethodStringArgs(t, file, "WithBuildDirectory"), []string{"cmd/api", "cmd/svc"}; !slices.Equal(got, want) {
-		t.Errorf("build directories = %q, want %q", got, want)
-	}
-	wantFlags := []string{
-		"-ldflags='-s -w' -tags='lambda.norpc'", // api
-		"-ldflags='-s -w'",                      // svc: no lambda.norpc
-	}
-	if got := goLambdaMethodStringArgs(t, file, "WithBuildFlags"); !slices.Equal(got, wantFlags) {
-		t.Errorf("build flags = %q, want %q", got, wantFlags)
+	for i, want := range []struct {
+		loopVar string
+		names   []string
+		flags   string
+	}{
+		{"lambda", []string{"api"}, `"-ldflags='-s -w' -tags='lambda.norpc'"`},
+		{"service", []string{"svc"}, `"-ldflags='-s -w'"`}, // no lambda.norpc
+	} {
+		loop := loops[i]
+		if loop.Var != want.loopVar || !slices.Equal(loop.Names, want.names) {
+			t.Errorf("loop %d over %s builds %q, want %s over %q", i, loop.Var, loop.Names, want.loopVar, want.names)
+		}
+		if got, wantDir := loop.Calls["WithBuildDirectory"], `"cmd/" + `+want.loopVar; got != wantDir {
+			t.Errorf("%s build directory = %s, want %s", want.loopVar, got, wantDir)
+		}
+		if got := loop.Calls["WithBuildFlags"]; got != want.flags {
+			t.Errorf("%s build flags = %s, want %s", want.loopVar, got, want.flags)
+		}
 	}
 	cgo := goLambdaCgoDisabledUses(t, file)
 	if cgo != 2 {
@@ -61,19 +71,26 @@ func TestGoLambdaServiceOnly(t *testing.T) {
 	goLambdaRenderServices(t, nil, []string{"svc"}, "")
 
 	file := goLambdaParseVorpalProgram(t)
-	if got, want := goLambdaCallStringArgs(t, file, "language", "NewGo"), []string{"svc"}; !slices.Equal(got, want) {
-		t.Errorf("NewGo artifacts = %q, want %q", got, want)
+	loops := goLambdaBuildLoops(t, file)
+	if len(loops) != 1 || loops[0].Var != "service" || !slices.Equal(loops[0].Names, []string{"svc"}) {
+		t.Errorf("build loops = %+v, want one service loop over [svc]", loops)
 	}
 
 	wf := goLambdaParseWorkflow(t)
 	if src := goLambdaReadFile(t, goLambdaWorkflowPath); strings.HasSuffix(src, "\n\n") {
 		t.Errorf("workflow ends with a blank line:\n%q", src)
 	}
-	if _, ok := wf.Jobs["build"]; ok {
-		t.Error("service-only config renders a lambda build job with an empty matrix")
+	if _, ok := wf.Jobs["build-services"]; ok {
+		t.Error("service-only config renders a build-services job")
 	}
-	if _, ok := wf.Jobs["build-services"]; !ok {
-		t.Error("service-only config has no build-services job")
+	var runs []string
+	for _, step := range wf.Jobs["build"].Steps {
+		if step.Run != "" && !strings.HasPrefix(step.Run, "rm -f") {
+			runs = append(runs, step.Run)
+		}
+	}
+	if want := []string{`just package-artifact "svc"`}; !slices.Equal(runs, want) {
+		t.Errorf("service-only build runs %q, want %q", runs, want)
 	}
 }
 
@@ -102,44 +119,35 @@ func TestGoLambdaServiceCI(t *testing.T) {
 		t.Fatalf("workflow does not parse: %v\n%s", err, src)
 	}
 
-	svc, ok := wf.Jobs["build-services"]
+	if _, ok := wf.Jobs["build-services"]; ok {
+		t.Error("services render a separate build-services job")
+	}
+	build, ok := wf.Jobs["build"]
 	if !ok {
-		t.Fatalf("no build-services job:\n%s", src)
+		t.Fatalf("no build job:\n%s", src)
 	}
-	if got := svc.Strategy.Matrix["service"]; !slices.Equal(got, []string{"svc"}) {
-		t.Errorf("service matrix = %q, want [svc]", got)
+	if len(build.Strategy.Matrix) != 0 {
+		t.Errorf("build job has a matrix %v, want one job for every entry", build.Strategy.Matrix)
 	}
-	var runs []string
-	for _, step := range svc.Steps {
-		if step.Run != "" {
+	var runs, uploads []string
+	for _, step := range build.Steps {
+		if step.Run != "" && !strings.HasPrefix(step.Run, "rm -f") {
 			runs = append(runs, step.Run)
 		}
 		if strings.HasPrefix(step.Uses, "actions/upload-artifact") {
-			t.Error("build-services uploads an artifact")
+			uploads = append(uploads, step.Uses)
 		}
 	}
-	build := slices.Index(runs, `just build "${{ matrix.service }}"`)
-	pkg := slices.Index(runs, `just package-artifact "${{ matrix.service }}"`)
-	if build < 0 || pkg < 0 || build > pkg {
-		t.Errorf("build-services runs %q, want just build then just package-artifact", runs)
+	if want := []string{`just package-artifact "svc"`, `just package "api"`, `just package "worker"`}; !slices.Equal(runs, want) {
+		t.Errorf("build runs %q, want %q", runs, want)
 	}
-	for _, run := range runs {
-		if strings.Contains(run, "just package ") || strings.Contains(run, "just deploy") {
-			t.Errorf("build-services runs %q", run)
-		}
+	if len(uploads) != 2 {
+		t.Errorf("build uploads %d artifacts, want one zip per lambda", len(uploads))
 	}
 
-	// The lambda build, upload and deploy matrices must not list the service.
-	for name, job := range wf.Jobs {
-		if name == "build-services" {
-			continue
-		}
-		if slices.Contains(job.Strategy.Matrix["profile"], "svc") {
-			t.Errorf("job %s lists svc in its profile matrix", name)
-		}
-	}
+	// The upload and deploy steps must not list the service.
 	if strings.Count(src, "svc") != 1 {
-		t.Errorf("svc appears %d times in the workflow, want only its matrix entry:\n%s", strings.Count(src, "svc"), src)
+		t.Errorf("svc appears %d times in the workflow, want only its package step:\n%s", strings.Count(src, "svc"), src)
 	}
 
 	just := goLambdaReadFile(t, "justfile")
@@ -244,8 +252,6 @@ func TestGoLambdaExtensionVorpalProgram(t *testing.T) {
 
 			// Source-ordered positions of the calls that matter.
 			var devEnv, artifacts []int
-			var goNames, buildCalls []string
-			var goPos, buildPos []int
 			ast.Inspect(file, func(n ast.Node) bool {
 				call, ok := n.(*ast.CallExpr)
 				if !ok {
@@ -256,16 +262,6 @@ func TestGoLambdaExtensionVorpalProgram(t *testing.T) {
 					devEnv = append(devEnv, int(call.Pos()))
 				case goLambdaIsSelector(call.Fun, "project", "Artifacts"):
 					artifacts = append(artifacts, int(call.Pos()))
-				case goLambdaIsSelector(call.Fun, "project", "Go"):
-					goNames = append(goNames, goLambdaStringLit(t, call.Args[1]))
-					goPos = append(goPos, int(call.Pos()))
-				default:
-					if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Build" && len(call.Args) == 1 {
-						if id, ok := sel.X.(*ast.Ident); ok && id.Name == "builder" {
-							buildCalls = append(buildCalls, "builder")
-							buildPos = append(buildPos, int(call.Pos()))
-						}
-					}
 				}
 				return true
 			})
@@ -278,29 +274,46 @@ func TestGoLambdaExtensionVorpalProgram(t *testing.T) {
 			}
 
 			want := slices.Concat(tc.lambdas, tc.services)
-			if !slices.Equal(goNames, want) {
-				t.Errorf("project.Go names = %q, want %q", goNames, want)
+			loops := goLambdaBuildLoops(t, file)
+			if got := goLambdaLoopNames(loops); !slices.Equal(got, want) {
+				t.Errorf("build loop names = %q, want %q", got, want)
 			}
 			// An unused `builder` variable would not compile.
 			if len(want) == 0 && bytes.Contains(src, []byte("builder")) {
 				t.Errorf("builder declared with nothing to build:\n%s", src)
 			}
-			if len(buildCalls) != len(want) {
-				t.Fatalf("builder.Build called %d times, want %d", len(buildCalls), len(want))
-			}
-			for i := range want {
-				if artifacts[0] > goPos[i] {
-					t.Errorf("project.Go(%q) precedes project.Artifacts", want[i])
+			for _, loop := range loops {
+				if int(loop.Loop.Pos()) < artifacts[0] {
+					t.Errorf("loop over %s precedes project.Artifacts", loop.Var)
 				}
-				if goPos[i] > buildPos[i] {
-					t.Errorf("%q is built before it passes through project.Go", want[i])
+				if !loop.Hooked {
+					t.Errorf("loop over %s does not pass its builder through project.Go(ctx, %s, ...)", loop.Var, loop.Var)
 				}
-				if i+1 < len(want) && buildPos[i] > goPos[i+1] {
-					t.Errorf("%q is built after %q passes through project.Go", want[i], want[i+1])
+				if got, wantNewGo := loop.Calls["NewGo"], loop.Var+", config.SYSTEMS"; got != wantNewGo {
+					t.Errorf("NewGo(%s), want NewGo(%s)", got, wantNewGo)
 				}
-			}
-			if got := goLambdaCallStringArgs(t, file, "language", "NewGo"); !slices.Equal(got, want) {
-				t.Errorf("NewGo artifacts = %q, want %q", got, want)
+
+				// Inside the loop body, project.Go must come before builder.Build.
+				var goPos, buildPos []int
+				ast.Inspect(loop.Loop.Body, func(n ast.Node) bool {
+					call, ok := n.(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+					if goLambdaIsSelector(call.Fun, "project", "Go") {
+						goPos = append(goPos, int(call.Pos()))
+					}
+					if goLambdaIsSelector(call.Fun, "builder", "Build") {
+						buildPos = append(buildPos, int(call.Pos()))
+					}
+					return true
+				})
+				if len(goPos) != 1 || len(buildPos) != 1 {
+					t.Fatalf("loop over %s: project.Go %d times, builder.Build %d times, want 1 each", loop.Var, len(goPos), len(buildPos))
+				}
+				if goPos[0] > buildPos[0] {
+					t.Errorf("loop over %s builds before passing through project.Go", loop.Var)
+				}
 			}
 		})
 	}

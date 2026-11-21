@@ -161,7 +161,7 @@ func TestGoCobraCliRendersDefaultVorpalProgram(t *testing.T) {
 	file := goCobraCliParseProgram(t)
 
 	goCobraCliAssertStrings(t, "FetchArtifactAlias aliases", goCobraCliFetchedAliases(t, file),
-		[]string{"golangci-lint:2.15.0", "govulncheck:1.9.0", "gitleaks:8.30.1", "rumdl:0.3.2"})
+		[]string{"golangci-lint:2.15.0", "govulncheck:1.9.0", "jq:1.8.1", "just:1.45.0", "gitleaks:8.30.1", "rumdl:0.3.2"})
 	goCobraCliAssertStrings(t, "dev environment name", goCobraCliCallStrings(t, file, "NewGoDevelopmentEnvironment"),
 		[]string{"demo-dev"})
 	goCobraCliAssertStrings(t, "artifact name", goCobraCliCallStrings(t, file, "NewGo"),
@@ -175,7 +175,7 @@ func TestGoCobraCliRendersDefaultVorpalProgram(t *testing.T) {
 func TestGoCobraCliVorpalOptionsChangeOutputIndependently(t *testing.T) {
 	goCobraCliRenderTemp(t, map[string]interface{}{
 		"vorpal": map[string]interface{}{
-			"tools":          []string{"just:1.0.0"},
+			"tools":          []string{"protoc:31.1"},
 			"buildDirectory": "cmd/other",
 			"includes":       []string{"cmd/other", "go.mod", "pkg"},
 			"sourceIncludes": []string{"cmd/vorpal", "go.mod", "go.sum", "vendor"},
@@ -201,7 +201,7 @@ directory = "cmd/vorpal"
 
 	file := goCobraCliParseProgram(t)
 	goCobraCliAssertStrings(t, "FetchArtifactAlias aliases", goCobraCliFetchedAliases(t, file),
-		append(slices.Clone(goDefaultTools), "just:1.0.0"))
+		append(slices.Clone(goDefaultTools), "protoc:31.1"))
 	goCobraCliAssertStrings(t, "build directory", goCobraCliCallStrings(t, file, "WithBuildDirectory"),
 		[]string{"cmd/other"})
 	goCobraCliAssertStrings(t, "artifact includes", goCobraCliCallStrings(t, file, "WithIncludes"),
@@ -212,7 +212,7 @@ func TestGoCobraCliRendersEmptyVorpalLists(t *testing.T) {
 	goCobraCliRenderTemp(t, map[string]interface{}{
 		"vorpal": map[string]interface{}{
 			"tools":        []string{},
-			"excludeTools": []string{"golangci-lint", "govulncheck", "gitleaks", "rumdl"},
+			"excludeTools": []string{"golangci-lint", "govulncheck", "jq", "just", "gitleaks", "rumdl"},
 			"includes":     []string{},
 		},
 	})

@@ -27,7 +27,7 @@ type GoLambdaConfig struct {
 	PrivateModules string             `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
 	Lambdas        []string           `json:"lambdas,omitempty" yaml:"lambdas,omitempty"`
 	// Services are Go binaries built from cmd/<name> that are not lambdas.
-	// CI only builds them: no package, upload or deploy, and no scaffolded
+	// CI only builds them: no zip, upload or deploy, and no scaffolded
 	// entrypoint.
 	Services []string `json:"services,omitempty" yaml:"services,omitempty"`
 	// Generate lists shell lines for a `generate` justfile recipe that
@@ -41,7 +41,7 @@ type GoLambdaConfig struct {
 	// `quirk-{{ environment }}-<quirk.service>-{{ lambda }}`.
 	FunctionName string `json:"functionName,omitempty" yaml:"functionName,omitempty"`
 	// Artifacts are extra Vorpal artifact names that CI builds with
-	// `just package-artifact <name>`, in the build-services matrix. Unlike services they
+	// `just package-artifact <name>`, as a step of the build job. Unlike services they
 	// do not pass through the generated vorpal program's Go() hook.
 	Artifacts []string             `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
 	OpenAPI   OpenAPIConfig        `json:"openapi,omitempty" yaml:"openapi,omitempty"`
@@ -62,6 +62,10 @@ type GoLambdaVorpalConfig struct {
 	// ExcludeTools removes default tools by name (`jq`) or full alias
 	// (`jq:1.8.1`).
 	ExcludeTools []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
+	// Includes narrows the source of every lambda and service artifact to
+	// these paths, relative to the project root. The top-level dist
+	// directory stays excluded either way; unset sends every other path.
+	Includes []string `json:"includes,omitempty" yaml:"includes,omitempty"`
 }
 
 // DevTools returns the Vorpal artifact aliases the development environment
@@ -130,8 +134,8 @@ func (c GoLambdaConfig) Render() error {
 
 	// Deploy jobs publish lambda zips, so without lambdas they would have
 	// nothing to deploy. Reject the config instead of dropping them silently.
-	if len(c.Services) > 0 && len(c.Lambdas) == 0 && len(c.Deploy) > 0 {
-		return errors.New("deploy is set but lambdas is empty; services are built only, so there is nothing to deploy")
+	if len(c.Lambdas) == 0 && len(c.Deploy) > 0 {
+		return errors.New("deploy is set but lambdas is empty; services and artifacts are built only, so there is nothing to deploy")
 	}
 
 	files, err := templates.RenderTemplates(c.renderMap(), c)

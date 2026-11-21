@@ -20,7 +20,7 @@ type OpenAPIConfig struct {
 	PackageName string `json:"packageName,omitempty" yaml:"packageName,omitempty"`
 
 	// GenerateInCI runs `just build-client` before `just check` and before the
-	// CI build jobs, for repositories that do not commit the generated client.
+	// CI build job, for repositories that do not commit the generated client.
 	GenerateInCI bool `json:"generateInCI,omitempty" yaml:"generateInCI,omitempty"`
 
 	// Module, when set, publishes the client as its own Go module with this

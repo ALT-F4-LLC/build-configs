@@ -137,11 +137,11 @@ func TestGoLibraryCIRunsCheckThenTestOnVorpalShell(t *testing.T) {
 		jobs = append(jobs, name)
 	}
 	slices.Sort(jobs)
-	if want := []string{"check", "doc-validate", "secret-scan", "test", "vuln-scan"}; !slices.Equal(jobs, want) {
+	if want := []string{"check", "test"}; !slices.Equal(jobs, want) {
 		t.Fatalf("jobs = %q, want %q (a library has no build job)", jobs, want)
 	}
 
-	for name, run := range map[string]string{"check": "just check", "doc-validate": "just doc-validate", "secret-scan": "just secret-scan", "test": "just test", "vuln-scan": "just vuln-scan"} {
+	for name, wantRuns := range map[string][]string{"check": {"just secret-scan", "just doc-validate", "just check", "just vuln-scan"}, "test": {"just test"}} {
 		job := wf.Jobs[name]
 		if job.RunsOn != "altf4llc" {
 			t.Errorf("job %s runs-on = %q, want altf4llc", name, job.RunsOn)
@@ -152,22 +152,22 @@ func TestGoLibraryCIRunsCheckThenTestOnVorpalShell(t *testing.T) {
 		if job.Permissions["contents"] != "read" {
 			t.Errorf("job %s permissions = %v, want contents: read", name, job.Permissions)
 		}
-		var ran bool
+		var runs []string
 		for _, step := range job.Steps {
-			if step.Run != run {
+			if step.Run == "" {
 				continue
 			}
-			ran = true
+			runs = append(runs, step.Run)
 			if step.Shell != goCobraCliStepShell {
-				t.Errorf("job %s step %q shell = %q, want %q", name, run, step.Shell, goCobraCliStepShell)
+				t.Errorf("job %s step %q shell = %q, want %q", name, step.Run, step.Shell, goCobraCliStepShell)
 			}
 		}
-		if !ran {
-			t.Errorf("job %s has no step running %q", name, run)
+		if !slices.Equal(runs, wantRuns) {
+			t.Errorf("job %s runs %q, want %q", name, runs, wantRuns)
 		}
 	}
 
-	if got, want := wf.Jobs["test"].Needs, []string{"check", "doc-validate", "secret-scan", "vuln-scan"}; !slices.Equal(got, want) {
+	if got, want := wf.Jobs["test"].Needs, []string{"check"}; !slices.Equal(got, want) {
 		t.Errorf("job test needs = %q, want %q", got, want)
 	}
 	if got := wf.Jobs["check"].Needs; len(got) != 0 {
@@ -270,12 +270,12 @@ func TestGoLibraryVorpalProgramFetchesTheDefaultTools(t *testing.T) {
 
 func TestGoLibraryVorpalToolsAddToTheDefaults(t *testing.T) {
 	goLibraryRenderTemp(t, map[string]any{
-		"vorpal": map[string]any{"tools": []string{"just:1.45.0"}},
+		"vorpal": map[string]any{"tools": []string{"protoc:31.1"}},
 	})
 
 	file, src := goLibraryVorpalProgram(t)
 	got := goCobraCliStrings(t, file)
-	if !slices.Contains(got, "just:1.45.0") {
+	if !slices.Contains(got, "protoc:31.1") {
 		t.Errorf("cmd/vorpal/main.go does not fetch the configured tool:\n%s", src)
 	}
 	for _, tool := range goDefaultTools {

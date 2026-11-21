@@ -85,6 +85,12 @@ jobs:
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: just secret-scan
+        shell: bash .github/vorpal-shell.sh {0}
+      - run: just doc-validate
+        shell: bash .github/vorpal-shell.sh {0}
       - id: generate-token
         uses: actions/create-github-app-token@v3
         with:
@@ -98,49 +104,6 @@ jobs:
           username: ${{ secrets.ALTF4LLC_GITHUB_APP_USER }}
       - run: just lint
         shell: bash .github/vorpal-shell.sh {0}
-      - run: rm -f ~/.netrc
-        if: always()
-
-  doc-validate:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-      - run: just doc-validate
-        shell: bash .github/vorpal-shell.sh {0}
-
-  secret-scan:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - run: just secret-scan
-        shell: bash .github/vorpal-shell.sh {0}
-
-  vuln-scan:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-      - id: generate-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.ALTF4LLC_GITHUB_APP_ID }}
-          owner: ${{ github.repository_owner }}
-          private-key: ${{ secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY }}
-      - uses: extractions/netrc@v3
-        with:
-          machine: github.com
-          password: ${{ steps.generate-token.outputs.token }}
-          username: ${{ secrets.ALTF4LLC_GITHUB_APP_USER }}
       - run: just vuln-scan
         shell: bash .github/vorpal-shell.sh {0}
       - run: rm -f ~/.netrc
@@ -150,17 +113,9 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     needs:
       - check
-      - doc-validate
-      - secret-scan
-      - vuln-scan
     permissions:
       contents: read
     runs-on: altf4llc
-    strategy:
-      matrix:
-        profile:
-          - api
-          - worker
     steps:
       - uses: actions/checkout@v7
       - id: generate-token
@@ -174,21 +129,24 @@ jobs:
           machine: github.com
           password: ${{ steps.generate-token.outputs.token }}
           username: ${{ secrets.ALTF4LLC_GITHUB_APP_USER }}
-      - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
-      - run: just build "${{ matrix.profile }}"
+      - run: just package "api"
         shell: bash .github/vorpal-shell.sh {0}
-      - run: just package "${{ matrix.profile }}"
+      - run: just package "worker"
         shell: bash .github/vorpal-shell.sh {0}
-      - uses: actions/upload-artifact@v7
-        with:
-          name: "zip-${{ matrix.profile }}"
-          path: "dist/${{ matrix.profile }}/lambda.zip"
-          if-no-files-found: error
-          retention-days: 7
-      - run: rm -f /tmp/.netrc
-        if: always()
       - run: rm -f ~/.netrc
         if: always()
+      - uses: actions/upload-artifact@v7
+        with:
+          name: "zip-api"
+          path: "dist/api/lambda.zip"
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        with:
+          name: "zip-worker"
+          path: "dist/worker/lambda.zip"
+          if-no-files-found: error
+          retention-days: 7
   
   deploy-dev:
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.ref == 'refs/heads/main') }}
@@ -198,15 +156,10 @@ jobs:
     needs:
       - build
     concurrency:
-      group: deploy-dev-${{ matrix.profile }}
+      group: deploy-dev
       cancel-in-progress: false
       queue: max
     runs-on: altf4llc
-    strategy:
-      matrix:
-        profile:
-          - api
-          - worker
     steps:
       - uses: actions/checkout@v7
       - uses: aws-actions/configure-aws-credentials@v6
@@ -215,9 +168,15 @@ jobs:
           role-to-assume: arn:aws:iam::111111111111:role/dev
       - uses: actions/download-artifact@v8
         with:
-          name: "zip-${{ matrix.profile }}"
-          path: "dist/${{ matrix.profile }}"
-      - run: just deploy dev "${{ matrix.profile }}"
+          name: "zip-api"
+          path: "dist/api"
+      - uses: actions/download-artifact@v8
+        with:
+          name: "zip-worker"
+          path: "dist/worker"
+      - run: just deploy dev "api"
+        shell: bash .github/vorpal-shell.sh {0}
+      - run: just deploy dev "worker"
         shell: bash .github/vorpal-shell.sh {0}
   deploy-prod:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
@@ -227,15 +186,10 @@ jobs:
     needs:
       - build
     concurrency:
-      group: deploy-prod-${{ matrix.profile }}
+      group: deploy-prod
       cancel-in-progress: false
       queue: max
     runs-on: altf4llc
-    strategy:
-      matrix:
-        profile:
-          - api
-          - worker
     steps:
       - uses: actions/checkout@v7
       - uses: aws-actions/configure-aws-credentials@v6
@@ -244,9 +198,15 @@ jobs:
           role-to-assume: arn:aws:iam::111111111111:role/prod
       - uses: actions/download-artifact@v8
         with:
-          name: "zip-${{ matrix.profile }}"
-          path: "dist/${{ matrix.profile }}"
-      - run: just deploy prod "${{ matrix.profile }}"
+          name: "zip-api"
+          path: "dist/api"
+      - uses: actions/download-artifact@v8
+        with:
+          name: "zip-worker"
+          path: "dist/worker"
+      - run: just deploy prod "api"
+        shell: bash .github/vorpal-shell.sh {0}
+      - run: just deploy prod "worker"
         shell: bash .github/vorpal-shell.sh {0}
 -- out/.golangci.yaml --
 ---
@@ -340,6 +300,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	api "github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/api/artifact"
+	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact"
 	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/artifact/language"
 	"github.com/ALT-F4-LLC/vorpal/sdk/go/pkg/config"
 )
@@ -358,6 +320,7 @@ func main() {
 		"govulncheck:1.9.0",
 		"jq:1.8.1",
 		"just:1.45.0",
+		"openjdk:25.0.1",
 		"rumdl:0.3.2",
 	} {
 		tool, err := ctx.FetchArtifactAlias(alias)
@@ -377,31 +340,37 @@ func main() {
 
 	sandbox := newPrivateModuleSandbox(ctx.GetTargetStr(), ctx.GetArtifactName())
 
-	_, err = language.NewGo("api", config.SYSTEMS).
-		WithBuildDirectory("cmd/api").
-		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
-		WithEnvironments(sandbox.environments("api", cgoDisabled)).
-		WithSecrets(sandbox.secretsFor("api")).
-		WithSourceScript(sandbox.scriptFor("api")).
-		Build(ctx)
-	if err != nil {
-		log.Fatalf("failed building api: %v", err)
-	}
-
-	_, err = language.NewGo("worker", config.SYSTEMS).
-		WithBuildDirectory("cmd/worker").
-		WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
-		WithEnvironments(sandbox.environments("worker", cgoDisabled)).
-		WithSecrets(sandbox.secretsFor("worker")).
-		WithSourceScript(sandbox.scriptFor("worker")).
-		Build(ctx)
-	if err != nil {
-		log.Fatalf("failed building worker: %v", err)
+	for _, lambda := range []string{
+		"api",
+		"worker",
+	} {
+		_, err = language.NewGo(lambda, config.SYSTEMS).
+			WithBuildDirectory("cmd/" + lambda).
+			WithBuildFlags("-ldflags='-s -w' -tags='lambda.norpc'").
+			WithSource(source(lambda)).
+			WithEnvironments(sandbox.environments(lambda, cgoDisabled)).
+			WithSecrets(sandbox.secretsFor(lambda)).
+			WithSourceScript(sandbox.scriptFor(lambda)).
+			Build(ctx)
+		if err != nil {
+			log.Fatalf("failed building %s: %v", lambda, err)
+		}
 	}
 
 	if err := ctx.Run(); err != nil {
 		log.Fatalf("failed running vorpal: %v", err)
 	}
+}
+
+// source returns the source for the artifact called name: the project root
+// without the dist directory, where `just build` and `just package` write,
+// so their output never changes the artifact digest.
+func source(name string) *api.ArtifactSource {
+	src := artifact.NewArtifactSource(name, ".").
+		WithExcludes([]string{"dist"}).
+		Build()
+
+	return &src
 }
 
 // privateModuleSandbox holds what a sandboxed build needs to fetch private Go

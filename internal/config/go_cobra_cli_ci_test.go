@@ -115,8 +115,8 @@ func TestGoCobraCliWorkflowJobsRunOnAltf4llcThroughVorpalShell(t *testing.T) {
 			goCobraCliRenderTemp(t, parameters)
 			wf := goCobraCliParseWorkflow(t)
 
-			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"build", "check", "doc-validate", "secret-scan", "vuln-scan"}) {
-				t.Fatalf("jobs = %q, want [build check doc-validate secret-scan vuln-scan]", got)
+			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"build", "check"}) {
+				t.Fatalf("jobs = %q, want [build check]", got)
 			}
 			wantIf := "${{ " + goCobraCliForkGuard + " }}"
 			for jobName, job := range wf.Jobs {
@@ -157,7 +157,7 @@ func TestGoCobraCliWorkflowJobsRunOnAltf4llcThroughVorpalShell(t *testing.T) {
 				}
 			}
 
-			for jobName, want := range map[string]string{"check": "just check", "build": "just build"} {
+			for jobName, want := range map[string]string{"check": "just check", "build": "just package"} {
 				if !slices.ContainsFunc(wf.Jobs[jobName].Steps, func(s goCobraCliWorkflowStep) bool { return s.Run == want }) {
 					t.Errorf("job %s does not run %q: %+v", jobName, want, wf.Jobs[jobName].Steps)
 				}
@@ -173,9 +173,6 @@ func TestGoCobraCliWorkflowCleansUpEachCredentialFileItWrites(t *testing.T) {
 	writers := map[string]func(goCobraCliWorkflowStep) bool{
 		"~/.netrc": func(s goCobraCliWorkflowStep) bool {
 			return strings.HasPrefix(s.Uses, "extractions/netrc@")
-		},
-		"/tmp/.netrc": func(s goCobraCliWorkflowStep) bool {
-			return strings.HasPrefix(s.Run, "cp ") && strings.HasSuffix(s.Run, " /tmp/.netrc")
 		},
 	}
 	for file, writes := range writers {
@@ -201,6 +198,38 @@ func TestGoCobraCliWorkflowCleansUpEachCredentialFileItWrites(t *testing.T) {
 	}
 	if cleanups != len(writers) {
 		t.Errorf("build job has %d credential cleanups, want %d: %+v", cleanups, len(writers), steps)
+	}
+}
+
+func TestGoCobraCliCheckJobWritesNetrcAroundLintOnlyForPrivateModules(t *testing.T) {
+	t.Run("private modules", func(t *testing.T) {
+		goCobraCliRenderTemp(t, goCobraCliPrivateModules)
+		steps := goCobraCliParseWorkflow(t).Jobs["check"].Steps
+		netrc := slices.IndexFunc(steps, func(s goCobraCliWorkflowStep) bool { return strings.HasPrefix(s.Uses, "extractions/netrc@") })
+		check := slices.IndexFunc(steps, func(s goCobraCliWorkflowStep) bool { return s.Run == "just check" })
+		cleanup := slices.Index(steps, goCobraCliWorkflowStep{If: "always()", Run: "rm -f ~/.netrc"})
+		if netrc < 0 || check < 0 || cleanup < 0 || netrc > check || check > cleanup {
+			t.Errorf("check steps netrc=%d check=%d cleanup=%d, want netrc < check < cleanup: %+v", netrc, check, cleanup, steps)
+		}
+	})
+	t.Run("none", func(t *testing.T) {
+		goCobraCliRenderTemp(t, nil)
+		for _, s := range goCobraCliParseWorkflow(t).Jobs["check"].Steps {
+			if strings.Contains(s.Uses, "netrc") || strings.Contains(s.Uses, "create-github-app-token") || strings.Contains(s.Run, "netrc") {
+				t.Errorf("check job without private modules has credential step %+v", s)
+			}
+		}
+	})
+}
+
+func TestGoCobraCliWorkflowDoesNotCopyNetrcToTmp(t *testing.T) {
+	goCobraCliRenderTemp(t, goCobraCliPrivateModules)
+
+	got := goCobraCliReadFile(t, goCobraCliWorkflowPath)
+	for _, banned := range []string{"/tmp/.netrc", "no-preserve"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("%s contains %q:\n%s", goCobraCliWorkflowPath, banned, got)
+		}
 	}
 }
 

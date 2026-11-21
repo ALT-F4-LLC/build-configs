@@ -122,7 +122,7 @@ func TestGoLambdaCIJobsRunOnAltf4llcThroughVorpalShell(t *testing.T) {
 			goLambdaRenderCI(t, privateModules)
 			wf := goLambdaParseWorkflow(t)
 
-			want := []string{"build", "check", "deploy-dev", "deploy-prod", "deploy-staging", "doc-validate", "secret-scan", "vuln-scan"}
+			want := []string{"build", "check", "deploy-dev", "deploy-prod", "deploy-staging"}
 			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, want) {
 				t.Fatalf("jobs = %q, want %q", got, want)
 			}
@@ -172,9 +172,6 @@ func TestGoLambdaCIJobIfJoinsForkGuard(t *testing.T) {
 	joined := "${{ (" + goLambdaTestForkGuard + ") && (" + goLambdaTestDeployIf + ") }}"
 	for name, want := range map[string]string{
 		"check":          guardOnly,
-		"doc-validate":   guardOnly,
-		"secret-scan":    guardOnly,
-		"vuln-scan":      guardOnly,
 		"build":          guardOnly,
 		"deploy-dev":     joined,
 		"deploy-prod":    joined,
@@ -194,9 +191,6 @@ func TestGoLambdaCIJobPermissions(t *testing.T) {
 	deploy := map[string]string{"id-token": "write", "contents": "read"}
 	for name, want := range map[string]map[string]string{
 		"check":          readOnly,
-		"doc-validate":   readOnly,
-		"secret-scan":    readOnly,
-		"vuln-scan":      readOnly,
 		"build":          readOnly,
 		"deploy-dev":     deploy,
 		"deploy-prod":    deploy,
@@ -227,15 +221,12 @@ func TestGoLambdaCICleansUpNetrcCredentials(t *testing.T) {
 	// follow it.
 	writers := map[int]string{}
 	for i, step := range steps {
-		switch {
-		case strings.HasPrefix(step.Uses, "extractions/netrc@"):
+		if strings.HasPrefix(step.Uses, "extractions/netrc@") {
 			writers[i] = "rm -f ~/.netrc"
-		case strings.HasPrefix(step.Run, "cp ") && strings.Contains(step.Run, "/tmp/.netrc"):
-			writers[i] = "rm -f /tmp/.netrc"
 		}
 	}
-	if len(writers) != 2 {
-		t.Fatalf("build job has %d netrc-writing steps, want 2: %+v", len(writers), steps)
+	if len(writers) != 1 {
+		t.Fatalf("build job has %d netrc-writing steps, want 1: %+v", len(writers), steps)
 	}
 	for i, cleanup := range writers {
 		found := slices.ContainsFunc(steps[i+1:], func(s goLambdaWorkflowStep) bool {
@@ -248,6 +239,17 @@ func TestGoLambdaCICleansUpNetrcCredentials(t *testing.T) {
 	for _, step := range steps {
 		if strings.HasPrefix(step.Run, "rm ") && !slices.Contains(slices.Collect(maps.Values(writers)), step.Run) {
 			t.Errorf("unexpected removal step %q", step.Run)
+		}
+	}
+}
+
+func TestGoLambdaCIDoesNotCopyNetrcToTmp(t *testing.T) {
+	goLambdaRenderCI(t, "github.com/ALT-F4-LLC/quirk-service-kit")
+
+	got := goLambdaReadFile(t, goLambdaWorkflowPath)
+	for _, banned := range []string{"/tmp/.netrc", "no-preserve"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("%s contains %q:\n%s", goLambdaWorkflowPath, banned, got)
 		}
 	}
 }
@@ -272,7 +274,7 @@ func TestGoLambdaCIDeployJobsQueueInsteadOfCancel(t *testing.T) {
 		if !ok {
 			t.Fatalf("job deploy-%s missing", env)
 		}
-		if want := "deploy-" + env + "-${{ matrix.profile }}"; job.Concurrency.Group != want {
+		if want := "deploy-" + env; job.Concurrency.Group != want {
 			t.Errorf("deploy-%s concurrency.group = %q, want %q", env, job.Concurrency.Group, want)
 		}
 		if job.Concurrency.CancelInProgress == nil || *job.Concurrency.CancelInProgress {
@@ -299,8 +301,8 @@ func TestGoLambdaCIDeployNeedsEveryBuildJob(t *testing.T) {
 		want      []string
 	}{
 		{name: "lambdas only", want: []string{"build"}},
-		{name: "services", services: []string{"mcp"}, want: []string{"build", "build-services"}},
-		{name: "artifacts", artifacts: []string{"client"}, want: []string{"build", "build-services"}},
+		{name: "services", services: []string{"mcp"}, want: []string{"build"}},
+		{name: "artifacts", artifacts: []string{"client"}, want: []string{"build"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())

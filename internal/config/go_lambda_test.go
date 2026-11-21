@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/format"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"os"
 	"slices"
@@ -59,24 +60,115 @@ func goLambdaCallStringArgs(t *testing.T, file *ast.File, pkg, fn string) []stri
 	return args
 }
 
-// goLambdaMethodStringArgs returns the string-literal argument of every
-// method call named method in file, in source order.
-func goLambdaMethodStringArgs(t *testing.T, file *ast.File, method string) []string {
+// goLambdaBuildLoop is one `for _, <Var> := range []string{...}` loop in the
+// rendered program that builds a language.NewGo artifact per name.
+type goLambdaBuildLoop struct {
+	Var   string
+	Names []string
+	// Calls maps NewGo and each method chained on it to its arguments as
+	// source text, such as `"cmd/" + lambda`.
+	Calls map[string]string
+	// Hooked reports whether the builder passes through
+	// project.Go(ctx, <Var>, ...).
+	Hooked bool
+	Loop   *ast.RangeStmt
+}
+
+// goLambdaBuildLoops returns the program's build loops in source order.
+func goLambdaBuildLoops(t *testing.T, file *ast.File) []goLambdaBuildLoop {
 	t.Helper()
-	var args []string
+	var loops []goLambdaBuildLoop
 	ast.Inspect(file, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok || len(call.Args) != 1 {
+		rs, ok := n.(*ast.RangeStmt)
+		if !ok {
 			return true
 		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok || sel.Sel.Name != method {
+		value, ok := rs.Value.(*ast.Ident)
+		if !ok {
 			return true
 		}
-		args = append(args, goLambdaStringLit(t, call.Args[0]))
+		lit, ok := rs.X.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		loop := goLambdaBuildLoop{Var: value.Name, Calls: map[string]string{}, Loop: rs}
+		for _, elt := range lit.Elts {
+			loop.Names = append(loop.Names, goLambdaStringLit(t, elt))
+		}
+		ast.Inspect(rs.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if goLambdaIsSelector(call.Fun, "project", "Go") {
+				id, ok := call.Args[1].(*ast.Ident)
+				loop.Hooked = ok && id.Name == loop.Var
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			name := sel.Sel.Name
+			if !goLambdaIsSelector(call.Fun, "language", "NewGo") {
+				if goLambdaChainRoot(sel.X) == nil {
+					return true
+				}
+			}
+			if _, dup := loop.Calls[name]; dup {
+				t.Fatalf("loop over %s calls %s twice", loop.Var, name)
+			}
+			loop.Calls[name] = goLambdaExprsSource(t, call.Args)
+			return true
+		})
+		if _, ok := loop.Calls["NewGo"]; ok {
+			loops = append(loops, loop)
+		}
 		return true
 	})
-	return args
+	return loops
+}
+
+// goLambdaExprsSource prints exprs as comma-separated source text.
+func goLambdaExprsSource(t *testing.T, exprs []ast.Expr) string {
+	t.Helper()
+	var parts []string
+	for _, expr := range exprs {
+		var buf bytes.Buffer
+		if err := printer.Fprint(&buf, token.NewFileSet(), expr); err != nil {
+			t.Fatalf("printing expression: %v", err)
+		}
+		parts = append(parts, buf.String())
+	}
+	return strings.Join(parts, ", ")
+}
+
+// goLambdaLoopNames returns every name the build loops build, in order.
+func goLambdaLoopNames(loops []goLambdaBuildLoop) []string {
+	var names []string
+	for _, loop := range loops {
+		names = append(names, loop.Names...)
+	}
+	return names
+}
+
+// goLambdaChainRoot follows a builder method chain down to the
+// language.NewGo call it starts from, or returns nil.
+func goLambdaChainRoot(expr ast.Expr) *ast.CallExpr {
+	for {
+		call, ok := expr.(*ast.CallExpr)
+		if !ok {
+			return nil
+		}
+		if goLambdaIsSelector(call.Fun, "language", "NewGo") {
+			return call
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return nil
+		}
+		expr = sel.X
+	}
 }
 
 func goLambdaIsSelector(expr ast.Expr, pkg, name string) bool {
@@ -220,32 +312,25 @@ func TestGoLambdaRenderVorpalProgramArtifactPerLambda(t *testing.T) {
 			goLambdaRenderTemp(t, tc.lambdas)
 			file := goLambdaParseVorpalProgram(t)
 
-			artifacts := goLambdaCallStringArgs(t, file, "language", "NewGo")
-			if !slices.Equal(artifacts, tc.lambdas) {
-				t.Errorf("lambda artifacts = %q, want %q", artifacts, tc.lambdas)
+			loops := goLambdaBuildLoops(t, file)
+			if len(loops) != 1 {
+				t.Fatalf("got %d build loops, want 1 lambda loop", len(loops))
 			}
-
-			var wantDirs []string
-			for _, lambda := range tc.lambdas {
-				wantDirs = append(wantDirs, "cmd/"+lambda)
+			loop := loops[0]
+			if loop.Var != "lambda" || !slices.Equal(loop.Names, tc.lambdas) {
+				t.Errorf("loop over %s builds %q, want lambda over %q", loop.Var, loop.Names, tc.lambdas)
 			}
-			dirs := goLambdaMethodStringArgs(t, file, "WithBuildDirectory")
-			if !slices.Equal(dirs, wantDirs) {
-				t.Errorf("build directories = %q, want %q", dirs, wantDirs)
-			}
-
-			flags := goLambdaMethodStringArgs(t, file, "WithBuildFlags")
-			for _, f := range flags {
-				if f != "-ldflags='-s -w' -tags='lambda.norpc'" {
-					t.Errorf("build flags = %q", f)
+			for method, want := range map[string]string{
+				"NewGo":              "lambda, config.SYSTEMS",
+				"WithBuildDirectory": `"cmd/" + lambda`,
+				"WithBuildFlags":     `"-ldflags='-s -w' -tags='lambda.norpc'"`,
+			} {
+				if got := loop.Calls[method]; got != want {
+					t.Errorf("%s(%s), want %s(%s)", method, got, method, want)
 				}
 			}
-			if len(flags) != len(tc.lambdas) {
-				t.Errorf("got %d build-flag calls, want %d", len(flags), len(tc.lambdas))
-			}
-			cgo := goLambdaCgoDisabledUses(t, file)
-			if cgo != len(tc.lambdas) {
-				t.Errorf("cgoDisabled is used %d times, want %d", cgo, len(tc.lambdas))
+			if cgo := goLambdaCgoDisabledUses(t, file); cgo != 1 {
+				t.Errorf("cgoDisabled is used %d times, want 1", cgo)
 			}
 		})
 	}

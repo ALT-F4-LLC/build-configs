@@ -20,6 +20,8 @@ func main() {
 	for _, alias := range []string{
 		"golangci-lint:2.15.0",
 		"govulncheck:1.9.0",
+		"jq:1.8.1",
+		"just:1.45.0",
 		"gitleaks:8.30.1",
 		"rumdl:0.3.2",
 	} {

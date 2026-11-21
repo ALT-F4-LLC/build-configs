@@ -19,6 +19,16 @@ jobs:
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
+      {{- if .HasDevTool "gitleaks" }}
+        with:
+          fetch-depth: 0
+      - run: just secret-scan
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
+      {{- if .HasDevTool "rumdl" }}
+      - run: just doc-validate
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
       {{- if .PrivateModules }}
       {{- if .Generate }}
       - run: just generate
@@ -45,6 +55,10 @@ jobs:
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
       - run: just lint
         shell: bash .github/vorpal-shell.sh {0}
+      {{- if .HasDevTool "govulncheck" }}
+      - run: just vuln-scan
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
       - run: rm -f ~/.netrc
         if: always()
       {{- else }}
@@ -54,161 +68,20 @@ jobs:
       {{- end }}
       - run: just check
         shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
-{{- if .HasDevTool "rumdl" }}
-
-  doc-validate:
-    if: {{ .ForkGuardedIf "" }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-      - run: just doc-validate
-        shell: bash .github/vorpal-shell.sh {0}
-{{- end }}
-{{- if .HasDevTool "gitleaks" }}
-
-  secret-scan:
-    if: {{ .ForkGuardedIf "" }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - run: just secret-scan
-        shell: bash .github/vorpal-shell.sh {0}
-{{- end }}
-{{- if .HasDevTool "govulncheck" }}
-
-  vuln-scan:
-    if: {{ .ForkGuardedIf "" }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    steps:
-      - uses: actions/checkout@v7
-      {{- if .Generate }}
-      - run: just generate
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
-      {{- if and .OpenAPI.Enable .OpenAPI.GenerateInCI }}
-      - run: just build-client
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
-      {{- if .PrivateModules }}
-      - id: generate-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID {{"}}"}}
-          owner: ${{"{{"}} github.repository_owner {{"}}"}}
-          private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY {{"}}"}}
-      - uses: extractions/netrc@v3
-        with:
-          machine: github.com
-          password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
-          username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
-      {{- end }}
+      {{- if .HasDevTool "govulncheck" }}
       - run: just vuln-scan
         shell: bash .github/vorpal-shell.sh {0}
-      {{- if .PrivateModules }}
-      - run: rm -f ~/.netrc
-        if: always()
       {{- end }}
-{{- end }}
-{{- if or .Services .Artifacts }}
-
-  build-services:
-    if: {{ .ForkGuardedIf "" }}
-    needs:
-      - check
-      {{- if .HasDevTool "rumdl" }}
-      - doc-validate
       {{- end }}
-      {{- if .HasDevTool "gitleaks" }}
-      - secret-scan
-      {{- end }}
-      {{- if .HasDevTool "govulncheck" }}
-      - vuln-scan
-      {{- end }}
-    permissions:
-      contents: read
-    runs-on: altf4llc
-    strategy:
-      matrix:
-        service:
-          {{- range .Services }}
-          - {{ . }}
-          {{- end }}
-          {{- range .Artifacts }}
-          - {{ . }}
-          {{- end }}
-    steps:
-      - uses: actions/checkout@v7
-      {{- if .Generate }}
-      - run: just generate
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
-      {{- if and .OpenAPI.Enable .OpenAPI.GenerateInCI }}
-      - run: just build-client
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
-      {{- if .PrivateModules }}
-      - id: generate-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_ID {{"}}"}}
-          owner: ${{"{{"}} github.repository_owner {{"}}"}}
-          private-key: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY {{"}}"}}
-      - uses: extractions/netrc@v3
-        with:
-          machine: github.com
-          password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
-          username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
-      - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
-      {{- end }}
-      {{- if .Services }}
-      - run: just build "${{"{{"}} matrix.service {{"}}"}}"
-        {{- if .Artifacts }}
-        if: contains(fromJSON('[{{ range $i, $s := .Services }}{{ if $i }},{{ end }}"{{ $s }}"{{ end }}]'), matrix.service)
-        {{- end }}
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
-      - run: just package-artifact "${{"{{"}} matrix.service {{"}}"}}"
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- if .PrivateModules }}
-      - run: rm -f /tmp/.netrc
-        if: always()
-      - run: rm -f ~/.netrc
-        if: always()
-      {{- end }}
-{{- end }}
-{{- if or .Lambdas (not (or .Services .Artifacts)) }}
+{{- if or .Lambdas .Services .Artifacts }}
 
   build:
     if: {{ .ForkGuardedIf "" }}
     needs:
       - check
-      {{- if .HasDevTool "rumdl" }}
-      - doc-validate
-      {{- end }}
-      {{- if .HasDevTool "gitleaks" }}
-      - secret-scan
-      {{- end }}
-      {{- if .HasDevTool "govulncheck" }}
-      - vuln-scan
-      {{- end }}
     permissions:
       contents: read
     runs-on: altf4llc
-    strategy:
-      matrix:
-        profile:
-          {{- range .Lambdas }}
-          - {{ . }}
-          {{- end }}
     steps:
       - uses: actions/checkout@v7
       {{- if .Generate }}
@@ -231,23 +104,30 @@ jobs:
           machine: github.com
           password: ${{"{{"}} steps.generate-token.outputs.token {{"}}"}}
           username: ${{"{{"}} secrets.ALTF4LLC_GITHUB_APP_USER {{"}}"}}
-      - run: cp --no-preserve=mode ~/.netrc /tmp/.netrc
       {{- end }}
-      - run: just build "${{"{{"}} matrix.profile {{"}}"}}"
+      {{- range .Artifacts }}
+      - run: just package-artifact "{{ . }}"
         shell: bash .github/vorpal-shell.sh {0}
-      - run: just package "${{"{{"}} matrix.profile {{"}}"}}"
+      {{- end }}
+      {{- range .Services }}
+      - run: just package-artifact "{{ . }}"
         shell: bash .github/vorpal-shell.sh {0}
-      - uses: actions/upload-artifact@v7
-        with:
-          name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
-          path: "dist/${{"{{"}} matrix.profile {{"}}"}}/lambda.zip"
-          if-no-files-found: error
-          retention-days: 7
+      {{- end }}
+      {{- range .Lambdas }}
+      - run: just package "{{ . }}"
+        shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
       {{- if .PrivateModules }}
-      - run: rm -f /tmp/.netrc
-        if: always()
       - run: rm -f ~/.netrc
         if: always()
+      {{- end }}
+      {{- range .Lambdas }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: "zip-{{ . }}"
+          path: "dist/{{ . }}/lambda.zip"
+          if-no-files-found: error
+          retention-days: 7
       {{- end }}
   {{ range .Deploy }}
   deploy-{{ .Environment }}:
@@ -259,34 +139,28 @@ jobs:
       id-token: write
       contents: read
     needs:
-      {{- if or $.Lambdas (not (or $.Services $.Artifacts)) }}
       - build
-      {{- end }}
-      {{- if or $.Services $.Artifacts }}
-      - build-services
-      {{- end }}
     concurrency:
-      group: deploy-{{ .Environment }}-${{"{{"}} matrix.profile {{"}}"}}
+      group: deploy-{{ .Environment }}
       cancel-in-progress: false
       queue: max
     runs-on: altf4llc
-    strategy:
-      matrix:
-        profile:
-          {{- range $.Lambdas }}
-          - {{ . }}
-          {{- end }}
     steps:
       - uses: actions/checkout@v7
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: {{ .Region }}
           role-to-assume: {{ .RoleARN }}
+      {{- range $.Lambdas }}
       - uses: actions/download-artifact@v8
         with:
-          name: "zip-${{"{{"}} matrix.profile {{"}}"}}"
-          path: "dist/${{"{{"}} matrix.profile {{"}}"}}"
-      - run: just deploy {{ .Environment }} "${{"{{"}} matrix.profile {{"}}"}}"
+          name: "zip-{{ . }}"
+          path: "dist/{{ . }}"
+      {{- end }}
+      {{- $env := .Environment }}
+      {{- range $.Lambdas }}
+      - run: just deploy {{ $env }} "{{ . }}"
         shell: bash .github/vorpal-shell.sh {0}
+      {{- end }}
   {{- end }}
 {{- end }}

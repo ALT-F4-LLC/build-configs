@@ -110,38 +110,42 @@ func TestGoLambdaFunctionName(t *testing.T) {
 	})
 }
 
+// goLambdaBuildRuns returns the run commands of the single build job.
+func goLambdaBuildRuns(t *testing.T, wf goLambdaOptionsWorkflow) []string {
+	t.Helper()
+	job, ok := wf.Jobs["build"]
+	if !ok {
+		t.Fatal("no build job")
+	}
+	if len(job.Strategy.Matrix) != 0 {
+		t.Errorf("build job has a matrix %v, want one job for every entry", job.Strategy.Matrix)
+	}
+	var runs []string
+	for _, step := range job.Steps {
+		if step.Run != "" && !strings.HasPrefix(step.Run, "rm -f") {
+			runs = append(runs, step.Run)
+		}
+	}
+	return runs
+}
+
 func TestGoLambdaArtifacts(t *testing.T) {
 	t.Run("off", func(t *testing.T) {
 		_, wf := goLambdaRenderOptions(t, func(*GoLambdaConfig) {})
 		if _, ok := wf.Jobs["build-services"]; ok {
-			t.Error("build-services rendered with no services or artifacts")
+			t.Error("build-services rendered")
+		}
+		if got, want := goLambdaBuildRuns(t, wf), []string{`just package "api"`}; !slices.Equal(got, want) {
+			t.Errorf("build runs %q, want %q", got, want)
 		}
 	})
 
 	t.Run("on without services", func(t *testing.T) {
 		_, wf := goLambdaRenderOptions(t, func(c *GoLambdaConfig) { c.Artifacts = []string{"client-go", "docs"} })
-		job, ok := wf.Jobs["build-services"]
-		if !ok {
-			t.Fatal("no build-services job")
-		}
-		if got := job.Strategy.Matrix["service"]; !slices.Equal(got, []string{"client-go", "docs"}) {
-			t.Errorf("matrix = %q, want [client-go docs]", got)
-		}
 		// Artifacts are Vorpal artifacts, not Go packages: no native build.
-		var packaged bool
-		for _, step := range job.Steps {
-			if step.Run == `just build "${{ matrix.service }}"` {
-				t.Errorf("artifacts-only build-services runs a native build: %+v", job.Steps)
-			}
-			if step.Run == `just package-artifact "${{ matrix.service }}"` {
-				packaged = true
-			}
-		}
-		if !packaged {
-			t.Errorf("build-services does not run just package-artifact on the matrix entry: %+v", job.Steps)
-		}
-		if got := wf.Jobs["build"].Strategy.Matrix["profile"]; !slices.Equal(got, []string{"api"}) {
-			t.Errorf("lambda build matrix = %q, want [api]", got)
+		want := []string{`just package-artifact "client-go"`, `just package-artifact "docs"`, `just package "api"`}
+		if got := goLambdaBuildRuns(t, wf); !slices.Equal(got, want) {
+			t.Errorf("build runs %q, want %q", got, want)
 		}
 	})
 
@@ -150,22 +154,25 @@ func TestGoLambdaArtifacts(t *testing.T) {
 			c.Services = []string{"svc"}
 			c.Artifacts = []string{"client-go"}
 		})
-		if got := wf.Jobs["build-services"].Strategy.Matrix["service"]; !slices.Equal(got, []string{"svc", "client-go"}) {
-			t.Errorf("matrix = %q, want [svc client-go]", got)
+		want := []string{`just package-artifact "client-go"`, `just package-artifact "svc"`, `just package "api"`}
+		if got := goLambdaBuildRuns(t, wf); !slices.Equal(got, want) {
+			t.Errorf("build runs %q, want %q", got, want)
 		}
 	})
 
-	t.Run("on with no lambdas drops the lambda build", func(t *testing.T) {
+	t.Run("on with no lambdas packages only the artifacts", func(t *testing.T) {
 		_, wf := goLambdaRenderOptions(t, func(c *GoLambdaConfig) {
 			c.Lambdas = nil
 			c.Deploy = nil
 			c.Artifacts = []string{"client-go"}
 		})
-		if _, ok := wf.Jobs["build"]; ok {
-			t.Error("artifacts-only config renders a lambda build job with an empty matrix")
+		if got, want := goLambdaBuildRuns(t, wf), []string{`just package-artifact "client-go"`}; !slices.Equal(got, want) {
+			t.Errorf("build runs %q, want %q", got, want)
 		}
-		if _, ok := wf.Jobs["build-services"]; !ok {
-			t.Error("artifacts-only config has no build-services job")
+		for _, step := range wf.Jobs["build"].Steps {
+			if strings.HasPrefix(step.Uses, "actions/upload-artifact") {
+				t.Errorf("artifacts-only build uploads %+v", step)
+			}
 		}
 	})
 }
@@ -196,14 +203,14 @@ func TestGoLambdaGithubEnvironment(t *testing.T) {
 func TestGoLambdaDeployDownloadPath(t *testing.T) {
 	_, wf := goLambdaRenderOptions(t, func(*GoLambdaConfig) {})
 	for _, name := range []string{"deploy-dev", "deploy-prod"} {
-		var path string
+		var paths []string
 		for _, step := range wf.Jobs[name].Steps {
 			if strings.HasPrefix(step.Uses, "actions/download-artifact") {
-				path = step.With["path"]
+				paths = append(paths, step.With["path"])
 			}
 		}
-		if want := "dist/${{ matrix.profile }}"; path != want {
-			t.Errorf("%s download path = %q, want %q", name, path, want)
+		if want := []string{"dist/api"}; !slices.Equal(paths, want) {
+			t.Errorf("%s download paths = %q, want %q", name, paths, want)
 		}
 	}
 }
