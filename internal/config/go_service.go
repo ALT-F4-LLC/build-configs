@@ -40,6 +40,14 @@ var (
 	// goServiceRepositoryPattern bounds the registry repository the image is
 	// pushed to, such as `quirk/backend-discord-bot`.
 	goServiceRepositoryPattern = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$`)
+
+	// goServiceRoleARNPattern, goServiceAccountPattern, goServiceRegionPattern
+	// and goServiceEnvironmentPattern bound the AWS push inputs, which reach
+	// YAML scalars in the generated workflow.
+	goServiceRoleARNPattern     = regexp.MustCompile(`^arn:aws[a-z-]*:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$`)
+	goServiceAccountPattern     = regexp.MustCompile(`^[0-9]{12}$`)
+	goServiceRegionPattern      = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]$`)
+	goServiceEnvironmentPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 )
 
 // GoServiceConfig renders a Go service repository: long-running binaries
@@ -72,6 +80,17 @@ type GoServiceImageConfig struct {
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	// Rootfs is the Vorpal alias of the root filesystem under the services.
 	Rootfs string `json:"rootfs,omitempty" yaml:"rootfs,omitempty"`
+	// RoleARN is the IAM role the push job assumes through GitHub OIDC. It is
+	// required with Repository; its trust policy is the push's security
+	// boundary.
+	RoleARN string `json:"roleArn,omitempty" yaml:"roleArn,omitempty"`
+	// Account and Region locate the ECR registry,
+	// <account>.dkr.ecr.<region>.amazonaws.com.
+	Account string `json:"account,omitempty" yaml:"account,omitempty"`
+	Region  string `json:"region,omitempty" yaml:"region,omitempty"`
+	// GithubEnvironment is the GitHub environment the push job runs in; empty
+	// leaves the job without an `environment:` key.
+	GithubEnvironment string `json:"githubEnvironment,omitempty" yaml:"githubEnvironment,omitempty"`
 }
 
 func NewGoServiceConfig(c Config) GoServiceConfig {
@@ -80,8 +99,22 @@ func NewGoServiceConfig(c Config) GoServiceConfig {
 		PrivateModules: "github.com/ALT-F4-LLC/quirk-service-kit",
 		Lint:           NewGolangCiLintConfig(),
 		Services:       []string{c.Name},
-		Image:          GoServiceImageConfig{Rootfs: goServiceDefaultRootfs},
+		Image: GoServiceImageConfig{
+			Rootfs:  goServiceDefaultRootfs,
+			Account: DefaultAccount,
+			Region:  DefaultRegion,
+		},
 	}
+}
+
+// Registry returns the ECR registry host the image is pushed to.
+func (c GoServiceConfig) Registry() string {
+	return c.Image.Account + ".dkr.ecr." + c.Image.Region + ".amazonaws.com"
+}
+
+// PushJobIf is the push job's `if:`: the fork guard and a push to main.
+func (c GoServiceConfig) PushJobIf() string {
+	return c.ForkGuardedIf(goServicePushCondition)
 }
 
 // DevTools returns the Vorpal artifact aliases the development environment
@@ -123,16 +156,10 @@ func (c GoServiceConfig) ImageArtifact() string {
 	return c.Name + "-image"
 }
 
-// PushIf is the step condition for the registry login and push: pushes to
+// PushIf is the step condition for the build job's image upload: pushes to
 // main only, never a pull request.
 func (c GoServiceConfig) PushIf() string {
 	return "${{ " + goServicePushCondition + " }}"
-}
-
-// PushIfAlways is PushIf on every outcome, for the step that removes the
-// registry credential from the runner even when the push fails.
-func (c GoServiceConfig) PushIfAlways() string {
-	return "${{ always() && " + goServicePushCondition + " }}"
 }
 
 // CheckDeps returns the recipes `just check` depends on, each preceded by a
@@ -194,6 +221,18 @@ func (c GoServiceConfig) validate() error {
 		}
 		if !goServiceAliasPattern.MatchString(c.Image.Rootfs) {
 			return fmt.Errorf("image.rootfs %q must be a Vorpal alias of the form <name>:<version>", c.Image.Rootfs)
+		}
+		if !goServiceRoleARNPattern.MatchString(c.Image.RoleARN) {
+			return fmt.Errorf("image.roleArn %q must be an IAM role ARN such as arn:aws:iam::123456789012:role/name; it is required with image.repository", c.Image.RoleARN)
+		}
+		if !goServiceAccountPattern.MatchString(c.Image.Account) {
+			return fmt.Errorf("image.account %q must be a 12-digit AWS account ID", c.Image.Account)
+		}
+		if !goServiceRegionPattern.MatchString(c.Image.Region) {
+			return fmt.Errorf("image.region %q must be an AWS region such as us-west-2", c.Image.Region)
+		}
+		if c.Image.GithubEnvironment != "" && !goServiceEnvironmentPattern.MatchString(c.Image.GithubEnvironment) {
+			return fmt.Errorf("image.githubEnvironment %q must be letters, digits, _ and -", c.Image.GithubEnvironment)
 		}
 		if err := claim(c.ImageArtifact(), "the image"); err != nil {
 			return err

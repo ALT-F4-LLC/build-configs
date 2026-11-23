@@ -111,11 +111,6 @@ jobs:
 
   build:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    # One build per ref at a time, so two pushes to main never load, tag and
-    # push their images through the runner's Docker daemon together.
-    concurrency:
-      group: build-${{ github.ref }}
-      cancel-in-progress: false
     needs:
       - check
     permissions:
@@ -140,28 +135,62 @@ jobs:
         shell: bash .github/vorpal-shell.sh {0}
       - run: rm -f ~/.netrc
         if: always()
-      # The registry credential lives in a per-job DOCKER_CONFIG under
-      # runner.temp, never in the runner's shared ~/.docker/config.json.
+      # The push job takes the tarball from here, so the OIDC token never
+      # reaches the job that runs the generators and the private module build.
       - if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        env:
+        uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: dist/quirk-backend-discord-bot-image/image.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  push:
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+    # One push per ref at a time, so two pushes to main never load, tag and
+    # push their images through the runner's Docker daemon together.
+    concurrency:
+      group: push-${{ github.ref }}
+      cancel-in-progress: false
+    needs:
+      - build
+    # Only this job may request a GitHub OIDC token. The role's trust policy,
+    # not this job's `if`, is the security boundary.
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: dist/quirk-backend-discord-bot-image
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-west-2
+          role-duration-seconds: 900
+          role-to-assume: arn:aws:iam::677459762413:role/altf4llc-gha-quirk-backend-discord-bot-push
+      # docker/login-action fetches the ECR token with the role's credentials
+      # and logs in with --password-stdin. The credential lives in a per-job
+      # DOCKER_CONFIG under runner.temp, never in the runner's shared
+      # ~/.docker/config.json.
+      - env:
           DOCKER_CONFIG: ${{ runner.temp }}/docker
         uses: docker/login-action@v3
         with:
           logout: true
-          password: ${{ secrets.ALTF4LLC_DOCKER_REGISTRY_PASSWORD }}
-          registry: ${{ vars.ALTF4LLC_DOCKER_REGISTRY_URL }}
-          username: ${{ vars.ALTF4LLC_DOCKER_REGISTRY_USERNAME }}
-      - if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        env:
+          registry: 677459762413.dkr.ecr.us-west-2.amazonaws.com
+      - env:
           DOCKER_CONFIG: ${{ runner.temp }}/docker
-          REGISTRY: ${{ vars.ALTF4LLC_DOCKER_REGISTRY_URL }}
+          REGISTRY: 677459762413.dkr.ecr.us-west-2.amazonaws.com
           TAG: ${{ github.sha }}
         run: just push "$REGISTRY" "$TAG"
         shell: bash .github/vorpal-shell.sh {0}
-      - if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - if: always()
         env:
           DOCKER_CONFIG: ${{ runner.temp }}/docker
-          REGISTRY: ${{ vars.ALTF4LLC_DOCKER_REGISTRY_URL }}
+          REGISTRY: 677459762413.dkr.ecr.us-west-2.amazonaws.com
         run: docker logout "$REGISTRY"
 -- out/.golangci.yaml --
 ---

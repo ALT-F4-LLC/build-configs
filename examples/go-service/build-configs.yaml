@@ -7,10 +7,16 @@ parameters:
   #   - project-name
   # Private Go modules, including API clients added with `go get`.
   privateModules: "github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai"
-  # Optional: an OCI image holding every service, pushed from main only.
+  # Optional: an OCI image holding every service, pushed to Amazon ECR from
+  # main only through GitHub OIDC.
   image:
     repository: quirk/project-name
     # rootfs: linux-vorpal:latest
+    # Required with repository: the role the push job assumes.
+    roleArn: arn:aws:iam::677459762413:role/altf4llc-gha-project-name-push
+    # account: "677459762413"
+    # region: us-west-2
+    # githubEnvironment: production
   # Optional: shell lines for a `generate` recipe that `check` depends on.
   # generate:
   #   - just build-data

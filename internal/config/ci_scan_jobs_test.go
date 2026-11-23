@@ -246,7 +246,7 @@ func TestScanJobsGateDownstreamJobs(t *testing.T) {
 		{GoLambdaName, ".github/workflows/ci.yaml", nil, []string{"build"}},
 		{GoLambdaName, ".github/workflows/ci.yaml", map[string]any{"services": []any{"mcp"}}, []string{"build"}},
 		{GoServiceName, ".github/workflows/ci.yaml", nil, []string{"build"}},
-		{GoServiceName, ".github/workflows/ci.yaml", map[string]any{"image": map[string]any{"repository": "quirk/x"}}, []string{"build"}},
+		{GoServiceName, ".github/workflows/ci.yaml", map[string]any{"image": map[string]any{"repository": "quirk/x", "roleArn": "arn:aws:iam::677459762413:role/x"}}, []string{"build"}},
 		{GoLibraryName, ".github/workflows/ci.yaml", nil, []string{"test"}},
 		{TerraformName, ".github/workflows/terraform.yaml", nil, []string{"plan"}},
 		{TerraformModuleName, ".github/workflows/terraform.yaml", nil, []string{"package"}},

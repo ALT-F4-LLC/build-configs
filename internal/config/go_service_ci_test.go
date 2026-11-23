@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	goServiceTestPushIf       = "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
-	goServiceTestPushIfAlways = "${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
-	goServiceRegistryLogin    = "docker/login-action@"
+	goServiceTestPushCondition = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+	goServiceTestPushIf        = "${{ " + goServiceTestPushCondition + " }}"
+	goServiceRegistryLogin     = "docker/login-action@"
+	goServiceAWSAction         = "aws-actions/configure-aws-credentials@"
 )
 
 type goServiceWorkflow struct {
@@ -25,6 +26,7 @@ type goServiceWorkflow struct {
 type goServiceWorkflowJob struct {
 	Concurrency map[string]any          `yaml:"concurrency"`
 	Env         map[string]string       `yaml:"env"`
+	Environment string                  `yaml:"environment"`
 	If          string                  `yaml:"if"`
 	Needs       []string                `yaml:"needs"`
 	Permissions map[string]string       `yaml:"permissions"`
@@ -72,27 +74,42 @@ func goServiceParseWorkflow(t *testing.T) goServiceWorkflow {
 	return wf
 }
 
-// Every job carries the fork guard, reads the repository only, runs on the
-// self-hosted runner, and runs its just recipes through the Vorpal shell.
+// Every job carries the fork guard, runs on the self-hosted runner, and runs
+// its just recipes through the Vorpal shell. check and build read the
+// repository only; with an image, the push job alone may request an OIDC
+// token, and only for pushes to main.
 func TestGoServiceCIJobsForkGuardAndPermissions(t *testing.T) {
 	for name, cfg := range goServiceCIConfigs() {
 		t.Run(name, func(t *testing.T) {
-			goServiceRender(t, cfg())
+			c := cfg()
+			goServiceRender(t, c)
 			wf := goServiceParseWorkflow(t)
 
-			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"build", "check"}) {
-				t.Fatalf("jobs = %q, want [build check]", got)
+			wantJobs := []string{"build", "check"}
+			if c.Image.Repository != "" {
+				wantJobs = []string{"build", "check", "push"}
+			}
+			if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, wantJobs) {
+				t.Fatalf("jobs = %q, want %q", got, wantJobs)
 			}
 			if !slices.Equal(wf.Jobs["build"].Needs, []string{"check"}) {
 				t.Errorf("build needs = %q, want [check]", wf.Jobs["build"].Needs)
 			}
-			wantIf := "${{ " + goLambdaTestForkGuard + " }}"
+			guard := "${{ " + goLambdaTestForkGuard + " }}"
 			for job, j := range wf.Jobs {
-				if j.If != wantIf {
-					t.Errorf("job %s if = %q, want the fork guard %q", job, j.If, wantIf)
+				wantIf, wantPermissions := guard, map[string]string{"contents": "read"}
+				if job == "push" {
+					wantIf = "${{ (" + goLambdaTestForkGuard + ") && (" + goServiceTestPushCondition + ") }}"
+					wantPermissions = map[string]string{"contents": "read", "id-token": "write"}
 				}
-				if !maps.Equal(j.Permissions, map[string]string{"contents": "read"}) {
-					t.Errorf("job %s permissions = %v, want contents: read only", job, j.Permissions)
+				if j.If != wantIf {
+					t.Errorf("job %s if = %q, want %q", job, j.If, wantIf)
+				}
+				if !maps.Equal(j.Permissions, wantPermissions) {
+					t.Errorf("job %s permissions = %v, want %v", job, j.Permissions, wantPermissions)
+				}
+				if job != "push" && j.Environment != "" {
+					t.Errorf("job %s environment = %q, want none", job, j.Environment)
 				}
 				if j.RunsOn != "altf4llc" {
 					t.Errorf("job %s runs-on = %q, want altf4llc", job, j.RunsOn)
@@ -112,15 +129,18 @@ func TestGoServiceCIJobsForkGuardAndPermissions(t *testing.T) {
 var goServiceSecretExpr = regexp.MustCompile(`\$\{\{[^}]*\b(secrets\.|steps\.[^}]*outputs|github\.token)`)
 
 // No run step carries a GitHub expression at all, so no secret, token or
-// registry credential, including the registry login's, can land on a command
-// line or in a shell script. Secrets reach only the `with` inputs of the App
-// token, netrc and registry login actions.
+// registry credential can land on a command line or in a shell script.
+// Secrets reach only the `with` inputs of the App token and netrc actions;
+// the registry login takes no static credential.
 func TestGoServiceCIKeepsSecretsOutOfRunLines(t *testing.T) {
 	for name, cfg := range goServiceCIConfigs() {
 		t.Run(name, func(t *testing.T) {
 			goServiceRender(t, cfg())
 			wf := goServiceParseWorkflow(t)
-			allowed := []string{"actions/create-github-app-token@", "extractions/netrc@", goServiceRegistryLogin}
+			if src := goLambdaReadFile(t, goLambdaWorkflowPath); strings.Contains(src, "ALTF4LLC_DOCKER_REGISTRY") {
+				t.Errorf("workflow still reads a static registry credential")
+			}
+			allowed := []string{"actions/create-github-app-token@", "extractions/netrc@"}
 			if len(wf.Env) > 0 {
 				t.Errorf("workflow env = %v; a workflow-level env reaches every run step", wf.Env)
 			}
@@ -150,11 +170,13 @@ func TestGoServiceCIKeepsSecretsOutOfRunLines(t *testing.T) {
 	}
 }
 
-// The registry login and push run only for pushes to main, never for a pull
-// request; they follow the netrc cleanup, so the GitHub App token and the
-// registry credential are never on the runner together; the credential lives
-// in a per-job DOCKER_CONFIG and is removed on every outcome; and one build
-// per ref runs at a time.
+// The build job uploads the image tarball only for pushes to main, after the
+// netrc cleanup, and touches neither AWS nor Docker. The push job runs only
+// for pushes to main, needs build, assumes the configured role through OIDC
+// for 15 minutes, logs in with no static credential to the computed ECR
+// registry from a per-job DOCKER_CONFIG, pushes, and always logs out. It
+// holds no App token, netrc or build step, and one push per ref runs at a
+// time.
 func TestGoServiceCIPushesImageFromMainOnly(t *testing.T) {
 	for name, cfg := range goServiceCIConfigs() {
 		c := cfg()
@@ -164,12 +186,12 @@ func TestGoServiceCIPushesImageFromMainOnly(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			goServiceRender(t, c)
 			wf := goServiceParseWorkflow(t)
-			goServiceCheckPushGating(t, wf, c.PrivateModules != "")
+			goServiceCheckPushGating(t, wf, c)
 		})
 	}
 }
 
-func goServiceCheckPushGating(t *testing.T, wf goServiceWorkflow, privateModules bool) {
+func goServiceCheckPushGating(t *testing.T, wf goServiceWorkflow, c GoServiceConfig) {
 	t.Helper()
 	if got := slices.Sorted(maps.Keys(wf.On)); !slices.Equal(got, []string{"pull_request", "push"}) {
 		t.Fatalf("on = %q, want pull_request and push", got)
@@ -177,89 +199,122 @@ func goServiceCheckPushGating(t *testing.T, wf goServiceWorkflow, privateModules
 	if push, ok := wf.On["push"].(map[string]any); !ok || !slices.Equal(goServiceStrings(push["branches"]), []string{"main"}) {
 		t.Errorf("on.push = %v, want branches [main]", wf.On["push"])
 	}
-	build := wf.Jobs["build"]
-	if build.Concurrency["group"] != "build-${{ github.ref }}" || build.Concurrency["cancel-in-progress"] != false {
-		t.Errorf("build concurrency = %v, want group build-${{ github.ref }} without cancel-in-progress", build.Concurrency)
-	}
+	registry := c.Image.Account + ".dkr.ecr." + c.Image.Region + ".amazonaws.com"
 
-	steps := build.Steps
-	index := func(match func(goServiceWorkflowStep) bool) int { return slices.IndexFunc(steps, match) }
-	image := index(func(s goServiceWorkflowStep) bool { return s.Run == "just package-image" })
-	netrcCleanup := index(func(s goServiceWorkflowStep) bool { return s.Run == ciNetrcCleanup && s.If == "always()" })
-	login := index(func(s goServiceWorkflowStep) bool { return strings.HasPrefix(s.Uses, goServiceRegistryLogin) })
-	push := index(func(s goServiceWorkflowStep) bool { return s.Run == `just push "$REGISTRY" "$TAG"` })
-	logout := index(func(s goServiceWorkflowStep) bool { return s.Run == `docker logout "$REGISTRY"` })
-
-	beforeLogin := image
-	if privateModules {
-		if netrcCleanup < image {
-			t.Fatalf("build steps image=%d netrc-cleanup=%d, want the cleanup after the image: %+v", image, netrcCleanup, steps)
-		}
-		beforeLogin = netrcCleanup
-	} else if netrcCleanup >= 0 {
-		t.Errorf("build removes ~/.netrc without privateModules")
+	build := wf.Jobs["build"].Steps
+	index := slices.IndexFunc[[]goServiceWorkflowStep]
+	image := index(build, func(s goServiceWorkflowStep) bool { return s.Run == "just package-image" })
+	netrcCleanup := index(build, func(s goServiceWorkflowStep) bool { return s.Run == ciNetrcCleanup && s.If == "always()" })
+	upload := index(build, func(s goServiceWorkflowStep) bool { return strings.HasPrefix(s.Uses, "actions/upload-artifact@") })
+	after := image
+	if c.PrivateModules != "" {
+		after = netrcCleanup
 	}
-	if image < 0 || login < beforeLogin || push < login || logout < push {
-		t.Fatalf("build steps image=%d netrc-cleanup=%d login=%d push=%d logout=%d, want them in that order: %+v",
-			image, netrcCleanup, login, push, logout, steps)
+	if image < 0 || after < image || upload < after || upload != len(build)-1 {
+		t.Fatalf("build steps image=%d netrc-cleanup=%d upload=%d, want the upload last: %+v", image, netrcCleanup, upload, build)
 	}
-	if steps[image].If != "" {
-		t.Errorf("package-image if = %q; pull requests must still build the image", steps[image].If)
+	if build[image].If != "" {
+		t.Errorf("package-image if = %q; pull requests must still build the image", build[image].If)
 	}
-	for _, i := range []int{login, push} {
-		if steps[i].If != goServiceTestPushIf {
-			t.Errorf("step %d (%s%s) if = %q, want %q", i, steps[i].Uses, steps[i].Run, steps[i].If, goServiceTestPushIf)
+	if build[upload].If != goServiceTestPushIf {
+		t.Errorf("upload if = %q, want %q", build[upload].If, goServiceTestPushIf)
+	}
+	if got := build[upload].With["path"]; got != "dist/"+c.ImageArtifact()+"/image.tar" {
+		t.Errorf("upload path = %q", got)
+	}
+	if build[upload].With["if-no-files-found"] != "error" {
+		t.Errorf("upload if-no-files-found = %q, want error", build[upload].With["if-no-files-found"])
+	}
+	for i, step := range build {
+		if strings.Contains(step.Run, "docker") || strings.Contains(step.Run, "just push") ||
+			strings.HasPrefix(step.Uses, "docker/") || strings.HasPrefix(step.Uses, "aws-actions/") {
+			t.Errorf("build step %d %q%q touches AWS or the registry", i, step.Run, step.Uses)
 		}
 	}
-	if steps[logout].If != goServiceTestPushIfAlways {
-		t.Errorf("logout if = %q, want %q", steps[logout].If, goServiceTestPushIfAlways)
+	for _, job := range []string{"check", "build"} {
+		if len(wf.Jobs[job].Concurrency) > 0 {
+			t.Errorf("%s concurrency = %v, want none", job, wf.Jobs[job].Concurrency)
+		}
+		for _, step := range wf.Jobs[job].Steps {
+			if strings.HasPrefix(step.Uses, "aws-actions/") || strings.HasPrefix(step.Uses, "docker/") {
+				t.Errorf("%s step %q uses AWS or Docker", job, step.Uses)
+			}
+		}
 	}
-	for _, i := range []int{login, push, logout} {
+
+	push := wf.Jobs["push"]
+	if !slices.Equal(push.Needs, []string{"build"}) {
+		t.Errorf("push needs = %q, want [build]", push.Needs)
+	}
+	if push.Concurrency["group"] != "push-${{ github.ref }}" || push.Concurrency["cancel-in-progress"] != false {
+		t.Errorf("push concurrency = %v, want group push-${{ github.ref }} without cancel-in-progress", push.Concurrency)
+	}
+	if push.Environment != c.Image.GithubEnvironment {
+		t.Errorf("push environment = %q, want %q", push.Environment, c.Image.GithubEnvironment)
+	}
+	steps := push.Steps
+	want := []string{"actions/checkout@", "actions/download-artifact@", goServiceAWSAction, goServiceRegistryLogin, `just push "$REGISTRY" "$TAG"`, `docker logout "$REGISTRY"`}
+	if len(steps) != len(want) {
+		t.Fatalf("push steps = %+v, want %q", steps, want)
+	}
+	for i, w := range want {
+		if !strings.HasPrefix(steps[i].Uses, w) && steps[i].Run != w {
+			t.Errorf("push step %d = %s%s, want %s", i, steps[i].Uses, steps[i].Run, w)
+		}
+	}
+	if steps[1].With["name"] != build[upload].With["name"] || steps[1].With["path"] != "dist/"+c.ImageArtifact() {
+		t.Errorf("download with = %v, want the uploaded artifact in dist/%s", steps[1].With, c.ImageArtifact())
+	}
+	creds := steps[2].With
+	wantCreds := map[string]string{"aws-region": c.Image.Region, "role-duration-seconds": "900", "role-to-assume": c.Image.RoleARN}
+	if !maps.Equal(creds, wantCreds) {
+		t.Errorf("configure-aws-credentials with = %v, want %v", creds, wantCreds)
+	}
+	if !maps.Equal(steps[3].With, map[string]string{"logout": "true", "registry": registry}) {
+		t.Errorf("registry login with = %v, want logout and registry %s only", steps[3].With, registry)
+	}
+	for _, i := range []int{3, 4, 5} {
 		if got := steps[i].Env["DOCKER_CONFIG"]; got != "${{ runner.temp }}/docker" {
-			t.Errorf("step %d (%s%s) DOCKER_CONFIG = %q, want ${{ runner.temp }}/docker", i, steps[i].Uses, steps[i].Run, got)
+			t.Errorf("push step %d DOCKER_CONFIG = %q, want ${{ runner.temp }}/docker", i, got)
 		}
 	}
-	if steps[login].With["logout"] != "true" {
-		t.Errorf("registry login logout = %q, want true", steps[login].With["logout"])
+	for _, i := range []int{4, 5} {
+		if got := steps[i].Env["REGISTRY"]; got != registry {
+			t.Errorf("push step %d REGISTRY = %q, want %s", i, got, registry)
+		}
 	}
-	if got := steps[login].With["password"]; got != "${{ secrets.ALTF4LLC_DOCKER_REGISTRY_PASSWORD }}" {
-		t.Errorf("registry login password = %q", got)
-	}
-	if got := steps[push].Env["REGISTRY"]; got != "${{ vars.ALTF4LLC_DOCKER_REGISTRY_URL }}" {
-		t.Errorf("push env REGISTRY = %q", got)
-	}
-	if got := steps[push].Env["TAG"]; got != "${{ github.sha }}" {
+	if got := steps[4].Env["TAG"]; got != "${{ github.sha }}" {
 		t.Errorf("push env TAG = %q", got)
 	}
-
-	// No other step touches the registry.
+	if steps[5].If != "always()" {
+		t.Errorf("logout if = %q, want always()", steps[5].If)
+	}
 	for i, step := range steps {
-		if i == login || i == push || i == logout {
-			continue
+		if i != 5 && step.If != "" {
+			t.Errorf("push step %d if = %q; the job if gates the push", i, step.If)
 		}
-		if strings.Contains(step.Run, "docker") || strings.Contains(step.Run, "just push") || strings.HasPrefix(step.Uses, "docker/") {
-			t.Errorf("build step %d %q%q touches the registry outside the gated steps", i, step.Run, step.Uses)
-		}
-	}
-	for _, step := range wf.Jobs["check"].Steps {
-		if strings.Contains(step.Run, "docker") || strings.Contains(step.Run, "push") || strings.HasPrefix(step.Uses, "docker/") {
-			t.Errorf("check step %q%q touches the registry", step.Run, step.Uses)
-		}
-	}
-	if len(wf.Jobs["check"].Concurrency) > 0 {
-		t.Errorf("check concurrency = %v, want none", wf.Jobs["check"].Concurrency)
 	}
 }
 
-// Without image.repository no step builds, logs in to, or pushes an image.
+// Without image.repository no job builds, logs in to, or pushes an image, and
+// no job may request an OIDC token.
 func TestGoServiceCIWithoutImageNeverTouchesRegistry(t *testing.T) {
 	goServiceRender(t, NewGoServiceConfig(Config{Name: "demo", Template: GoServiceName}))
 	src := goLambdaReadFile(t, goLambdaWorkflowPath)
-	for _, absent := range []string{"docker", "REGISTRY", "package-image", "just push"} {
+	for _, absent := range []string{"docker", "REGISTRY", "package-image", "just push", "id-token", "aws-actions/", "dkr.ecr", "upload-artifact"} {
 		if strings.Contains(src, absent) {
 			t.Errorf("workflow without image.repository contains %q", absent)
 		}
 	}
+}
+
+// A GitHub environment applies to the push job alone.
+func TestGoServiceCIPushEnvironment(t *testing.T) {
+	cfg := goServiceBotConfig()
+	cfg.Image.GithubEnvironment = "production"
+	goServiceRender(t, cfg)
+	wf := goServiceParseWorkflow(t)
+	goServiceCheckPushGating(t, wf, cfg)
 }
 
 // The check job runs the generators before it writes the App token; the build
@@ -296,7 +351,7 @@ func TestGoServiceCIOrdersGenerateAndPackages(t *testing.T) {
 
 	wantBuild := []string{
 		"just generate", `just package "extra"`, `just package "api"`, `just package "worker"`, "just package-image",
-		ciNetrcCleanup, `just push "$REGISTRY" "$TAG"`, `docker logout "$REGISTRY"`,
+		ciNetrcCleanup,
 	}
 	if got := runs("build"); !slices.Equal(got, wantBuild) {
 		t.Errorf("build runs %q, want %q", got, wantBuild)

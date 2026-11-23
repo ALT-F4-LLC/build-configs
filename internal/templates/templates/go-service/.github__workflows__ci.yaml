@@ -64,13 +64,6 @@ jobs:
 
   build:
     if: {{ .ForkGuardedIf "" }}
-    {{- if .Image.Repository }}
-    # One build per ref at a time, so two pushes to main never load, tag and
-    # push their images through the runner's Docker daemon together.
-    concurrency:
-      group: build-${{"{{"}} github.ref {{"}}"}}
-      cancel-in-progress: false
-    {{- end }}
     needs:
       - check
     permissions:
@@ -112,27 +105,64 @@ jobs:
         if: always()
       {{- end }}
       {{- if .Image.Repository }}
-      # The registry credential lives in a per-job DOCKER_CONFIG under
-      # runner.temp, never in the runner's shared ~/.docker/config.json.
+      # The push job takes the tarball from here, so the OIDC token never
+      # reaches the job that runs the generators and the private module build.
       - if: {{ .PushIf }}
-        env:
+        uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: dist/{{ .ImageArtifact }}/image.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  push:
+    if: {{ .PushJobIf }}
+    # One push per ref at a time, so two pushes to main never load, tag and
+    # push their images through the runner's Docker daemon together.
+    concurrency:
+      group: push-${{"{{"}} github.ref {{"}}"}}
+      cancel-in-progress: false
+    {{- if .Image.GithubEnvironment }}
+    environment: {{ .Image.GithubEnvironment }}
+    {{- end }}
+    needs:
+      - build
+    # Only this job may request a GitHub OIDC token. The role's trust policy,
+    # not this job's `if`, is the security boundary.
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: altf4llc
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: dist/{{ .ImageArtifact }}
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: {{ .Image.Region }}
+          role-duration-seconds: 900
+          role-to-assume: {{ .Image.RoleARN }}
+      # docker/login-action fetches the ECR token with the role's credentials
+      # and logs in with --password-stdin. The credential lives in a per-job
+      # DOCKER_CONFIG under runner.temp, never in the runner's shared
+      # ~/.docker/config.json.
+      - env:
           DOCKER_CONFIG: ${{"{{"}} runner.temp {{"}}"}}/docker
         uses: docker/login-action@v3
         with:
           logout: true
-          password: ${{"{{"}} secrets.ALTF4LLC_DOCKER_REGISTRY_PASSWORD {{"}}"}}
-          registry: ${{"{{"}} vars.ALTF4LLC_DOCKER_REGISTRY_URL {{"}}"}}
-          username: ${{"{{"}} vars.ALTF4LLC_DOCKER_REGISTRY_USERNAME {{"}}"}}
-      - if: {{ .PushIf }}
-        env:
+          registry: {{ .Registry }}
+      - env:
           DOCKER_CONFIG: ${{"{{"}} runner.temp {{"}}"}}/docker
-          REGISTRY: ${{"{{"}} vars.ALTF4LLC_DOCKER_REGISTRY_URL {{"}}"}}
+          REGISTRY: {{ .Registry }}
           TAG: ${{"{{"}} github.sha {{"}}"}}
         run: just push "$REGISTRY" "$TAG"
         shell: bash .github/vorpal-shell.sh {0}
-      - if: {{ .PushIfAlways }}
+      - if: always()
         env:
           DOCKER_CONFIG: ${{"{{"}} runner.temp {{"}}"}}/docker
-          REGISTRY: ${{"{{"}} vars.ALTF4LLC_DOCKER_REGISTRY_URL {{"}}"}}
+          REGISTRY: {{ .Registry }}
         run: docker logout "$REGISTRY"
       {{- end }}
