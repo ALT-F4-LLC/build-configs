@@ -13,7 +13,7 @@ parameters:
     repository: quirk/project-name
     # rootfs: linux-vorpal:latest
     # Required with repository: the role the push job assumes.
-    roleArn: arn:aws:iam::677459762413:role/altf4llc-gha-project-name-push
+    roleArn: arn:aws:iam::677459762413:role/altf4llc-gha-project-name
     # account: "677459762413"
     # region: us-west-2
     # githubEnvironment: production

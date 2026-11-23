@@ -176,7 +176,7 @@ jobs:
         with:
           aws-region: us-west-2
           role-duration-seconds: 900
-          role-to-assume: arn:aws:iam::677459762413:role/altf4llc-gha-quirk-backend-discord-bot-push
+          role-to-assume: arn:aws:iam::677459762413:role/altf4llc-gha-quirk-backend-discord-bot
       # docker/login-action fetches the ECR token with the role's credentials
       # and logs in with --password-stdin. The credential lives in a per-job
       # DOCKER_CONFIG under runner.temp, never in the runner's shared
@@ -568,14 +568,14 @@ package-image:
     install -m 0644 "$OUTPUT/image.tar" 'dist/quirk-backend-discord-bot-image/image.tar'
 
 # push loads the image package-image wrote and pushes it to
-# <registry>/quirk/backend-discord-bot:<tag>. Log in to the registry first. It
+# <registry>/quirk-backend-discord-bot:<tag>. Log in to the registry first. It
 # removes both tags from the local daemon on exit, so a persistent runner keeps
 # no image.
 push registry tag=`git rev-parse HEAD`:
     #!/usr/bin/env bash
     set -euxo pipefail
-    cleanup() { docker image rm --force 'quirk-backend-discord-bot-image:latest' '{{ registry }}/quirk/backend-discord-bot:{{ tag }}' >/dev/null 2>&1 || true; }
+    cleanup() { docker image rm --force 'quirk-backend-discord-bot-image:latest' '{{ registry }}/quirk-backend-discord-bot:{{ tag }}' >/dev/null 2>&1 || true; }
     trap cleanup EXIT
     docker image load --input 'dist/quirk-backend-discord-bot-image/image.tar'
-    docker image tag 'quirk-backend-discord-bot-image:latest' '{{ registry }}/quirk/backend-discord-bot:{{ tag }}'
-    docker image push '{{ registry }}/quirk/backend-discord-bot:{{ tag }}'
+    docker image tag 'quirk-backend-discord-bot-image:latest' '{{ registry }}/quirk-backend-discord-bot:{{ tag }}'
+    docker image push '{{ registry }}/quirk-backend-discord-bot:{{ tag }}'

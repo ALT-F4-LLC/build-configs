@@ -439,7 +439,7 @@ does not scaffold `cmd/<name>/main.go`. See
   Every build reads them through `GOPRIVATE` and the `~/.netrc` credential.
   Setting the list replaces the `quirk-service-kit` default, so keep it there
   when the service still imports it.
-- `image.repository` turns on the image, such as `quirk/backend-discord-bot`,
+- `image.repository` turns on the image, such as `quirk-backend-discord-bot`,
   without the registry host. The Vorpal program builds `<name>-image` for
   Linux targets only, from the `image.rootfs` alias (default
   `linux-vorpal:latest`, which floats) with every service on it.
