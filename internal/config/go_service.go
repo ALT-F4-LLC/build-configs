@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
@@ -107,7 +108,7 @@ func (c GoServiceConfig) ForkGuardedIf(condition string) string {
 // root, where a local .env would be uploaded too.
 var goServiceDefaultSourceIncludes = []string{"cmd", "internal", "pkg", "go.mod", "go.sum"}
 
-// SourceIncludes returns the paths every service and image source keeps:
+// SourceIncludes returns the paths every service source keeps:
 // vorpal.includes when set, else goServiceDefaultSourceIncludes.
 func (c GoServiceConfig) SourceIncludes() []string {
 	if len(c.Vorpal.Includes) > 0 {
@@ -196,6 +197,14 @@ func (c GoServiceConfig) validate() error {
 		}
 		if err := claim(c.ImageArtifact(), "the image"); err != nil {
 			return err
+		}
+	}
+
+	// Vorpal matches includes as path prefixes from the root: an empty entry
+	// keeps every path and a ./ or / prefix keeps none.
+	for _, include := range c.Vorpal.Includes {
+		if include == "" || strings.HasPrefix(include, "/") || strings.HasPrefix(include, "./") || slices.Contains(strings.Split(include, "/"), "..") {
+			return fmt.Errorf("vorpal.includes entry %q must be a non-empty relative path with no leading ./ or /, and no .. segment", include)
 		}
 	}
 

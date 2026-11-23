@@ -321,10 +321,11 @@ module in CI, so the App installation must include the owning repository.
 
 `cmd/vorpal/main.go` gives each lambda and service builder its own source
 through `WithSource`: the project root without the top-level `dist/`
-directory, where `just build` and `just package` write, and without `.env`,
-`.direnv` and `.claude`. Vorpal ignores `.gitignore` and uploads the source
-to the registry, and excludes match by path prefix, so other untracked files
-such as `.env.local` still go in. Every other path stays in the source by
+directory, where `just build` and `just package` write, and without the
+top-level `.env`, `.direnv` and `.claude`. Vorpal ignores `.gitignore` and
+uploads the source to the registry. Excludes match whole path components from
+the project root, not globs, so `.env.local` and a nested `cmd/api/.env`
+still go in. Every other path stays in the source by
 default. `vorpal.includes` narrows every lambda and service source to the
 listed paths, relative to the project root, and the excludes still apply:
 
@@ -390,7 +391,9 @@ list and drops them, so avoid it in the hook. `WithSecrets` and
 [Vorpal source](#vorpal-source), and a builder with a source ignores
 `WithIncludes`, so a hook's `WithIncludes` call no longer takes effect. To
 change a lambda's or service's source in the hook, call `WithSource` with a
-complete source, and exclude `dist` in it to keep the digest stable. The
+complete source, and exclude `dist` in it to keep the digest stable; that
+source also replaces the `.env`, `.direnv` and `.claude` excludes and
+`go-service`'s default allowlist, so carry them over. The
 `dist/` exclusion and `vorpal.includes` apply only to the lambda and service
 builders; artifacts that `project.Artifacts` registers keep whatever source
 they declare.
@@ -424,8 +427,11 @@ does not scaffold `cmd/<name>/main.go`. See
 - `vorpal.includes` defaults to `cmd`, `internal`, `pkg`, `go.mod` and
   `go.sum`, unlike `go-lambda`'s whole-root default: Vorpal ignores
   `.gitignore` and uploads the source to the registry, so an allowlist keeps
-  a local `.env` out. Set it to the full list when the build compiles or
-  embeds other paths.
+  a top-level `.env` out; one inside an allowed directory still goes in. Set
+  it to the full list when the build compiles or embeds other paths. The
+  default leaves out a committed `vendor/` and a root `go.work`, so the build
+  downloads modules instead. Entries must be relative paths with no leading
+  `./`; an empty entry would match every path.
 - `privateModules` is also how a service gets API clients and other shared
   code: import them with `go get` as Go modules and list their repositories,
   such as

@@ -63,8 +63,9 @@ type GoLambdaVorpalConfig struct {
 	// (`jq:1.8.1`).
 	ExcludeTools []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
 	// Includes narrows the source of every lambda and service artifact to
-	// these paths, relative to the project root. The top-level dist
-	// directory stays excluded either way; unset sends every other path.
+	// these paths, relative to the project root. The excludes (top-level
+	// dist, .env, .direnv and .claude) apply either way; unset, go-lambda
+	// sends every other path and go-service an allowlist.
 	Includes []string `json:"includes,omitempty" yaml:"includes,omitempty"`
 }
 

