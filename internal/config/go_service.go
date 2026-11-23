@@ -101,6 +101,21 @@ func (c GoServiceConfig) ForkGuardedIf(condition string) string {
 	return GoLambdaConfig{}.ForkGuardedIf(condition)
 }
 
+// goServiceDefaultSourceIncludes is the service source when vorpal.includes
+// is unset. Vorpal ignores .gitignore and uploads the source to the registry,
+// so the source names what a Go build reads rather than taking the whole
+// root, where a local .env would be uploaded too.
+var goServiceDefaultSourceIncludes = []string{"cmd", "internal", "pkg", "go.mod", "go.sum"}
+
+// SourceIncludes returns the paths every service and image source keeps:
+// vorpal.includes when set, else goServiceDefaultSourceIncludes.
+func (c GoServiceConfig) SourceIncludes() []string {
+	if len(c.Vorpal.Includes) > 0 {
+		return c.Vorpal.Includes
+	}
+	return goServiceDefaultSourceIncludes
+}
+
 // ImageArtifact returns the Vorpal artifact name of the OCI image, which is
 // also the image name and `latest` tag inside its tarball.
 func (c GoServiceConfig) ImageArtifact() string {

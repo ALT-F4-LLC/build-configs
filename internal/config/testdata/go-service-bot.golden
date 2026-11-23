@@ -309,13 +309,22 @@ func main() {
 	}
 }
 
-// source returns the source for the artifact called name: the project root
-// without the dist directory, where `just build` and `just package-image`
-// write, so their output never changes the artifact digest.
+// source returns the source for the artifact called name: only the listed
+// paths, since Vorpal ignores .gitignore and uploads the source to the
+// registry, and never the dist directory, where `just build` and
+// `just package-image` write, so their output never changes the artifact
+// digest.
 func source(name string) *api.ArtifactSource {
 	src := artifact.NewArtifactSource(name, ".").
 		WithExcludes([]string{
 			"dist",
+		}).
+		WithIncludes([]string{
+			"cmd",
+			"internal",
+			"pkg",
+			"go.mod",
+			"go.sum",
 		}).
 		Build()
 

@@ -132,8 +132,8 @@ func TestGoLambdaVorpalSourceExcludesDist(t *testing.T) {
 			goLambdaAssertBuilderSources(t, file)
 
 			excludes, includes := goLambdaSourceFilter(t, file)
-			if !slices.Equal(excludes, []string{"dist"}) {
-				t.Errorf("source excludes = %q, want [dist]", excludes)
+			if !slices.Equal(excludes, goLambdaSourceExcludes) {
+				t.Errorf("source excludes = %q, want %q", excludes, goLambdaSourceExcludes)
 			}
 			if includes != nil {
 				t.Errorf("source includes = %q with vorpal.includes unset, want no WithIncludes call", includes)
@@ -150,8 +150,8 @@ func TestGoLambdaVorpalSourceIncludes(t *testing.T) {
 			goLambdaAssertBuilderSources(t, file)
 
 			gotExcludes, gotIncludes := goLambdaSourceFilter(t, file)
-			if !slices.Equal(gotExcludes, []string{"dist"}) {
-				t.Errorf("source excludes = %q, want [dist]", gotExcludes)
+			if !slices.Equal(gotExcludes, goLambdaSourceExcludes) {
+				t.Errorf("source excludes = %q, want %q", gotExcludes, goLambdaSourceExcludes)
 			}
 			if !slices.Equal(gotIncludes, includes) {
 				t.Errorf("source includes = %q, want %q", gotIncludes, includes)
@@ -207,3 +207,7 @@ parameters:
 		t.Errorf("default Vorpal.Includes = %q, want unset", def.Vorpal.Includes)
 	}
 }
+
+// goLambdaSourceExcludes is the source exclude list: dist, plus the local
+// secret and tool paths Vorpal would otherwise upload with the source.
+var goLambdaSourceExcludes = []string{"dist", ".env", ".direnv", ".claude"}

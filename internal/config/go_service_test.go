@@ -398,3 +398,28 @@ func TestGoServicePrivateModuleScriptScopesUmask(t *testing.T) {
 		})
 	}
 }
+
+// The service source keeps only the default allowlist, so a local .env never
+// reaches the registry, and vorpal.includes replaces that list when set.
+func TestGoServiceVorpalSourceIsAllowlisted(t *testing.T) {
+	for name, tc := range map[string]struct {
+		includes []string
+		want     []string
+	}{
+		"default":  {nil, []string{"cmd", "internal", "pkg", "go.mod", "go.sum"}},
+		"includes": {[]string{"cmd", "go.mod", "go.sum", "assets"}, []string{"cmd", "go.mod", "go.sum", "assets"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := goServiceBotConfig()
+			cfg.Vorpal.Includes = tc.includes
+			goServiceRender(t, cfg)
+			excludes, includes := goLambdaSourceFilter(t, goLambdaParseVorpalProgram(t))
+			if !slices.Equal(includes, tc.want) {
+				t.Errorf("source includes = %q, want %q", includes, tc.want)
+			}
+			if !slices.Equal(excludes, []string{"dist"}) {
+				t.Errorf("source excludes = %q, want [dist]", excludes)
+			}
+		})
+	}
+}
