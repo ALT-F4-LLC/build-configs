@@ -22,12 +22,12 @@ const goServiceBotRoleARN = "arn:aws:iam::677459762413:role/altf4llc-gha-quirk-b
 const goServiceBotPrivateModules = "github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai,github.com/ALT-F4-LLC/quirk-lambda-database"
 
 // goServiceBotConfig describes quirk-backend-discord-bot: one service, an
-// image pushed to quirk-backend-discord-bot, and private modules for the
+// image pushed to quirk/backend-discord-bot, and private modules for the
 // service kit and both client modules.
 func goServiceBotConfig() GoServiceConfig {
 	cfg := NewGoServiceConfig(Config{Name: "quirk-backend-discord-bot", Template: GoServiceName})
 	cfg.PrivateModules = goServiceBotPrivateModules
-	cfg.Image.Repository = "quirk-backend-discord-bot"
+	cfg.Image.Repository = "quirk/backend-discord-bot"
 	cfg.Image.RoleARN = goServiceBotRoleARN
 	return cfg
 }
@@ -53,7 +53,7 @@ parameters:
   vorpal:
     includes: [cmd, internal, go.mod, go.sum, assets]
   image:
-    repository: quirk-backend-discord-bot
+    repository: quirk/backend-discord-bot
     roleArn: arn:aws:iam::677459762413:role/altf4llc-gha-quirk-backend-discord-bot
     region: us-east-1
 `
@@ -294,8 +294,8 @@ func TestGoServiceJustfileRecipes(t *testing.T) {
 		`install -m 0644 "$OUTPUT/image.tar" 'dist/quirk-backend-discord-bot-image/image.tar'`,
 		"push registry tag=`git rev-parse HEAD`:",
 		"docker image load --input 'dist/quirk-backend-discord-bot-image/image.tar'",
-		"docker image tag 'quirk-backend-discord-bot-image:latest' '{{ registry }}/quirk-backend-discord-bot:{{ tag }}'",
-		"docker image push '{{ registry }}/quirk-backend-discord-bot:{{ tag }}'",
+		"docker image tag 'quirk-backend-discord-bot-image:latest' '{{ registry }}/quirk/backend-discord-bot:{{ tag }}'",
+		"docker image push '{{ registry }}/quirk/backend-discord-bot:{{ tag }}'",
 		"package-all:\n    just package \"quirk-backend-discord-bot\"\n",
 	} {
 		if !strings.Contains(src, want) {

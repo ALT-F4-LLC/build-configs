@@ -38,7 +38,7 @@ var (
 	goServicePrivateModulesPattern = regexp.MustCompile(`^[A-Za-z0-9._~/*,-]+$`)
 
 	// goServiceRepositoryPattern bounds the registry repository the image is
-	// pushed to, such as `quirk-backend-discord-bot`.
+	// pushed to, such as `quirk/backend-discord-bot`.
 	goServiceRepositoryPattern = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$`)
 
 	// goServiceRoleARNPattern, goServiceAccountPattern, goServiceRegionPattern
@@ -76,7 +76,7 @@ type GoServiceConfig struct {
 // image and pushes nothing.
 type GoServiceImageConfig struct {
 	// Repository is the registry repository the image is pushed to, without
-	// the registry host, such as `quirk-backend-discord-bot`.
+	// the registry host, such as `quirk/backend-discord-bot`.
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	// Rootfs is the Vorpal alias of the root filesystem under the services.
 	Rootfs string `json:"rootfs,omitempty" yaml:"rootfs,omitempty"`
@@ -220,7 +220,7 @@ func (c GoServiceConfig) validate() error {
 	}
 	if c.Image.Repository != "" {
 		if !goServiceRepositoryPattern.MatchString(c.Image.Repository) {
-			return fmt.Errorf("image.repository %q must be a lowercase registry path such as quirk-backend-discord-bot", c.Image.Repository)
+			return fmt.Errorf("image.repository %q must be a lowercase registry path such as quirk/backend-discord-bot", c.Image.Repository)
 		}
 		if !goServiceAliasPattern.MatchString(c.Image.Rootfs) {
 			return fmt.Errorf("image.rootfs %q must be a Vorpal alias of the form <name>:<version>", c.Image.Rootfs)
