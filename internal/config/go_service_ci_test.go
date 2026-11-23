@@ -262,11 +262,10 @@ func TestGoServiceCIWithoutImageNeverTouchesRegistry(t *testing.T) {
 	}
 }
 
-// The check job copies the clients and runs the generators before it writes
-// the App token; the build job copies the clients and runs the generators,
-// then packages every artifact, then every service,
+// The check job runs the generators before it writes the App token; the build
+// job runs the generators, then packages every artifact, then every service,
 // then the image, while the token is on disk.
-func TestGoServiceCIOrdersClientsAndPackages(t *testing.T) {
+func TestGoServiceCIOrdersGenerateAndPackages(t *testing.T) {
 	cfg := goServiceBotConfig()
 	cfg.Services = []string{"api", "worker"}
 	cfg.Artifacts = []string{"extra"}
@@ -283,20 +282,20 @@ func TestGoServiceCIOrdersClientsAndPackages(t *testing.T) {
 		}
 		return out
 	}
-	wantCheck := []string{"just secret-scan", "just doc-validate", "just clients", "just generate", "just lint", "just vuln-scan", ciNetrcCleanup}
+	wantCheck := []string{"just secret-scan", "just doc-validate", "just generate", "just lint", "just vuln-scan", ciNetrcCleanup}
 	if got := runs("check"); !slices.Equal(got, wantCheck) {
 		t.Errorf("check runs %q, want %q", got, wantCheck)
 	}
 	token := slices.IndexFunc(wf.Jobs["check"].Steps, func(s goServiceWorkflowStep) bool {
 		return strings.HasPrefix(s.Uses, "actions/create-github-app-token@")
 	})
-	clients := slices.IndexFunc(wf.Jobs["check"].Steps, func(s goServiceWorkflowStep) bool { return s.Run == "just clients" })
-	if token < 0 || clients > token {
-		t.Errorf("check runs just clients at %d, after the App token at %d", clients, token)
+	generate := slices.IndexFunc(wf.Jobs["check"].Steps, func(s goServiceWorkflowStep) bool { return s.Run == "just generate" })
+	if token < 0 || generate < 0 || generate > token {
+		t.Errorf("check runs just generate at %d, after the App token at %d", generate, token)
 	}
 
 	wantBuild := []string{
-		"just clients", "just generate", `just package "extra"`, `just package "api"`, `just package "worker"`, "just package-image",
+		"just generate", `just package "extra"`, `just package "api"`, `just package "worker"`, "just package-image",
 		ciNetrcCleanup, `just push "$REGISTRY" "$TAG"`, `docker logout "$REGISTRY"`,
 	}
 	if got := runs("build"); !slices.Equal(got, wantBuild) {

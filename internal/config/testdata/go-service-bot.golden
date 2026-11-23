@@ -91,8 +91,6 @@ jobs:
         shell: bash .github/vorpal-shell.sh {0}
       - run: just doc-validate
         shell: bash .github/vorpal-shell.sh {0}
-      - run: just clients
-        shell: bash .github/vorpal-shell.sh {0}
       - id: generate-token
         uses: actions/create-github-app-token@v3
         with:
@@ -236,19 +234,6 @@ var services = []string{
 	"quirk-backend-discord-bot",
 }
 
-// client is a Vorpal artifact copied into the source tree before a build.
-type client struct {
-	// artifact wraps alias so `vorpal build --path` can fetch it.
-	artifact string
-	alias    string
-	output   string
-}
-
-var clients = []client{
-	{artifact: "quirk-backend-discord-bot-client-ai", alias: "quirk-lambda-ai-client-go:0.1.0", output: "internal/client_ai"},
-	{artifact: "quirk-backend-discord-bot-client-database", alias: "quirk-lambda-database-client-go:0.1.0", output: "internal/client_database"},
-}
-
 func main() {
 	ctx := config.GetContext()
 
@@ -270,26 +255,10 @@ func main() {
 
 	_, err := language.NewGoDevelopmentEnvironment("quirk-backend-discord-bot-dev", config.SYSTEMS).
 		WithArtifacts(tools).
-		WithEnvironments([]string{"GOPRIVATE=github.com/ALT-F4-LLC/quirk-service-kit"}).
+		WithEnvironments([]string{"GOPRIVATE=github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai,github.com/ALT-F4-LLC/quirk-lambda-database"}).
 		Build(ctx)
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
-	}
-
-	// Each client alias is wrapped in an artifact of its own for `just
-	// clients`, and copied into every service source before the build.
-	var clientArtifacts []*string
-	var clientScripts []string
-	for _, c := range clients {
-		digest, err := ctx.FetchArtifactAlias(c.alias)
-		if err != nil {
-			log.Fatalf("failed fetching %s alias: %v", c.alias, err)
-		}
-		if err := wrapClient(ctx, c.artifact, digest); err != nil {
-			log.Fatalf("failed building %s: %v", c.artifact, err)
-		}
-		clientArtifacts = append(clientArtifacts, digest)
-		clientScripts = append(clientScripts, copyScript(*digest, c.output))
 	}
 
 	// The private module credential goes to the artifact being built and,
@@ -307,10 +276,6 @@ func main() {
 			WithBuildDirectory("cmd/" + service).
 			WithBuildFlags("-ldflags='-s -w'").
 			WithSource(source(service))
-		builder = builder.WithArtifacts(clientArtifacts)
-		for _, script := range clientScripts {
-			builder = builder.WithSourceScript(script)
-		}
 		builder = builder.
 			WithEnvironments(sandbox.environments(service, cgoDisabled)).
 			WithSecrets(sandbox.secretsFor(service))
@@ -346,36 +311,15 @@ func main() {
 
 // source returns the source for the artifact called name: the project root
 // without the dist directory, where `just build` and `just package-image`
-// write, so their output never changes the artifact digest. Client
-// outputs are left out too; the build copies them in from their artifacts.
+// write, so their output never changes the artifact digest.
 func source(name string) *api.ArtifactSource {
 	src := artifact.NewArtifactSource(name, ".").
 		WithExcludes([]string{
 			"dist",
-			"internal/client_ai",
-			"internal/client_database",
 		}).
 		Build()
 
 	return &src
-}
-
-// wrapClient builds the artifact called name, whose output is a copy of the
-// client artifact digest.
-func wrapClient(ctx *config.ConfigContext, name string, digest *string) error {
-	step, err := artifact.Shell(ctx, []*string{digest}, nil,
-		"mkdir -p \"$VORPAL_OUTPUT\"\ncp -R \""+artifact.GetEnvKey(*digest)+"/.\" \"$VORPAL_OUTPUT\"", nil)
-	if err != nil {
-		return err
-	}
-	_, err = artifact.NewArtifact(name, []*api.ArtifactStep{step}, config.SYSTEMS).Build(ctx)
-	return err
-}
-
-// copyScript returns the source script line that copies the client artifact
-// digest into output, relative to the source root.
-func copyScript(digest, output string) string {
-	return "mkdir -p '" + output + "'\ncp -R \"" + artifact.GetEnvKey(digest) + "/.\" '" + output + "'"
 }
 
 // privateModuleSandbox holds what a sandboxed build needs to fetch private Go
@@ -396,7 +340,7 @@ func newPrivateModuleSandbox(target string, credentialed []string) privateModule
 	// The sandbox builds with GOPRIVATE so Go never asks the module proxy or
 	// the checksum database about the private modules.
 	s := privateModuleSandbox{
-		base:         []string{"GOPRIVATE=github.com/ALT-F4-LLC/quirk-service-kit"},
+		base:         []string{"GOPRIVATE=github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai,github.com/ALT-F4-LLC/quirk-lambda-database"},
 		credentialed: credentialed,
 		secrets:      map[string]string{},
 	}
@@ -539,19 +483,7 @@ build service:
         -o 'dist/{{ service }}/{{ service }}' \
         './cmd/{{ service }}'
 
-# clients copies each client artifact into the source tree, as the Vorpal
-# service build does inside its sandbox.
-clients:
-    #!/usr/bin/env bash
-    set -euxo pipefail
-    rm -rf 'internal/client_ai'
-    mkdir -p 'internal/client_ai'
-    cp -R "$(vorpal build --path 'quirk-backend-discord-bot-client-ai')/." 'internal/client_ai'
-    rm -rf 'internal/client_database'
-    mkdir -p 'internal/client_database'
-    cp -R "$(vorpal build --path 'quirk-backend-discord-bot-client-database')/." 'internal/client_database'
-
-check: clients
+check:
     golangci-lint run ./...
 
 # lint runs the linter alone: CI runs it after the generators, with a private

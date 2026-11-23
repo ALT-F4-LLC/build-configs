@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
@@ -26,11 +25,11 @@ const (
 var (
 	// goServiceNamePattern bounds the names that reach shell words, justfile
 	// strings, YAML scalars and Vorpal artifact names: the project name,
-	// services, artifacts and clients.
+	// services and artifacts.
 	goServiceNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 	// goServiceAliasPattern bounds a Vorpal artifact alias, such as
-	// `quirk-lambda-ai-client-go:0.1.0` or `library/linux-vorpal:latest`.
+	// `linux-vorpal:latest` or `library/linux-vorpal:latest`.
 	goServiceAliasPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*:[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 	// goServicePrivateModulesPattern bounds the GOPRIVATE glob list, which
@@ -57,27 +56,11 @@ type GoServiceConfig struct {
 	Generate []string `json:"generate,omitempty" yaml:"generate,omitempty"`
 	// Artifacts are extra Vorpal artifact names that the CI build job builds
 	// with `just package <name>`.
-	Artifacts []string `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
-	// Clients are Vorpal artifacts, such as generated API clients, copied
-	// into the source tree before every build.
-	Clients []GoServiceClientConfig `json:"clients,omitempty" yaml:"clients,omitempty"`
-	Image   GoServiceImageConfig    `json:"image,omitempty" yaml:"image,omitempty"`
+	Artifacts []string             `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
+	Image     GoServiceImageConfig `json:"image,omitempty" yaml:"image,omitempty"`
 	// Vorpal takes the same options as go-lambda's: extension, script, tools,
 	// excludeTools and includes.
 	Vorpal GoLambdaVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
-}
-
-// GoServiceClientConfig names one Vorpal artifact that the service source
-// needs but the repository does not commit.
-type GoServiceClientConfig struct {
-	// Name identifies the client; the wrapper artifact is
-	// <project>-client-<name>.
-	Name string `json:"name" yaml:"name"`
-	// Alias is the Vorpal artifact alias whose output holds the client files.
-	Alias string `json:"alias" yaml:"alias"`
-	// Output is the directory, relative to the repository root, the files are
-	// copied into. `just clients` deletes it first.
-	Output string `json:"output" yaml:"output"`
 }
 
 // GoServiceImageConfig turns on the OCI image. An empty Repository builds no
@@ -124,12 +107,6 @@ func (c GoServiceConfig) ImageArtifact() string {
 	return c.Name + "-image"
 }
 
-// ClientArtifact returns the Vorpal artifact name that wraps a client alias,
-// so `vorpal build --path` can fetch it.
-func (c GoServiceConfig) ClientArtifact(client GoServiceClientConfig) string {
-	return c.Name + "-client-" + client.Name
-}
-
 // PushIf is the step condition for the registry login and push: pushes to
 // main only, never a pull request.
 func (c GoServiceConfig) PushIf() string {
@@ -146,9 +123,6 @@ func (c GoServiceConfig) PushIfAlways() string {
 // space, or the empty string.
 func (c GoServiceConfig) CheckDeps() string {
 	var deps []string
-	if len(c.Clients) > 0 {
-		deps = append(deps, "clients")
-	}
 	if len(c.Generate) > 0 {
 		deps = append(deps, "generate")
 	}
@@ -198,43 +172,6 @@ func (c GoServiceConfig) validate() error {
 		}
 	}
 
-	// `just clients` runs rm -rf on each output, so no output may hold or sit
-	// inside a path the build needs, or overlap another output.
-	reserved := []string{"cmd", "dist", ".github", "go.mod", "go.sum", "justfile", "Vorpal.toml", "Vorpal.lock", "build-configs.yaml"}
-	var outputs []string
-	for _, client := range c.Clients {
-		if !goServiceNamePattern.MatchString(client.Name) {
-			return fmt.Errorf("client name %q must be lowercase letters, digits, _ and -, starting with a letter or digit", client.Name)
-		}
-		if !goServiceAliasPattern.MatchString(client.Alias) {
-			return fmt.Errorf("client %q alias %q must be a Vorpal alias of the form <name>:<version>", client.Name, client.Alias)
-		}
-		if !openAPIOutputPattern.MatchString(client.Output) || slices.Contains(strings.Split(client.Output, "/"), "..") ||
-			slices.Contains(strings.Split(client.Output, "/"), ".") {
-			return fmt.Errorf("client %q output %q must be a relative path of letters, digits, _, ., / and -, with no . or .. segment", client.Name, client.Output)
-		}
-		if strings.HasSuffix(client.Output, "/") || strings.Contains(client.Output, "//") {
-			return fmt.Errorf("client %q output %q must have no trailing slash or empty segment", client.Name, client.Output)
-		}
-		// Compare case-insensitively: on a case-insensitive filesystem,
-		// rm -rf 'Cmd' deletes cmd.
-		output := strings.ToLower(client.Output)
-		for _, path := range reserved {
-			if goServicePathsOverlap(output, strings.ToLower(path)) {
-				return fmt.Errorf("client %q output %q overlaps %s, which `just clients` would delete", client.Name, client.Output, path)
-			}
-		}
-		for _, other := range outputs {
-			if goServicePathsOverlap(output, other) {
-				return fmt.Errorf("client output %q overlaps client output %q", client.Output, other)
-			}
-		}
-		outputs = append(outputs, output)
-		if err := claim(c.ClientArtifact(client), "a client"); err != nil {
-			return err
-		}
-	}
-
 	if c.Image.Repository != "" {
 		if !goServiceRepositoryPattern.MatchString(c.Image.Repository) {
 			return fmt.Errorf("image.repository %q must be a lowercase registry path such as quirk/backend-discord-bot", c.Image.Repository)
@@ -254,12 +191,6 @@ func (c GoServiceConfig) validate() error {
 	}
 
 	return nil
-}
-
-// goServicePathsOverlap reports whether slash-separated relative paths a and b
-// are equal or one lies inside the other.
-func goServicePathsOverlap(a, b string) bool {
-	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }
 
 func (c GoServiceConfig) renderMap() templates.RenderMap {

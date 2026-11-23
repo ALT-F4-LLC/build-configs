@@ -12,19 +12,6 @@ build service:
         -o 'dist/{{"{{"}} service {{"}}"}}/{{"{{"}} service {{"}}"}}' \
         './cmd/{{"{{"}} service {{"}}"}}'
 
-{{ if .Clients -}}
-# clients copies each client artifact into the source tree, as the Vorpal
-# service build does inside its sandbox.
-clients:
-    #!/usr/bin/env bash
-    set -euxo pipefail
-    {{- range .Clients }}
-    rm -rf '{{ .Output }}'
-    mkdir -p '{{ .Output }}'
-    cp -R "$(vorpal build --path '{{ $.ClientArtifact . }}')/." '{{ .Output }}'
-    {{- end }}
-
-{{ end -}}
 {{ if .Generate -}}
 generate:
     #!/usr/bin/env bash

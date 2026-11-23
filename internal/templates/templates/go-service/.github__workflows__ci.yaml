@@ -30,10 +30,6 @@ jobs:
         shell: bash .github/vorpal-shell.sh {0}
       {{- end }}
       {{- if .PrivateModules }}
-      {{- if .Clients }}
-      - run: just clients
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
       {{- if .Generate }}
       - run: just generate
         shell: bash .github/vorpal-shell.sh {0}
@@ -82,10 +78,6 @@ jobs:
     runs-on: altf4llc
     steps:
       - uses: actions/checkout@v7
-      {{- if and .Clients .Generate }}
-      - run: just clients
-        shell: bash .github/vorpal-shell.sh {0}
-      {{- end }}
       {{- if .Generate }}
       - run: just generate
         shell: bash .github/vorpal-shell.sh {0}

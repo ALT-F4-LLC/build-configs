@@ -408,8 +408,8 @@ pushes to a container registry from `main`. It follows `go-lambda`'s
 conventions for the fork guard, permissions, scans and the private module
 credential, and takes the same `lint`, `privateModules`, `generate`,
 `artifacts` and `vorpal` options (`extension`, `script`, `tools`,
-`excludeTools` and `includes`). The project name, services, artifacts and
-client names must be lowercase letters, digits, `_` and `-`, and
+`excludeTools` and `includes`). The project name, services and artifacts
+must be lowercase letters, digits, `_` and `-`, and
 `privateModules` a comma-separated list of module path globs. The template
 does not scaffold `cmd/<name>/main.go`. See
 [`examples/go-service`](./examples/go-service/build-configs.yaml).
@@ -419,22 +419,11 @@ does not scaffold `cmd/<name>/main.go`. See
   `go install`, and `package <name>` runs `vorpal build --path <name>` on a
   service or an `artifacts` entry. Every service builds with `CGO_ENABLED=0`
   and `-ldflags='-s -w'`.
-- `clients` lists Vorpal artifacts that the source needs but the repository
-  does not commit, such as generated API clients. Each entry has a `name`, an
-  `alias` of the form `<name>:<version>`, and an `output` directory relative
-  to the repository root. The Vorpal program wraps each alias in an artifact
-  called `<name>-client-<client>` and copies it into `output` inside every
-  service build. Each service source excludes the `output` directories, so a
-  local copy never changes the artifact digest. `just clients` deletes each
-  `output` and copies the client into it, so an `output` may not overlap
-  another, `cmd`, `dist`, `.github`, or a top-level build file; `check`
-  depends on `clients`. CI runs `just clients` before it writes the GitHub
-  App token. That needs no cross-repository checkout token only when each
-  alias is already published where the runner's Vorpal registry resolves it;
-  a client built from a sibling repository in the same run needs its own
-  step. Add each `output` to the project's `.gitignore`. A
-  `vorpal.extension` `Go` hook must not call `WithArtifacts`: it replaces the
-  client artifacts while their copy scripts remain, and the build then fails.
+- `privateModules` is also how a service gets API clients and other shared
+  code: import them with `go get` as Go modules and list their repositories,
+  such as
+  `github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai`.
+  Every build reads them through `GOPRIVATE` and the `~/.netrc` credential.
 - `image.repository` turns on the image, such as `quirk/backend-discord-bot`,
   without the registry host. The Vorpal program builds `<name>-image` for
   Linux targets only, from the `image.rootfs` alias (default
@@ -445,11 +434,11 @@ does not scaffold `cmd/<name>/main.go`. See
   commit, and removes both local tags on exit. Log in to the registry first.
 
 The CI `check` job runs `secret-scan` and `doc-validate`, then, with
-`privateModules`, `clients` and `generate`, writes the GitHub App token to
-`~/.netrc`, runs `lint` and `vuln-scan`, and always removes `~/.netrc`.
-Without `privateModules` it runs `just check` and `vuln-scan`. The `build` job
-needs `check`, runs `clients` when `generate` is set and then `generate`,
-writes `~/.netrc`, runs `just package` for every artifact and service and
+`privateModules`, runs `generate`, writes the GitHub App token to `~/.netrc`,
+runs `lint` and `vuln-scan`, and always removes `~/.netrc`. Without
+`privateModules` it runs `just check` and `vuln-scan`. The `build` job needs
+`check`, runs `generate`, writes `~/.netrc`, runs `just package` for every
+artifact and service and
 `just package-image`, then always removes `~/.netrc`. Building the image under
 the image artifact gives every service the private module credential, as
 building a service alone does. The Vorpal agent seals each secret afresh per

@@ -36,22 +36,6 @@ var services = []string{
 	{{ printf "%q" . }},
 {{- end }}
 }
-{{- if .Clients }}
-
-// client is a Vorpal artifact copied into the source tree before a build.
-type client struct {
-	// artifact wraps alias so `vorpal build --path` can fetch it.
-	artifact string
-	alias    string
-	output   string
-}
-
-var clients = []client{
-{{- range .Clients }}
-	{artifact: {{ printf "%q" ($.ClientArtifact .) }}, alias: {{ printf "%q" .Alias }}, output: {{ printf "%q" .Output }}},
-{{- end }}
-}
-{{- end }}
 
 func main() {
 	ctx := config.GetContext()
@@ -80,24 +64,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed building development environment: %v", err)
 	}
-{{- if .Clients }}
-
-	// Each client alias is wrapped in an artifact of its own for `just
-	// clients`, and copied into every service source before the build.
-	var clientArtifacts []*string
-	var clientScripts []string
-	for _, c := range clients {
-		digest, err := ctx.FetchArtifactAlias(c.alias)
-		if err != nil {
-			log.Fatalf("failed fetching %s alias: %v", c.alias, err)
-		}
-		if err := wrapClient(ctx, c.artifact, digest); err != nil {
-			log.Fatalf("failed building %s: %v", c.artifact, err)
-		}
-		clientArtifacts = append(clientArtifacts, digest)
-		clientScripts = append(clientScripts, copyScript(*digest, c.output))
-	}
-{{- end }}
 {{- if .PrivateModules }}
 
 	// The private module credential goes to the artifact being built and,
@@ -127,12 +93,6 @@ func main() {
 			WithBuildDirectory("cmd/" + service).
 			WithBuildFlags("-ldflags='-s -w'").
 			WithSource(source(service))
-{{- if .Clients }}
-		builder = builder.WithArtifacts(clientArtifacts)
-		for _, script := range clientScripts {
-			builder = builder.WithSourceScript(script)
-		}
-{{- end }}
 {{- if .PrivateModules }}
 		builder = builder.
 			WithEnvironments(sandbox.environments(service, cgoDisabled)).
@@ -186,15 +146,11 @@ func main() {
 
 // source returns the source for the artifact called name: the project root
 // without the dist directory, where `just build` and `just package-image`
-// write, so their output never changes the artifact digest.{{ if .Clients }} Client
-// outputs are left out too; the build copies them in from their artifacts.{{ end }}
+// write, so their output never changes the artifact digest.
 func source(name string) *api.ArtifactSource {
 	src := artifact.NewArtifactSource(name, ".").
 		WithExcludes([]string{
 			"dist",
-{{- range .Clients }}
-			{{ printf "%q" .Output }},
-{{- end }}
 		}).
 {{- if .Vorpal.Includes }}
 		WithIncludes([]string{
@@ -207,26 +163,6 @@ func source(name string) *api.ArtifactSource {
 
 	return &src
 }
-{{- if .Clients }}
-
-// wrapClient builds the artifact called name, whose output is a copy of the
-// client artifact digest.
-func wrapClient(ctx *config.ConfigContext, name string, digest *string) error {
-	step, err := artifact.Shell(ctx, []*string{digest}, nil,
-		"mkdir -p \"$VORPAL_OUTPUT\"\ncp -R \""+artifact.GetEnvKey(*digest)+"/.\" \"$VORPAL_OUTPUT\"", nil)
-	if err != nil {
-		return err
-	}
-	_, err = artifact.NewArtifact(name, []*api.ArtifactStep{step}, config.SYSTEMS).Build(ctx)
-	return err
-}
-
-// copyScript returns the source script line that copies the client artifact
-// digest into output, relative to the source root.
-func copyScript(digest, output string) string {
-	return "mkdir -p '" + output + "'\ncp -R \"" + artifact.GetEnvKey(digest) + "/.\" '" + output + "'"
-}
-{{- end }}
 {{- if .PrivateModules }}
 
 // privateModuleSandbox holds what a sandboxed build needs to fetch private Go
