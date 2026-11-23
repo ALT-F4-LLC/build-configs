@@ -7,9 +7,10 @@ import (
 )
 
 // The go-service snapshots pin every rendered file: the defaults, and the
-// shape of quirk-backend-discord-bot (two clients, an image pushed from main,
-// and the default private module). They reuse the -update flag and the
-// snapshot helpers from terraform_module_snapshot_test.go.
+// shape of quirk-backend-discord-bot (one service, an image pushed from main,
+// and private modules for the service kit and both client modules). They
+// reuse the -update flag and the snapshot helpers from
+// terraform_module_snapshot_test.go.
 func TestGoServiceSnapshot(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

@@ -45,6 +45,7 @@ func TestGoServiceGeneratesFromBuildConfigsYAML(t *testing.T) {
 	yaml := `name: quirk-backend-discord-bot
 template: go-service
 parameters:
+  privateModules: github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai
   image:
     repository: quirk/backend-discord-bot
 `
@@ -69,8 +70,8 @@ parameters:
 	if svc.Image.Rootfs != goServiceDefaultRootfs {
 		t.Errorf("image.rootfs = %q, want the default %q kept beside image.repository", svc.Image.Rootfs, goServiceDefaultRootfs)
 	}
-	if svc.PrivateModules != "github.com/ALT-F4-LLC/quirk-service-kit" {
-		t.Errorf("privateModules = %q, want the go-lambda default", svc.PrivateModules)
+	if svc.PrivateModules != "github.com/ALT-F4-LLC/quirk-service-kit,github.com/ALT-F4-LLC/quirk-lambda-ai" {
+		t.Errorf("privateModules = %q, want the build-configs.yaml list", svc.PrivateModules)
 	}
 	if err := tpl.Render(); err != nil {
 		t.Fatalf("Render: %v", err)
@@ -108,6 +109,8 @@ func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 		{"image repository uppercase", func(c *GoServiceConfig) { c.Image.Repository = "Quirk/Bot" }, "image.repository"},
 		{"image repository with host", func(c *GoServiceConfig) { c.Image.Repository = "registry:5000/bot" }, "image.repository"},
 		{"image rootfs", func(c *GoServiceConfig) { c.Image.Repository = "quirk/bot"; c.Image.Rootfs = "" }, "image.rootfs"},
+		{"image rootfs without version", func(c *GoServiceConfig) { c.Image.Repository = "quirk/bot"; c.Image.Rootfs = "linux-vorpal" }, "image.rootfs"},
+		{"image rootfs with quote", func(c *GoServiceConfig) { c.Image.Repository = "quirk/bot"; c.Image.Rootfs = `a:1"` }, "image.rootfs"},
 		{"image name collides", func(c *GoServiceConfig) {
 			c.Image.Repository = "quirk/bot"
 			c.Services = []string{"demo-image"}
@@ -240,6 +243,17 @@ func TestGoServiceJustfileRecipes(t *testing.T) {
 	}
 	if !strings.Contains(src, "check:\n") {
 		t.Errorf("default check recipe has dependencies:\n%s", src)
+	}
+
+	// CI without privateModules runs only `just check`, so check must run
+	// the generators.
+	cfg.Generate = []string{"just gen"}
+	goServiceRender(t, cfg)
+	src = goLambdaReadFile(t, "justfile")
+	for _, want := range []string{"check: generate\n", "generate:\n    #!/usr/bin/env bash\n    set -euxo pipefail\n    just gen\n"} {
+		if !strings.Contains(src, want) {
+			t.Errorf("justfile with generate does not contain %q:\n%s", want, src)
+		}
 	}
 }
 
