@@ -416,4 +416,36 @@ func TestGoServicePrivateModuleScriptScopesUmask(t *testing.T) {
 	if want := "machine github.com login app password tok\n"; string(content) != want {
 		t.Errorf(".netrc = %q, want %q", content, want)
 	}
+
+	// A missing secret file, or a .netrc the script cannot write, fails the
+	// script; errexit is off inside the subshell, so each command carries its
+	// own exit.
+	for name, prepare := range map[string]func(t *testing.T){
+		"missing password": func(t *testing.T) {
+			if err := os.Remove(filepath.Join(secrets, "NETRC_PASSWORD")); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"unwritable netrc": func(t *testing.T) {
+			if err := os.Mkdir(netrc, 0o700); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := os.RemoveAll(netrc); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(secrets, "NETRC_PASSWORD"), []byte("tok"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			prepare(t)
+			cmd := exec.Command("bash", "-c", "set -euo pipefail\n"+script+"\necho reached") //nolint:gosec // runs the script the test itself rendered
+			cmd.Env = append(os.Environ(), "VORPAL_SECRET_DIR="+secrets, "VORPAL_WORKSPACE="+workspace)
+			out, err := cmd.CombinedOutput()
+			if err == nil || strings.Contains(string(out), "reached") {
+				t.Errorf("script succeeded, want failure:\n%s", out)
+			}
+		})
+	}
 }

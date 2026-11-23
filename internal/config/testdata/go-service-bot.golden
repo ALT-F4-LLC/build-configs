@@ -435,8 +435,8 @@ func newPrivateModuleSandbox(target string, credentialed []string) privateModule
 		"umask 077\n" +
 		"netrc_login=\"$(<\"$VORPAL_SECRET_DIR/NETRC_USERNAME\")\" || exit 1\n" +
 		"netrc_password=\"$(<\"$VORPAL_SECRET_DIR/NETRC_PASSWORD\")\" || exit 1\n" +
-		"printf 'machine github.com login %s password %s\\n' \"$netrc_login\" \"$netrc_password\" > \"$VORPAL_WORKSPACE/.netrc\"\n" +
-		"chmod 600 \"$VORPAL_WORKSPACE/.netrc\"\n" +
+		"printf 'machine github.com login %s password %s\\n' \"$netrc_login\" \"$netrc_password\" > \"$VORPAL_WORKSPACE/.netrc\" || exit 1\n" +
+		"chmod 600 \"$VORPAL_WORKSPACE/.netrc\" || exit 1\n" +
 		") || exit 1"
 
 	return s
