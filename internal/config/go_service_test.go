@@ -164,6 +164,32 @@ func TestGoServiceRenderRejectsInvalidConfig(t *testing.T) {
 			c.Image.RoleARN = goServiceBotRoleARN
 			c.Image.GithubEnvironment = "prod env"
 		}, "image.githubEnvironment"},
+		{"image environment leading dash", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
+			c.Image.GithubEnvironment = "-x"
+		}, "image.githubEnvironment"},
+		{"image environment with expression", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
+			c.Image.GithubEnvironment = "${{ x }}"
+		}, "image.githubEnvironment"},
+		{"image region with newline", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
+			c.Image.Region = "us-west-2\nx: y"
+		}, "image.region"},
+		{"image account not digits", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = goServiceBotRoleARN
+			c.Image.Account = "abcdefghijkl"
+		}, "image.account"},
+		{"image role in china partition", func(c *GoServiceConfig) {
+			c.Image.Repository = "quirk/bot"
+			c.Image.RoleARN = "arn:aws-cn:iam::677459762413:role/x"
+		}, "image.roleArn"},
+		{"role without repository", func(c *GoServiceConfig) { c.Image.RoleARN = goServiceBotRoleARN }, "image.repository"},
+		{"environment without repository", func(c *GoServiceConfig) { c.Image.GithubEnvironment = "production" }, "image.repository"},
 		{"empty include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"cmd", ""} }, "vorpal.includes"},
 		{"dot-slash include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"./cmd"} }, "vorpal.includes"},
 		{"absolute include", func(c *GoServiceConfig) { c.Vorpal.Includes = []string{"/etc"} }, "vorpal.includes"},
@@ -467,6 +493,28 @@ func TestGoServiceVorpalSourceIsAllowlisted(t *testing.T) {
 			}
 			if !slices.Equal(excludes, []string{"dist"}) {
 				t.Errorf("source excludes = %q, want [dist]", excludes)
+			}
+		})
+	}
+}
+
+// Valid AWS inputs beyond the bot's pass validation.
+func TestGoServiceAcceptsAWSInputs(t *testing.T) {
+	cases := map[string]func(*GoServiceConfig){
+		"govcloud role and region": func(c *GoServiceConfig) {
+			c.Image.RoleARN = "arn:aws-us-gov:iam::123456789012:role/x"
+			c.Image.Region = "us-gov-west-1"
+		},
+		"role with path":  func(c *GoServiceConfig) { c.Image.RoleARN = "arn:aws:iam::123456789012:role/ci/push-image" },
+		"region ap":       func(c *GoServiceConfig) { c.Image.Region = "ap-southeast-1" },
+		"environment set": func(c *GoServiceConfig) { c.Image.GithubEnvironment = "prod_1-a" },
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := goServiceBotConfig()
+			mutate(&cfg)
+			if err := cfg.validate(); err != nil {
+				t.Errorf("validate = %v, want nil", err)
 			}
 		})
 	}

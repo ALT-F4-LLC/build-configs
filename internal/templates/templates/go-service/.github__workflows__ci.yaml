@@ -118,12 +118,14 @@ jobs:
   push:
     if: {{ .PushJobIf }}
     # One push per ref at a time, so two pushes to main never load, tag and
-    # push their images through the runner's Docker daemon together.
+    # push their images through the runner's Docker daemon together; queue: max
+    # keeps every pending push, so no main commit goes without an image.
     concurrency:
       group: push-${{"{{"}} github.ref {{"}}"}}
       cancel-in-progress: false
+      queue: max
     {{- if .Image.GithubEnvironment }}
-    environment: {{ .Image.GithubEnvironment }}
+    environment: "{{ .Image.GithubEnvironment }}"
     {{- end }}
     needs:
       - build
@@ -139,6 +141,10 @@ jobs:
         with:
           name: image
           path: dist/{{ .ImageArtifact }}
+      # Build the Vorpal development environment before the role session
+      # starts, so its 15 minutes cover only the login and the push.
+      - run: just --version
+        shell: bash .github/vorpal-shell.sh {0}
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: {{ .Image.Region }}

@@ -44,10 +44,10 @@ var (
 	// goServiceRoleARNPattern, goServiceAccountPattern, goServiceRegionPattern
 	// and goServiceEnvironmentPattern bound the AWS push inputs, which reach
 	// YAML scalars in the generated workflow.
-	goServiceRoleARNPattern     = regexp.MustCompile(`^arn:aws[a-z-]*:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$`)
+	goServiceRoleARNPattern     = regexp.MustCompile(`^arn:aws(-us-gov)?:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$`)
 	goServiceAccountPattern     = regexp.MustCompile(`^[0-9]{12}$`)
 	goServiceRegionPattern      = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]$`)
-	goServiceEnvironmentPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	goServiceEnvironmentPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 )
 
 // GoServiceConfig renders a Go service repository: long-running binaries
@@ -215,6 +215,9 @@ func (c GoServiceConfig) validate() error {
 		}
 	}
 
+	if c.Image.Repository == "" && (c.Image.RoleARN != "" || c.Image.GithubEnvironment != "") {
+		return errors.New("image.roleArn and image.githubEnvironment take effect only with image.repository; set it or remove them")
+	}
 	if c.Image.Repository != "" {
 		if !goServiceRepositoryPattern.MatchString(c.Image.Repository) {
 			return fmt.Errorf("image.repository %q must be a lowercase registry path such as quirk/backend-discord-bot", c.Image.Repository)
@@ -232,7 +235,7 @@ func (c GoServiceConfig) validate() error {
 			return fmt.Errorf("image.region %q must be an AWS region such as us-west-2", c.Image.Region)
 		}
 		if c.Image.GithubEnvironment != "" && !goServiceEnvironmentPattern.MatchString(c.Image.GithubEnvironment) {
-			return fmt.Errorf("image.githubEnvironment %q must be letters, digits, _ and -", c.Image.GithubEnvironment)
+			return fmt.Errorf("image.githubEnvironment %q must start with a letter and hold only letters, digits, _ and -", c.Image.GithubEnvironment)
 		}
 		if err := claim(c.ImageArtifact(), "the image"); err != nil {
 			return err

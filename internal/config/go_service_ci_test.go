@@ -172,11 +172,11 @@ func TestGoServiceCIKeepsSecretsOutOfRunLines(t *testing.T) {
 
 // The build job uploads the image tarball only for pushes to main, after the
 // netrc cleanup, and touches neither AWS nor Docker. The push job runs only
-// for pushes to main, needs build, assumes the configured role through OIDC
-// for 15 minutes, logs in with no static credential to the computed ECR
-// registry from a per-job DOCKER_CONFIG, pushes, and always logs out. It
-// holds no App token, netrc or build step, and one push per ref runs at a
-// time.
+// for pushes to main and needs build. It builds the Vorpal shell, then
+// assumes the configured role through OIDC for 15 minutes, logs in with no
+// static credential to the computed ECR registry from a per-job
+// DOCKER_CONFIG, pushes, and always logs out. It holds no App token, netrc,
+// generator or service build, and pushes per ref queue one at a time.
 func TestGoServiceCIPushesImageFromMainOnly(t *testing.T) {
 	for name, cfg := range goServiceCIConfigs() {
 		c := cfg()
@@ -222,6 +222,9 @@ func goServiceCheckPushGating(t *testing.T, wf goServiceWorkflow, c GoServiceCon
 	if got := build[upload].With["path"]; got != "dist/"+c.ImageArtifact()+"/image.tar" {
 		t.Errorf("upload path = %q", got)
 	}
+	if build[upload].With["retention-days"] != "1" {
+		t.Errorf("upload retention-days = %q, want 1", build[upload].With["retention-days"])
+	}
 	if build[upload].With["if-no-files-found"] != "error" {
 		t.Errorf("upload if-no-files-found = %q, want error", build[upload].With["if-no-files-found"])
 	}
@@ -246,14 +249,14 @@ func goServiceCheckPushGating(t *testing.T, wf goServiceWorkflow, c GoServiceCon
 	if !slices.Equal(push.Needs, []string{"build"}) {
 		t.Errorf("push needs = %q, want [build]", push.Needs)
 	}
-	if push.Concurrency["group"] != "push-${{ github.ref }}" || push.Concurrency["cancel-in-progress"] != false {
-		t.Errorf("push concurrency = %v, want group push-${{ github.ref }} without cancel-in-progress", push.Concurrency)
+	if push.Concurrency["group"] != "push-${{ github.ref }}" || push.Concurrency["cancel-in-progress"] != false || push.Concurrency["queue"] != "max" {
+		t.Errorf("push concurrency = %v, want group push-${{ github.ref }}, no cancel-in-progress, queue max", push.Concurrency)
 	}
 	if push.Environment != c.Image.GithubEnvironment {
 		t.Errorf("push environment = %q, want %q", push.Environment, c.Image.GithubEnvironment)
 	}
 	steps := push.Steps
-	want := []string{"actions/checkout@", "actions/download-artifact@", goServiceAWSAction, goServiceRegistryLogin, `just push "$REGISTRY" "$TAG"`, `docker logout "$REGISTRY"`}
+	want := []string{"actions/checkout@", "actions/download-artifact@", "just --version", goServiceAWSAction, goServiceRegistryLogin, `just push "$REGISTRY" "$TAG"`, `docker logout "$REGISTRY"`}
 	if len(steps) != len(want) {
 		t.Fatalf("push steps = %+v, want %q", steps, want)
 	}
@@ -265,32 +268,32 @@ func goServiceCheckPushGating(t *testing.T, wf goServiceWorkflow, c GoServiceCon
 	if steps[1].With["name"] != build[upload].With["name"] || steps[1].With["path"] != "dist/"+c.ImageArtifact() {
 		t.Errorf("download with = %v, want the uploaded artifact in dist/%s", steps[1].With, c.ImageArtifact())
 	}
-	creds := steps[2].With
+	creds := steps[3].With
 	wantCreds := map[string]string{"aws-region": c.Image.Region, "role-duration-seconds": "900", "role-to-assume": c.Image.RoleARN}
 	if !maps.Equal(creds, wantCreds) {
 		t.Errorf("configure-aws-credentials with = %v, want %v", creds, wantCreds)
 	}
-	if !maps.Equal(steps[3].With, map[string]string{"logout": "true", "registry": registry}) {
-		t.Errorf("registry login with = %v, want logout and registry %s only", steps[3].With, registry)
+	if !maps.Equal(steps[4].With, map[string]string{"logout": "true", "registry": registry}) {
+		t.Errorf("registry login with = %v, want logout and registry %s only", steps[4].With, registry)
 	}
-	for _, i := range []int{3, 4, 5} {
+	for _, i := range []int{4, 5, 6} {
 		if got := steps[i].Env["DOCKER_CONFIG"]; got != "${{ runner.temp }}/docker" {
 			t.Errorf("push step %d DOCKER_CONFIG = %q, want ${{ runner.temp }}/docker", i, got)
 		}
 	}
-	for _, i := range []int{4, 5} {
+	for _, i := range []int{5, 6} {
 		if got := steps[i].Env["REGISTRY"]; got != registry {
 			t.Errorf("push step %d REGISTRY = %q, want %s", i, got, registry)
 		}
 	}
-	if got := steps[4].Env["TAG"]; got != "${{ github.sha }}" {
+	if got := steps[5].Env["TAG"]; got != "${{ github.sha }}" {
 		t.Errorf("push env TAG = %q", got)
 	}
-	if steps[5].If != "always()" {
-		t.Errorf("logout if = %q, want always()", steps[5].If)
+	if steps[6].If != "always()" {
+		t.Errorf("logout if = %q, want always()", steps[6].If)
 	}
 	for i, step := range steps {
-		if i != 5 && step.If != "" {
+		if i != 6 && step.If != "" {
 			t.Errorf("push step %d if = %q; the job if gates the push", i, step.If)
 		}
 	}

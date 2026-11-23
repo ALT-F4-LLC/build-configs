@@ -470,30 +470,37 @@ separate `push` job then runs only when
 `github.event_name == 'push' && github.ref == 'refs/heads/main'`, so a pull
 request builds the image but never requests an AWS credential or pushes. The
 `push` job needs `build` and is the only job with `id-token: write`. It holds
-no GitHub App token and runs no generator or Vorpal build, then:
+no GitHub App token and runs no generator or service build; its only Vorpal
+build is the development environment behind `.github/vorpal-shell.sh`, which
+runs the repository's `cmd/vorpal` program. It then:
 
 1. downloads the tarball;
-2. assumes `image.roleArn` in `image.region` for 900 seconds with
+2. builds the development environment with `just --version`, so the role
+   session covers only the login and the push;
+3. assumes `image.roleArn` in `image.region` for 900 seconds with
    `aws-actions/configure-aws-credentials`;
-3. logs in to `<image.account>.dkr.ecr.<image.region>.amazonaws.com` with
+4. logs in to `<image.account>.dkr.ecr.<image.region>.amazonaws.com` with
    `docker/login-action`, which fetches the ECR token with those credentials
    and passes it on stdin;
-4. pushes `${{ github.sha }}` with `just push`;
-5. runs `docker logout` on every outcome.
+5. pushes `${{ github.sha }}` with `just push`;
+6. runs `docker logout` on every outcome.
 
 The Docker steps set `DOCKER_CONFIG` to `${{ runner.temp }}/docker`, so the
 credential never reaches the runner's shared `~/.docker/config.json`; a
 credential helper on the runner's `PATH` would still receive it. The `push`
-job carries a `concurrency` group per ref without `cancel-in-progress`, so two
-pushes to `main` never tag and push through the runner's Docker daemon at
-once. GitHub keeps one pending run per group, so when three pushes land in
-quick succession the middle one is cancelled and its commit gets no image tag.
-No `run:` line carries a GitHub expression. Every job carries the fork guard,
-and `check` and `build` have `permissions: contents: read` only.
+job carries a `concurrency` group per ref with `queue: max` and without
+`cancel-in-progress`, so pushes to `main` run one at a time through the
+runner's Docker daemon and every commit gets its image tag. No `run:` line
+carries a GitHub expression. Every job carries the fork guard, and `check` and
+`build` have `permissions: contents: read` only.
 
-- `image.roleArn` is required with `image.repository`; there is no default
-  role name. `image.account` defaults to `677459762413` and `image.region` to
-  `us-west-2`.
+- `image.roleArn` is required with `image.repository`, and set without it is
+  an error; there is no default role name. Only the `aws` and `aws-us-gov`
+  partitions are accepted.
+- `image.account` defaults to `677459762413` and `image.region` to
+  `us-west-2`. Quote `image.account` in YAML so it stays a string. The
+  account is not read from `image.roleArn`: a role in another account pushes
+  to `image.account`, which then needs a repository policy granting it.
 - `image.githubEnvironment` runs the `push` job in that GitHub environment.
 - The job `if` is not a security boundary against a same-repository pull
   request that edits the workflow; the role's trust policy is. It must use
@@ -501,11 +508,16 @@ and `check` and `build` have `permissions: contents: read` only.
   `sts.amazonaws.com` and on `token.actions.githubusercontent.com:sub` =
   `repo:<owner>/<repo>:ref:refs/heads/main`. With `image.githubEnvironment`
   the subject is `repo:<owner>/<repo>:environment:<name>` instead, so a policy
-  pinned to the ref stops matching; limit that environment to `main`.
-- The role needs `ecr:GetAuthorizationToken`, plus
+  pinned to the ref stops matching. Give that environment a deployment-branch
+  rule limiting it to `main`: without one, a workflow on any branch that
+  names the environment gets the same subject. An organization or repository
+  with a customized OIDC subject template issues a different `sub`.
+- The role needs `ecr:GetAuthorizationToken` on `Resource: "*"`, plus
   `ecr:BatchCheckLayerAvailability`, `ecr:InitiateLayerUpload`,
   `ecr:UploadLayerPart`, `ecr:CompleteLayerUpload` and `ecr:PutImage` on the
-  one repository. The template creates neither the role nor the repository.
+  one repository. The repository must already exist as `image.repository` in
+  `image.account` and `image.region`; the template creates neither it nor the
+  role.
 
 The generated `cmd/vorpal/main.go` needs the Vorpal Go SDK at or after
 `v0.0.0-20260915234803-77ac6ad903ae` to compile, and at or after
