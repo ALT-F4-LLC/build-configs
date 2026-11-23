@@ -80,10 +80,11 @@ Every Go template's `justfile` carries the recipes this repository's own
   `dist/<profile>/<profile>`, with `-tags lambda.norpc` for lambdas only,
   `package` builds the Vorpal artifact and zips it as `bootstrap`, and
   `package-all` packages every lambda. There is no native packaging recipe.
-  `go-cobra-cli` and `go-lambda` CI run the Vorpal package recipes and never
-  `build`, which stays a local recipe; `go-library` CI runs neither, because
-  every CI step already builds the development environment that its
-  `package` builds. Add `dist/` to the project's
+  `go-service` is described under [`go-service`](#go-service).
+  `go-cobra-cli`, `go-lambda` and `go-service` CI run the Vorpal package
+  recipes and never `build`, which stays a local recipe; `go-library` CI runs
+  neither, because every CI step already builds the development environment
+  that its `package` builds. Add `dist/` to the project's
   `.gitignore`. Vorpal does not read `.gitignore`, so the `go-lambda` Vorpal
   program excludes the top-level `dist/` directory from every lambda and
   service source itself, and files an earlier `build` or `package` wrote there
@@ -141,7 +142,7 @@ parameters:
 
 Every generated workflow runs all of its checks as steps of one `check` job,
 in this order: `secret-scan`, `doc-validate`, `check` (`lint` in `go-lambda`
-with `privateModules`), then `vuln-scan`. `terraform` and `terraform-module`
+and `go-service` with `privateModules`), then `vuln-scan`. `terraform` and `terraform-module`
 run only `secret-scan` and `check`. Each scan step renders only while the
 development environment carries its tool (`rumdl`, `gitleaks` or
 `govulncheck`) at any version, so excluding one in `vorpal.excludeTools` also
@@ -156,8 +157,9 @@ that requires those status checks must require `check` instead.
 Generated CI runs `test` only for `go-library`.
 
 The job after `check` in every generated workflow needs `check`, so a failed
-check or scan blocks it: `build` in `go-cobra-cli` and `go-lambda`, `test` in
-`go-library`, `plan` in `terraform`, and `package` in `terraform-module`.
+check or scan blocks it: `build` in `go-cobra-cli`, `go-lambda` and
+`go-service`, `test` in `go-library`, `plan` in `terraform`, and `package` in
+`terraform-module`.
 Deploy and apply jobs follow those jobs, so they wait on the checks too.
 
 ### `go-cobra-cli`
@@ -397,6 +399,92 @@ and the generator leaves it alone:
 ```text
 cmd/vorpal/main.go
 ```
+
+### `go-service`
+
+`go-service` scaffolds a Go service repository: long-running binaries built
+from `cmd/<name>` by Vorpal, optionally packed into one OCI image that CI
+pushes to a container registry from `main`. It follows `go-lambda`'s
+conventions for the fork guard, permissions, scans and the private module
+credential, and takes the same `lint`, `privateModules`, `generate`,
+`artifacts` and `vorpal` options (`extension`, `script`, `tools`,
+`excludeTools` and `includes`). The project name, services, artifacts and
+client names must be lowercase letters, digits, `_` and `-`, and
+`privateModules` a comma-separated list of module path globs. The template
+does not scaffold `cmd/<name>/main.go`. See
+[`examples/go-service`](./examples/go-service/build-configs.yaml).
+
+- `services` lists the binaries, and defaults to `[<name>]`. `build <service>`
+  runs `go build` into `dist/<service>/<service>`, `install <service>` runs
+  `go install`, and `package <name>` runs `vorpal build --path <name>` on a
+  service or an `artifacts` entry. Every service builds with `CGO_ENABLED=0`
+  and `-ldflags='-s -w'`.
+- `clients` lists Vorpal artifacts that the source needs but the repository
+  does not commit, such as generated API clients. Each entry has a `name`, an
+  `alias` of the form `<name>:<version>`, and an `output` directory relative
+  to the repository root. The Vorpal program wraps each alias in an artifact
+  called `<name>-client-<client>` and copies it into `output` inside every
+  service build. Each service source excludes the `output` directories, so a
+  local copy never changes the artifact digest. `just clients` deletes each
+  `output` and copies the client into it, so an `output` may not overlap
+  another, `cmd`, `dist`, `.github`, or a top-level build file; `check`
+  depends on `clients`. CI runs `just clients` before it writes the GitHub
+  App token. That needs no cross-repository checkout token only when each
+  alias is already published where the runner's Vorpal registry resolves it;
+  a client built from a sibling repository in the same run needs its own
+  step. Add each `output` to the project's `.gitignore`. A
+  `vorpal.extension` `Go` hook must not call `WithArtifacts`: it replaces the
+  client artifacts while their copy scripts remain, and the build then fails.
+- `image.repository` turns on the image, such as `quirk/backend-discord-bot`,
+  without the registry host. The Vorpal program builds `<name>-image` for
+  Linux targets only, from the `image.rootfs` alias (default
+  `linux-vorpal:latest`, which floats) with every service on it.
+  `just package-image` builds it and copies `image.tar` to
+  `dist/<name>-image/`, and `just push <registry> [tag]` loads that tarball,
+  pushes `<registry>/<repository>:<tag>` with `tag` defaulting to `HEAD`'s
+  commit, and removes both local tags on exit. Log in to the registry first.
+
+The CI `check` job runs `secret-scan` and `doc-validate`, then, with
+`privateModules`, `clients` and `generate`, writes the GitHub App token to
+`~/.netrc`, runs `lint` and `vuln-scan`, and always removes `~/.netrc`.
+Without `privateModules` it runs `just check` and `vuln-scan`. The `build` job
+needs `check`, runs `clients` when `generate` is set and then `generate`,
+writes `~/.netrc`, runs `just package` for every artifact and service and
+`just package-image`, then always removes `~/.netrc`. Building the image under
+the image artifact gives every service the private module credential, as
+building a service alone does. The Vorpal agent seals each secret afresh per
+invocation and the sealed value enters the artifact digest, so with
+`privateModules` and `image.repository` both set, `just package-image`
+rebuilds every service rather than reusing the `just package` result; this
+follows from the Vorpal source and has not been observed in a CI run.
+
+With `image.repository`, the `build` job then logs in with
+`docker/login-action`, pushes `${{ github.sha }}` with `just push`, and runs
+`docker logout` on every outcome. Those three steps run only when
+`github.event_name == 'push' && github.ref == 'refs/heads/main'`, so a pull
+request builds the image but never logs in or pushes. They run after
+`~/.netrc` is removed, so the App token and the registry credential are never
+on the runner together, and they set `DOCKER_CONFIG` to
+`${{ runner.temp }}/docker`, so the credential never reaches the runner's
+shared `~/.docker/config.json`; a credential helper on the runner's `PATH`
+would still receive it. The `build` job carries a `concurrency` group per ref
+without `cancel-in-progress`, so two pushes to `main` never tag and push
+through the runner's Docker daemon at once. GitHub keeps one pending run per
+group, so when three pushes land in quick succession the middle one is
+cancelled and its commit gets no image tag. Unlike `go-lambda`'s deploy
+jobs, the push runs in `build` with no GitHub `environment`, so a
+same-repository pull request that edits the workflow is not stopped by an
+environment rule. The login reads the password from
+`secrets.ALTF4LLC_DOCKER_REGISTRY_PASSWORD` and the registry and username from
+`vars.ALTF4LLC_DOCKER_REGISTRY_URL` and `vars.ALTF4LLC_DOCKER_REGISTRY_USERNAME`;
+no `run:` line carries a GitHub expression. Every job carries the fork guard
+and `permissions: contents: read`.
+
+The generated `cmd/vorpal/main.go` needs the Vorpal Go SDK at or after
+`v0.0.0-20260915234803-77ac6ad903ae` to compile, and at or after
+`v0.0.0-20261112004409-56d9bfe3f08b` with a Vorpal agent and worker at 0.5.0
+or later for a build that attaches the private module credential, as
+`go-lambda` does.
 
 ### `go-library`
 

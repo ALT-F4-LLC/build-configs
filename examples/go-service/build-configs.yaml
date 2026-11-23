@@ -1,0 +1,24 @@
+---
+name: project-name
+template: go-service
+parameters:
+  # Optional: the binaries built from cmd/<name> (default [<name>]).
+  # services:
+  #   - project-name
+  privateModules: "github.com/ALT-F4-LLC/quirk-service-kit"
+  # Optional: Vorpal artifacts copied into the source tree before each build,
+  # such as generated API clients. `just clients` copies them for local work.
+  clients:
+    - name: ai
+      alias: quirk-lambda-ai-client-go:0.1.0
+      output: internal/client_ai
+  # Optional: an OCI image holding every service, pushed from main only.
+  image:
+    repository: quirk/project-name
+    # rootfs: linux-vorpal:latest
+  # Optional: shell lines for a `generate` recipe that `check` depends on.
+  # generate:
+  #   - just build-data
+  # Optional: extra Vorpal artifacts CI builds with `just package <name>`.
+  # artifacts:
+  #   - example-client

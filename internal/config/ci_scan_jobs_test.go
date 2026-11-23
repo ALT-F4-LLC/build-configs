@@ -60,6 +60,7 @@ var scanJobsTemplates = []struct {
 }{
 	{GoCobraCliName, ".github/workflows/ci.yaml", map[string]string{"doc-validate": "rumdl", "secret-scan": "gitleaks", "vuln-scan": "govulncheck"}},
 	{GoLambdaName, ".github/workflows/ci.yaml", map[string]string{"doc-validate": "rumdl", "secret-scan": "gitleaks", "vuln-scan": "govulncheck"}},
+	{GoServiceName, ".github/workflows/ci.yaml", map[string]string{"doc-validate": "rumdl", "secret-scan": "gitleaks", "vuln-scan": "govulncheck"}},
 	{GoLibraryName, ".github/workflows/ci.yaml", map[string]string{"doc-validate": "rumdl", "secret-scan": "gitleaks", "vuln-scan": "govulncheck"}},
 	{TerraformName, ".github/workflows/terraform.yaml", map[string]string{"secret-scan": "gitleaks"}},
 	{TerraformModuleName, ".github/workflows/terraform.yaml", map[string]string{"secret-scan": "gitleaks"}},
@@ -181,7 +182,7 @@ func TestScanJobsFollowDevTools(t *testing.T) {
 // it mints the App token, writes the token before the vuln scan, and always
 // removes it afterward.
 func TestScanJobsVulnScanCleansUpPrivateModuleToken(t *testing.T) {
-	for _, template := range []string{GoCobraCliName, GoLambdaName} {
+	for _, template := range []string{GoCobraCliName, GoLambdaName, GoServiceName} {
 		t.Run(template, func(t *testing.T) {
 			wf := scanJobsRender(t, template, ".github/workflows/ci.yaml", map[string]any{
 				"privateModules": "github.com/ALT-F4-LLC/private",
@@ -244,6 +245,8 @@ func TestScanJobsGateDownstreamJobs(t *testing.T) {
 		{GoCobraCliName, ".github/workflows/ci.yaml", nil, []string{"build"}},
 		{GoLambdaName, ".github/workflows/ci.yaml", nil, []string{"build"}},
 		{GoLambdaName, ".github/workflows/ci.yaml", map[string]any{"services": []any{"mcp"}}, []string{"build"}},
+		{GoServiceName, ".github/workflows/ci.yaml", nil, []string{"build"}},
+		{GoServiceName, ".github/workflows/ci.yaml", map[string]any{"image": map[string]any{"repository": "quirk/x"}}, []string{"build"}},
 		{GoLibraryName, ".github/workflows/ci.yaml", nil, []string{"test"}},
 		{TerraformName, ".github/workflows/terraform.yaml", nil, []string{"plan"}},
 		{TerraformModuleName, ".github/workflows/terraform.yaml", nil, []string{"package"}},

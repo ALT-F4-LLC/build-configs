@@ -12,6 +12,7 @@ func TestEveryTemplateCarriesJqAndJust(t *testing.T) {
 	for name, tools := range map[string][]string{
 		GoCobraCliName:      NewGoCobraCliConfig(cfg).DevTools(),
 		GoLambdaName:        NewGoLambdaConfig(cfg).DevTools(),
+		GoServiceName:       NewGoServiceConfig(cfg).DevTools(),
 		GoLibraryName:       NewGoLibraryConfig(cfg).DevTools(),
 		TerraformName:       NewTerraformConfig(cfg).DevTools(),
 		TerraformModuleName: NewTerraformModuleConfig(cfg).DevTools(),

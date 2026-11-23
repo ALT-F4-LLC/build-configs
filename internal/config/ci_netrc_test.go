@@ -22,7 +22,7 @@ type ciNetrcWorkflow struct {
 	} `yaml:"jobs"`
 }
 
-// TestCINetrcCredentialStaysInHomeNetrc renders the go-cobra-cli and go-lambda
+// TestCINetrcCredentialStaysInHomeNetrc renders the go-cobra-cli, go-lambda and go-service
 // workflows with private modules and checks that the GitHub App credential
 // lives only in the ~/.netrc that extractions/netrc writes: no run step names
 // a .netrc file except the cleanup, and each build job removes ~/.netrc on
@@ -52,6 +52,14 @@ func TestCINetrcCredentialStaysInHomeNetrc(t *testing.T) {
 				}
 			},
 			jobs: []string{"build"},
+		},
+		{
+			name: "go-service",
+			render: func(t *testing.T) {
+				t.Helper()
+				goServiceRender(t, goServiceBotConfig())
+			},
+			jobs: []string{"build", "check"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

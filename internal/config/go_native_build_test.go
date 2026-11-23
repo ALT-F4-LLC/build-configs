@@ -125,3 +125,35 @@ func TestGoCobraCliJustfileExportsGoprivate(t *testing.T) {
 		}
 	})
 }
+
+// go-service's build job packages every artifact and service with Vorpal, one
+// step each, runs no native build, and runs the generators before the token
+// is on disk.
+func TestGoServiceBuildPackagesWithoutBuild(t *testing.T) {
+	cfg := goServiceBotConfig()
+	cfg.Services = []string{"api", "worker"}
+	cfg.Artifacts = []string{"extra"}
+	cfg.Generate = []string{"echo gen"}
+	goServiceRender(t, cfg)
+	var wf nativeBuildWorkflow
+	if err := yaml.Unmarshal([]byte(goLambdaReadFile(t, goLambdaWorkflowPath)), &wf); err != nil {
+		t.Fatalf("workflow does not parse: %v", err)
+	}
+	for job, j := range wf.Jobs {
+		if nativeBuildStepIndex(j.Steps, func(s nativeBuildStep) bool { return strings.HasPrefix(s.Run, "just build") }) >= 0 {
+			t.Errorf("%s runs just build: %+v", job, j.Steps)
+		}
+	}
+	steps := wf.Jobs["build"].Steps
+	for _, entry := range []string{"extra", "api", "worker"} {
+		if nativeBuildStepIndex(steps, func(s nativeBuildStep) bool { return s.Run == `just package "`+entry+`"` }) < 0 {
+			t.Errorf("build steps = %+v, want just package %q", steps, entry)
+		}
+	}
+	gen := nativeBuildStepIndex(steps, func(s nativeBuildStep) bool { return s.Run == "just generate" })
+	token := nativeBuildStepIndex(steps, func(s nativeBuildStep) bool { return s.ID == "generate-token" })
+	pkg := nativeBuildStepIndex(steps, func(s nativeBuildStep) bool { return strings.HasPrefix(s.Run, "just package") })
+	if gen < 0 || token < 0 || pkg < 0 || gen > token || token > pkg {
+		t.Errorf("build steps = %+v, want just generate, then the token, then the package steps", steps)
+	}
+}

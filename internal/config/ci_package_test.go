@@ -75,6 +75,12 @@ func TestCIRunsPackageWithoutBuild(t *testing.T) {
 				t.Fatalf("Render: %v", err)
 			}
 		}},
+		{name: GoServiceName, render: func(t *testing.T) {
+			t.Helper()
+			cfg := goServiceBotConfig()
+			cfg.Artifacts = []string{"extra"}
+			goServiceRender(t, cfg)
+		}},
 		{name: GoLibraryName},
 		{name: TerraformName},
 		{name: TerraformModuleName},

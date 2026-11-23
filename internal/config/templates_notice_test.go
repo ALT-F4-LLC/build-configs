@@ -35,6 +35,7 @@ const (
 var vorpalMainTemplates = []string{
 	"go-cobra-cli/cmd__vorpal__main.go.tmpl",
 	"go-lambda/cmd__vorpal__main.go.tmpl",
+	"go-service/cmd__vorpal__main.go.tmpl",
 	"go-library/cmd__vorpal__main.go.tmpl",
 	"terraform/cmd__vorpal__main.go.tmpl",
 	"terraform-module/cmd__vorpal__main.go.tmpl",

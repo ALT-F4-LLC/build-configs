@@ -43,6 +43,7 @@ func TestGoTemplatesSupportRootJustfileRecipes(t *testing.T) {
 		{GoLibraryName, func(t *testing.T) { goLibraryRenderTemp(t, nil) }, []string{"install"}},
 		// Lambda binaries are bootstraps, not tools to install.
 		{GoLambdaName, func(t *testing.T) { goLambdaRenderTemp(t, []string{"api"}) }, []string{"install"}},
+		{GoServiceName, func(t *testing.T) { goServiceRender(t, goServiceBotConfig()) }, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
