@@ -112,15 +112,20 @@ Every Go template's `justfile` carries the recipes this repository's own
   `Vorpal.toml`, as in [`typescript-frontend`](#typescript-frontend). Vorpal
   compiles it with `bun build --compile` from `bun.lock`, `package.json`,
   `tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go and no
-  `go.mod`. The first `build-configs generate` also creates `package.json`,
-  `bun.lock` and `tsconfig.json`, and never overwrites one that exists, so
-  Renovate, bun and you own them afterward. `package.json` pins
-  `@altf4llc/vorpal-sdk` 0.6.0, `typescript` and `@types/bun`, named for the
-  repository, and `bun.lock` is the lockfile bun 1.4.4 writes for exactly
-  those three, with integrity hashes. Opt out of one with `.bcignore`. A
-  repository that already has a `package.json` keeps it: add the SDK at 0.6.0
-  yourself and run `bun install`. Then pin the sources in `Vorpal.lock` for every
-  platform that builds, such as `vorpal prepare <name>-dev` and
+  `go.mod`. `build-configs generate` also creates `tsconfig.json`, and
+  `package.json` with `bun.lock`, when they are missing, and never replaces
+  one that exists, so Renovate, bun and you own them afterward. `package.json`
+  and `bun.lock` are written as a pair: with either one present or listed in
+  `.bcignore`, or with a `bun.lockb`, `package-lock.json`, `yarn.lock` or
+  `pnpm-lock.yaml` present, neither is written, and you add
+  `@altf4llc/vorpal-sdk` 0.6.0 yourself and run `bun install`. The pair pins
+  `@altf4llc/vorpal-sdk` 0.6.0, `typescript` 7.0.2 and `@types/bun` 1.4.4,
+  named for the repository. The lock is the `bun.lock` the Vorpal CLI ships
+  at its 0.6.0 tag in its TypeScript template, with every package pinned by
+  integrity hash; `bun install --frozen-lockfile` accepts it and a plain
+  `bun install` leaves it unchanged on bun 1.4.4. Then pin the sources in
+  `Vorpal.lock` for every platform that builds, such as
+  `vorpal prepare <name>-dev` and
   `vorpal prepare --system x86_64-linux <name>-dev`; the program declares only
   the development environment. `.gitignore` ignores `node_modules`. There
   is no `vorpal.script`, which the Vorpal CLI reads only for a Go config
