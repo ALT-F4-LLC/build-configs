@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -191,12 +190,6 @@ func (c TypeScriptFrontendConfig) SourceExcludes() []string {
 		}
 	}
 	return excludes
-}
-
-// JSString returns s as a JavaScript string literal. A JSON string is one.
-func (c TypeScriptFrontendConfig) JSString(s string) (string, error) {
-	b, err := json.Marshal(s)
-	return string(b), err
 }
 
 // CheckDeps returns the recipes `just check` depends on, each preceded by a

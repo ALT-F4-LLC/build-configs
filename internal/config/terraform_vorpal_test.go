@@ -1,13 +1,10 @@
 package config
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
+	"encoding/json"
 	"io/fs"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -34,122 +31,59 @@ func terraformVorpalReadFile(t *testing.T, name string) string {
 	return string(b)
 }
 
-// terraformVorpalDevEnvironment parses the rendered Vorpal program and returns
-// the name passed to artifact.NewDevelopmentEnvironment, every alias passed to
-// FetchArtifactAlias, and the aliases whose fetched variables are passed to
-// WithArtifacts.
-func terraformVorpalDevEnvironment(t *testing.T, src string) (string, []string, []string) {
-	t.Helper()
-	file, err := parser.ParseFile(token.NewFileSet(), "cmd/vorpal/main.go", src, 0)
-	if err != nil {
-		t.Fatalf("rendered cmd/vorpal/main.go does not parse: %v\n%s", err, src)
-	}
+// terraformVorpalProgramPath is the rendered Vorpal config program.
+const terraformVorpalProgramPath = "src/vorpal.ts"
 
-	stringArg := func(call *ast.CallExpr) (string, bool) {
-		if len(call.Args) == 0 {
-			return "", false
-		}
-		lit, ok := call.Args[0].(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return "", false
-		}
-		value, err := strconv.Unquote(lit.Value)
-		if err != nil {
-			t.Fatalf("unquoting %s: %v", lit.Value, err)
-		}
-		return value, true
-	}
+// terraformVorpalProgramTools decodes the `const tools: string[]` array the
+// rendered program declares, and returns the development environment name it
+// declares in `const devEnvironment`.
+func terraformVorpalProgramTools(t *testing.T, src string) (string, []string) {
+	t.Helper()
 
 	var envName string
-	var aliases []string
-	aliasByVar := map[string]string{}
-	var artifactVars []string
-	withLoopTools := false
-	ast.Inspect(file, func(n ast.Node) bool {
-		if assign, ok := n.(*ast.AssignStmt); ok && len(assign.Lhs) > 0 && len(assign.Rhs) == 1 {
-			ident, isIdent := assign.Lhs[0].(*ast.Ident)
-			call, isCall := assign.Rhs[0].(*ast.CallExpr)
-			if isIdent && isCall {
-				if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "FetchArtifactAlias" {
-					if value, ok := stringArg(call); ok {
-						aliasByVar[ident.Name] = value
-					}
-				}
+	for line := range strings.SplitSeq(src, "\n") {
+		if value, ok := strings.CutPrefix(line, "const devEnvironment = "); ok {
+			var name string
+			if err := json.Unmarshal([]byte(strings.TrimSuffix(value, ";")), &name); err != nil {
+				t.Fatalf("devEnvironment %q is not a JSON string: %v", value, err)
 			}
-			return true
-		}
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		switch sel.Sel.Name {
-		case "NewDevelopmentEnvironment":
-			if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "artifact" {
-				if value, ok := stringArg(call); ok {
-					envName = value
-				}
-			}
-		case "FetchArtifactAlias":
-			if value, ok := stringArg(call); ok {
-				aliases = append(aliases, value)
-			}
-		case "WithArtifacts":
-			if len(call.Args) == 1 {
-				if ident, ok := call.Args[0].(*ast.Ident); ok && ident.Name == "tools" {
-					withLoopTools = true
-				}
-				if list, ok := call.Args[0].(*ast.CompositeLit); ok {
-					for _, elt := range list.Elts {
-						if ident, ok := elt.(*ast.Ident); ok {
-							artifactVars = append(artifactVars, ident.Name)
-						}
-					}
-				}
-			}
-		}
-		return true
-	})
-
-	var envArtifacts []string
-	for _, name := range artifactVars {
-		if alias, ok := aliasByVar[name]; ok {
-			envArtifacts = append(envArtifacts, alias)
+			envName = name
 		}
 	}
-
-	// Aliases listed in a `for _, alias := range []string{...}` loop that
-	// fetches each one into `tools`, which WithArtifacts receives.
-	loopAliases := goCobraCliFetchedAliases(t, file)
-	aliases = append(aliases, loopAliases...)
-	if withLoopTools {
-		envArtifacts = append(envArtifacts, loopAliases...)
-	}
-	return envName, aliases, envArtifacts
+	return envName, typeScriptFrontendArray(t, src, "tools")
 }
 
 func TestTerraformRenderWritesVorpalConfig(t *testing.T) {
 	terraformVorpalRender(t, nil)
 
 	got := terraformVorpalReadFile(t, "Vorpal.toml")
-	for _, want := range []string{
-		`language = "go"`,
-		"includes = [\n    \"cmd/vorpal\",\n    \"go.mod\",\n    \"go.sum\"\n]",
-		"[source.go]\ndirectory = \"cmd/vorpal\"",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("Vorpal.toml missing %q:\n%s", want, got)
-		}
+	want := hashNoticeLines + `language = "typescript"
+
+[source]
+includes = [
+    "bun.lock",
+    "bunfig.toml",
+    "package.json",
+    "src/vorpal.ts",
+    "tsconfig.json"
+]
+
+[source.typescript]
+entrypoint = "src/vorpal.ts"
+`
+	if got != want {
+		t.Errorf("Vorpal.toml =\n%s\nwant\n%s", got, want)
+	}
+	if _, err := os.Stat("cmd/vorpal/main.go"); err == nil {
+		t.Error("cmd/vorpal/main.go rendered; the config program is TypeScript")
 	}
 }
 
 func TestTerraformRenderWritesVorpalDevEnvironment(t *testing.T) {
 	terraformVorpalRender(t, nil)
 
-	envName, aliases, envArtifacts := terraformVorpalDevEnvironment(t, terraformVorpalReadFile(t, "cmd/vorpal/main.go"))
+	src := terraformVorpalReadFile(t, terraformVorpalProgramPath)
+	envName, aliases := terraformVorpalProgramTools(t, src)
 	if envName != "demo-dev" {
 		t.Errorf("development environment name = %q, want %q", envName, "demo-dev")
 	}
@@ -157,9 +91,20 @@ func TestTerraformRenderWritesVorpalDevEnvironment(t *testing.T) {
 		if !slices.Contains(aliases, want) {
 			t.Errorf("aliases %v missing %q", aliases, want)
 		}
-		if !slices.Contains(envArtifacts, want) {
-			t.Errorf("dev environment artifacts %v missing %q", envArtifacts, want)
+	}
+	for _, want := range []string{
+		`from "@altf4llc/vorpal-sdk";`,
+		"new TypeScriptDevelopmentEnvironment(devEnvironment, SYSTEMS)",
+		".withArtifacts(toolDigests)",
+		"await context.run();",
+		"void main();",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("%s does not contain %q", terraformVorpalProgramPath, want)
 		}
+	}
+	if strings.Contains(src, "<no value>") {
+		t.Errorf("%s has an unrendered value:\n%s", terraformVorpalProgramPath, src)
 	}
 }
 
@@ -168,11 +113,35 @@ func TestTerraformRenderVorpalTerraformVersionOverride(t *testing.T) {
 		"vorpal": map[string]interface{}{"terraformVersion": "1.12.0"},
 	})
 
-	_, aliases, _ := terraformVorpalDevEnvironment(t, terraformVorpalReadFile(t, "cmd/vorpal/main.go"))
+	_, aliases := terraformVorpalProgramTools(t, terraformVorpalReadFile(t, terraformVorpalProgramPath))
 	if !slices.Contains(aliases, "terraform:1.12.0") {
 		t.Errorf("aliases %v missing %q", aliases, "terraform:1.12.0")
 	}
 	if slices.Contains(aliases, "terraform:1.13.1") {
 		t.Errorf("aliases %v still carry the default %q", aliases, "terraform:1.13.1")
+	}
+}
+
+// Every value the config reaches the program through is a JSON string literal,
+// so a quote or backslash in a tool alias or the name cannot end it.
+func TestTerraformRenderVorpalProgramQuotesValues(t *testing.T) {
+	terraformVorpalRender(t, map[string]interface{}{
+		"vorpal": map[string]interface{}{"tools": []interface{}{`a"b:1`, `c\d:2`, "e`${f}`:3"}},
+	})
+
+	_, aliases := terraformVorpalProgramTools(t, terraformVorpalReadFile(t, terraformVorpalProgramPath))
+	for _, want := range []string{`a"b:1`, `c\d:2`, "e`${f}`:3"} {
+		if !slices.Contains(aliases, want) {
+			t.Errorf("aliases %q missing %q", aliases, want)
+		}
+	}
+}
+
+// The ignore file keeps the Bun dependencies of the config program out of git.
+func TestTerraformRenderIgnoresNodeModules(t *testing.T) {
+	terraformVorpalRender(t, nil)
+
+	if got := terraformVorpalReadFile(t, ".gitignore"); !strings.Contains(got, "\nnode_modules\n") {
+		t.Errorf(".gitignore does not ignore node_modules:\n%s", got)
 	}
 }

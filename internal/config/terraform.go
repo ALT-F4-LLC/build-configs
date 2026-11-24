@@ -33,11 +33,15 @@ type TerraformConfig struct {
 	Vorpal   TerraformVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
 }
 
-// TerraformVorpalConfig drives the generated Vorpal.toml and cmd/vorpal
+// terraformVorpalProgram is the TypeScript Vorpal config program the terraform
+// and terraform-module templates render.
+const terraformVorpalProgram = "src/vorpal.ts"
+
+// TerraformVorpalConfig drives the generated Vorpal.toml and src/vorpal.ts
 // program. Tools adds Vorpal artifact aliases to the default list;
-// ExcludeTools removes defaults by name or full alias.
+// ExcludeTools removes defaults by name or full alias. The Vorpal CLI reads a
+// script only for a Go config program, so there is no script option.
 type TerraformVorpalConfig struct {
-	Script           string   `json:"script,omitempty" yaml:"script,omitempty"`
 	TerraformVersion string   `json:"terraformVersion,omitempty" yaml:"terraformVersion,omitempty"`
 	Tools            []string `json:"tools,omitempty" yaml:"tools,omitempty"`
 	ExcludeTools     []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
@@ -108,11 +112,11 @@ func (c TerraformConfig) Render() error {
 		return err
 	}
 
-	vorpalMain, err := templates.RenderTemplate(templates.TerraformTemplates, "cmd/vorpal/main.go.tmpl", c)
+	vorpalProgram, err := templates.RenderTemplate(templates.TerraformTemplates, terraformVorpalProgram+".tmpl", c)
 	if err != nil {
 		return err
 	}
-	files["./cmd/vorpal/main.go"] = vorpalMain
+	files["./"+terraformVorpalProgram] = vorpalProgram
 
 	if err := templates.WriteFiles(files); err != nil {
 		return err

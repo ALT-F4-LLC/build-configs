@@ -22,6 +22,12 @@ func (c Config) DevEnvironment() string {
 	return c.Name + "-dev"
 }
 
+// JSString returns s as a JavaScript string literal. A JSON string is one.
+func (c Config) JSString(s string) (string, error) {
+	b, err := json.Marshal(s)
+	return string(b), err
+}
+
 // ShellQuotedDevEnvironment returns DevEnvironment as one POSIX single-quoted
 // shell word, so generated scripts pass it to vorpal verbatim whatever
 // characters the name holds.

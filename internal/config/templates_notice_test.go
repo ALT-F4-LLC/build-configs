@@ -37,8 +37,6 @@ var vorpalMainTemplates = []string{
 	"go-lambda/cmd__vorpal__main.go.tmpl",
 	"go-service/cmd__vorpal__main.go.tmpl",
 	"go-library/cmd__vorpal__main.go.tmpl",
-	"terraform/cmd__vorpal__main.go.tmpl",
-	"terraform-module/cmd__vorpal__main.go.tmpl",
 }
 
 // TestTemplatesCarryGeneratedNotice walks every template and checks the notice

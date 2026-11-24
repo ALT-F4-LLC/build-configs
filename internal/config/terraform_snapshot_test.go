@@ -24,7 +24,7 @@ func TestTerraformSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:   "schedule script env deploy key",
+			name:   "schedule env deploy key",
 			golden: "terraform-full.golden",
 			config: func() TerraformConfig {
 				cfg := NewTerraformConfig(Config{Name: "example", Template: TerraformName})
@@ -32,7 +32,6 @@ func TestTerraformSnapshot(t *testing.T) {
 				cfg.Region = "us-east-1"
 				cfg.GitHub.Action.SetupDeployKey = true
 				cfg.GitHub.Env = map[string]string{"TF_VAR_example": "value"}
-				cfg.Vorpal.Script = "just plan"
 				return cfg
 			},
 		},

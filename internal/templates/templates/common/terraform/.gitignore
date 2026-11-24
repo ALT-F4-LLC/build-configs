@@ -41,3 +41,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 .terraform.lock.hcl
+
+# Bun dependencies for the Vorpal config program
+node_modules

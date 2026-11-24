@@ -1,12 +1,8 @@
 package config
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -31,51 +27,17 @@ func terraformModuleRenderTemp(t *testing.T, name string, params map[string]any)
 	}
 }
 
-// terraformModuleParseVorpalProgram parses the rendered cmd/vorpal/main.go and
-// collects the names passed to artifact.NewDevelopmentEnvironment and the
-// aliases passed to FetchArtifactAlias.
+// terraformModuleParseVorpalProgram reads the rendered src/vorpal.ts and
+// returns the development environment name and the aliases in its tools list.
 func terraformModuleParseVorpalProgram(t *testing.T) terraformModuleVorpalProgram {
 	t.Helper()
 
-	src, err := os.ReadFile("cmd/vorpal/main.go")
+	src, err := os.ReadFile("src/vorpal.ts")
 	if err != nil {
-		t.Fatalf("cmd/vorpal/main.go was not written: %v", err)
+		t.Fatalf("src/vorpal.ts was not written: %v", err)
 	}
-	file, err := parser.ParseFile(token.NewFileSet(), "main.go", src, 0)
-	if err != nil {
-		t.Fatalf("rendered program does not parse: %v\n%s", err, src)
-	}
-
-	var program terraformModuleVorpalProgram
-	ast.Inspect(file, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok || len(call.Args) == 0 {
-			return true
-		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		lit, ok := call.Args[0].(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
-		}
-		value, err := strconv.Unquote(lit.Value)
-		if err != nil {
-			t.Fatalf("unquote %s: %v", lit.Value, err)
-		}
-		switch sel.Sel.Name {
-		case "NewDevelopmentEnvironment":
-			if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "artifact" {
-				program.environmentNames = append(program.environmentNames, value)
-			}
-		case "FetchArtifactAlias":
-			program.aliases = append(program.aliases, value)
-		}
-		return true
-	})
-	program.aliases = append(program.aliases, goCobraCliFetchedAliases(t, file)...)
-	return program
+	envName, aliases := terraformVorpalProgramTools(t, string(src))
+	return terraformModuleVorpalProgram{environmentNames: []string{envName}, aliases: aliases}
 }
 
 func TestTerraformModuleRendersVorpalToml(t *testing.T) {
@@ -86,15 +48,18 @@ func TestTerraformModuleRendersVorpalToml(t *testing.T) {
 		t.Fatalf("Vorpal.toml was not written: %v", err)
 	}
 
-	for _, want := range []string{`language = "go"`, "includes = [\n    \"cmd/vorpal\",\n    \"go.mod\",\n    \"go.sum\"\n]", "[source.go]\ndirectory = \"cmd/vorpal\""} {
+	for _, want := range []string{`language = "typescript"`, "includes = [\n    \"bun.lock\",\n    \"bunfig.toml\",\n    \"package.json\",\n    \"src/vorpal.ts\",\n    \"tsconfig.json\"\n]", "[source.typescript]\nentrypoint = \"src/vorpal.ts\""} {
 		if !strings.Contains(string(got), want) {
 			t.Errorf("Vorpal.toml missing %q:\n%s", want, got)
 		}
 	}
 	for line := range strings.SplitSeq(string(got), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "script") {
-			t.Errorf("Vorpal.toml has a script line %q by default, want none:\n%s", line, got)
+			t.Errorf("Vorpal.toml has a script line %q, want none:\n%s", line, got)
 		}
+	}
+	if _, err := os.Stat("cmd/vorpal/main.go"); err == nil {
+		t.Error("cmd/vorpal/main.go rendered; the config program is TypeScript")
 	}
 }
 

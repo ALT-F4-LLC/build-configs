@@ -107,15 +107,22 @@ Every Go template's `justfile` carries the recipes this repository's own
   environment, and does not run `build`. `terraform` CI runs no `package`
   either, because every CI step already builds the development environment
   that `package` builds.
-- The generated `Vorpal.toml` of `terraform` and `terraform-module` lists
-  `go.mod` and `go.sum`, because `cmd/vorpal/main.go` imports the Vorpal Go
-  SDK. The generator writes neither file, and `vorpal.script` is unset by
-  default, so a repository with no Go code runs `go mod init` and
-  `go mod tidy` once and commits both files; see
-  [Vorpal SDK Floor](#vorpal-sdk-floor). Both justfiles also render a `docs`
-  recipe that runs `terraform-docs`. No Vorpal artifact provides that tool,
-  so no development environment carries it, and the recipe works only where
-  `terraform-docs` is already on the host `PATH`.
+- The Vorpal config program of `terraform` and `terraform-module` is
+  TypeScript: `src/vorpal.ts` with `language = "typescript"` in
+  `Vorpal.toml`, as in [`typescript-frontend`](#typescript-frontend). Vorpal
+  compiles it with `bun build --compile` from `bun.lock`, `package.json`,
+  `tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go and no
+  `go.mod`. The generator writes none of those files except `src/vorpal.ts`:
+  add `@altf4llc/vorpal-sdk` 0.6.0 as a devDependency, commit `bun.lock`, and
+  pin the sources in `Vorpal.lock` for every platform that builds, such as
+  `vorpal prepare <name>` and `vorpal prepare --system x86_64-linux <name>`,
+  and the same for `<name>-dev`. `.gitignore` ignores `node_modules`. There
+  is no `vorpal.script`, which the Vorpal CLI reads only for a Go config
+  program. A repository that generated an earlier Go version keeps its
+  `cmd/vorpal/main.go`, `go.mod` and `go.sum`; delete them. Both justfiles
+  also render a `docs` recipe that runs `terraform-docs`. No Vorpal artifact
+  provides that tool, so no development environment carries it, and the recipe
+  works only where `terraform-docs` is already on the host `PATH`.
 - The `typescript-frontend` justfile shares `doc-validate` and `secret-scan`
   and runs bun for the rest; see
   [`typescript-frontend`](#typescript-frontend).
