@@ -107,6 +107,15 @@ Every Go template's `justfile` carries the recipes this repository's own
   environment, and does not run `build`. `terraform` CI runs no `package`
   either, because every CI step already builds the development environment
   that `package` builds.
+- The generated `Vorpal.toml` of `terraform` and `terraform-module` lists
+  `go.mod` and `go.sum`, because `cmd/vorpal/main.go` imports the Vorpal Go
+  SDK. The generator writes neither file, and `vorpal.script` is unset by
+  default, so a repository with no Go code runs `go mod init` and
+  `go mod tidy` once and commits both files; see
+  [Vorpal SDK Floor](#vorpal-sdk-floor). Both justfiles also render a `docs`
+  recipe that runs `terraform-docs`. No Vorpal artifact provides that tool,
+  so no development environment carries it, and the recipe works only where
+  `terraform-docs` is already on the host `PATH`.
 - The `typescript-frontend` justfile shares `doc-validate` and `secret-scan`
   and runs bun for the rest; see
   [`typescript-frontend`](#typescript-frontend).
