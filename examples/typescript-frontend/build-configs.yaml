@@ -6,7 +6,7 @@ parameters:
   # and typecheck; test is unset, so no test recipe or CI step renders. Point
   # build at a script that passes Vite's --mode to pick an env file.
   scripts:
-    # build: build
+    build: build:prod
     # lint: lint
     typecheck: build:tsc
     # test: test
@@ -26,16 +26,16 @@ parameters:
       - openapi-generator-cli:7.18.0
       - openjdk:25.0.1
     # The Vorpal source allowlist. Setting it replaces the default, so list
-    # every path the build reads; env holds the Vite mode files.
+    # every path the build reads by its exact name: an entry keeps that file
+    # or directory only. env holds the Vite mode files.
     includes:
       - bun.lock
-      - bunfig.toml
+      - env
       - index.html
       - package.json
-      - postcss.config
-      - public
+      - postcss.config.js
       - src
-      - tailwind.config
-      - tsconfig
-      - vite.config
-      - env
+      - tailwind.config.js
+      - tsconfig.json
+      - tsconfig.node.json
+      - vite.config.ts

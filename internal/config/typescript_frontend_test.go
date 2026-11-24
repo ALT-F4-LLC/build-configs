@@ -1,7 +1,7 @@
 package config
 
 import (
-	"go/format"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,12 +20,17 @@ const typeScriptFrontendPortalGenerate = "openapi-generator-cli generate --input
 // Vite SPA on bun whose typecheck script is `build:tsc`, which has no test
 // script, whose Vite envDir is env/, and whose API client is generated with
 // openapi-generator-cli, a Java tool.
+// typeScriptFrontendPortalIncludes are the paths quirk-frontend-portal's Vite
+// build reads, by exact name.
+var typeScriptFrontendPortalIncludes = []string{"bun.lock", "env", "index.html", "package.json", "postcss.config.js", "src", "tailwind.config.js", "tsconfig.json", "tsconfig.node.json", "vite.config.ts"}
+
 func typeScriptFrontendPortalConfig() TypeScriptFrontendConfig {
 	cfg := NewTypeScriptFrontendConfig(Config{Name: "quirk-frontend-portal", Template: TypeScriptFrontendName})
+	cfg.Scripts.Build = "build:prod"
 	cfg.Scripts.Typecheck = "build:tsc"
 	cfg.Generate = []string{typeScriptFrontendPortalGenerate}
 	cfg.Vorpal.Tools = []string{"openapi-generator-cli:7.18.0", "openjdk:25.0.1"}
-	cfg.Vorpal.Includes = append(slices.Clone(typeScriptFrontendDefaultSourceIncludes), "env")
+	cfg.Vorpal.Includes = typeScriptFrontendPortalIncludes
 	return cfg
 }
 
@@ -108,8 +113,8 @@ func TestTypeScriptFrontendExampleRenders(t *testing.T) {
 	if !ok {
 		t.Fatalf("templater is %T, want TypeScriptFrontendConfig", tpl)
 	}
-	if fe.Scripts.Build != "build" || fe.Scripts.Lint != "lint" || fe.Scripts.Typecheck != "build:tsc" || fe.Scripts.Test != "" {
-		t.Errorf("scripts = %+v, want the defaults with typecheck build:tsc and no test", fe.Scripts)
+	if fe.Scripts.Build != "build:prod" || fe.Scripts.Lint != "lint" || fe.Scripts.Typecheck != "build:tsc" || fe.Scripts.Test != "" {
+		t.Errorf("scripts = %+v, want build:prod, typecheck build:tsc and no test", fe.Scripts)
 	}
 	if fe.Output != "dist" {
 		t.Errorf("output = %q, want the dist default", fe.Output)
@@ -124,7 +129,7 @@ func TestTypeScriptFrontendExampleRenders(t *testing.T) {
 	}
 	for _, file := range []string{
 		".envrc", ".github/renovate.json", ".github/vorpal-shell.sh",
-		".github/workflows/ci.yaml", "Vorpal.toml", "cmd/vorpal/main.go", "justfile",
+		".github/workflows/ci.yaml", "Vorpal.toml", "justfile", typeScriptFrontendVorpalProgram,
 	} {
 		if _, err := os.Stat(file); err != nil {
 			t.Errorf("%s was not rendered: %v", file, err)
@@ -187,75 +192,132 @@ func TestTypeScriptFrontendRenderRejectsInvalidConfig(t *testing.T) {
 	}
 }
 
-// The Vorpal program builds the TypeScript development environment and one
-// artifact that installs from bun.lock, runs the build script under bun, and
-// copies the output directory.
+// The Vorpal program builds the TypeScript development environment, bun, and
+// one artifact that installs from bun.lock, runs the build script under bun,
+// and copies the output directory.
 func TestTypeScriptFrontendVorpalProgramBuildsFrontend(t *testing.T) {
 	cfg := typeScriptFrontendPortalConfig()
-	cfg.Scripts.Build = "build:prod"
 	cfg.Output = "out"
 	typeScriptFrontendRender(t, cfg)
-	src := goLambdaReadFile(t, "cmd/vorpal/main.go")
-	lits := goServiceProgramStrings(t)
+	src := goLambdaReadFile(t, typeScriptFrontendVorpalProgram)
 
-	for _, want := range []string{"quirk-frontend-portal", "quirk-frontend-portal-dev", "gitleaks:8.30.1", "rumdl:0.3.2", "openapi-generator-cli:7.18.0", "openjdk:25.0.1"} {
-		if !slices.Contains(lits, want) {
-			t.Errorf("cmd/vorpal/main.go has no string literal %q", want)
-		}
+	if got, want := typeScriptFrontendArray(t, src, "tools"), []string{"gitleaks:8.30.1", "jq:1.8.1", "just:1.45.0", "rumdl:0.3.2", "openapi-generator-cli:7.18.0", "openjdk:25.0.1"}; !slices.Equal(got, want) {
+		t.Errorf("tools = %q, want %q", got, want)
 	}
 	for _, want := range []string{
-		"language.NewTypeScriptDevelopmentEnvironment(",
-		"artifact.Bun(ctx)",
-		"artifact.Shell(ctx, []*string{bun}",
-		"bun install --frozen-lockfile\n",
-		"bun --bun run build:prod\n",
-		`test -d "out"`,
-		`cp -R "out/." "$VORPAL_OUTPUT/"`,
-		`pushd "./source/quirk-frontend-portal"`,
+		`from "@altf4llc/vorpal-sdk";`,
+		`const frontend = "quirk-frontend-portal";`,
+		`const devEnvironment = "quirk-frontend-portal-dev";`,
+		"new TypeScriptDevelopmentEnvironment(devEnvironment, SYSTEMS)",
+		`const bunVersion = "1.4.4";`,
+		"withAliases([`bun:${bunVersion}`])",
+		"await shell(context, [bun], [], buildScript, [])",
+		`"pushd \"./source/quirk-frontend-portal\"",`,
+		`"bun install --frozen-lockfile",`,
+		`"bun --bun run build:prod",`,
+		`"test -d \"out\"",`,
+		`"cp -R \"out/.\" \"$VORPAL_OUTPUT/\"",`,
+		"await context.run();",
+		"void main();",
 	} {
 		if !strings.Contains(src, want) {
-			t.Errorf("cmd/vorpal/main.go does not contain %q", want)
+			t.Errorf("%s does not contain %q", typeScriptFrontendVorpalProgram, want)
 		}
 	}
-	for _, absent := range []string{"NewOciImage", "readNetrc", "WithSecrets", "GOPRIVATE", "project."} {
+	for _, absent := range []string{"<no value>", "OciImage", "withSecrets", "process.env", "require("} {
 		if strings.Contains(src, absent) {
-			t.Errorf("cmd/vorpal/main.go contains %q", absent)
+			t.Errorf("%s contains %q", typeScriptFrontendVorpalProgram, absent)
 		}
 	}
 }
 
-// The rendered Vorpal program is gofmt-clean for every combination of
-// tools, script and includes.
-func TestTypeScriptFrontendVorpalProgramGofmtClean(t *testing.T) {
+// Vorpal.toml names the TypeScript program and builds it from the lockfile,
+// package.json and tsconfig.json alone.
+func TestTypeScriptFrontendVorpalTomlUsesTypeScript(t *testing.T) {
+	typeScriptFrontendRender(t, typeScriptFrontendPortalConfig())
+	got := goLambdaReadFile(t, "Vorpal.toml")
+	want := hashNoticeLines + `language = "typescript"
+
+[source]
+includes = [
+    "bun.lock",
+    "bunfig.toml",
+    "package.json",
+    "src/vorpal.ts",
+    "tsconfig.json"
+]
+
+[source.typescript]
+entrypoint = "src/vorpal.ts"
+`
+	if got != want {
+		t.Errorf("Vorpal.toml =\n%s\nwant\n%s", got, want)
+	}
+	if _, err := os.Stat("cmd/vorpal/main.go"); err == nil {
+		t.Error("cmd/vorpal/main.go rendered; the config program is TypeScript")
+	}
+}
+
+// Every string the config reaches the program through is a JSON string
+// literal, so a quote or backslash in a tool alias or include cannot end it.
+func TestTypeScriptFrontendVorpalProgramQuotesValues(t *testing.T) {
 	for name, mutate := range map[string]func(*TypeScriptFrontendConfig){
 		"default": func(*TypeScriptFrontendConfig) {},
-		"portal":  func(c *TypeScriptFrontendConfig) { *c = typeScriptFrontendPortalConfig() },
 		"no tools": func(c *TypeScriptFrontendConfig) {
 			c.Vorpal.ExcludeTools = []string{"gitleaks", "jq", "just", "rumdl"}
 		},
-		"script tools": func(c *TypeScriptFrontendConfig) {
-			c.Vorpal.Script = "echo hi"
-			c.Vorpal.Tools = []string{"awscli2:2.33.1"}
+		"odd values": func(c *TypeScriptFrontendConfig) {
+			c.Vorpal.Tools = []string{`a"b:1`, `c\d:2`, "e`${f}`:3"}
+			c.Vorpal.Includes = []string{`src/"x"`, `back\slash`}
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg := NewTypeScriptFrontendConfig(Config{Name: "demo", Template: TypeScriptFrontendName})
 			mutate(&cfg)
 			typeScriptFrontendRender(t, cfg)
-			src := goLambdaReadFile(t, "cmd/vorpal/main.go")
-			formatted, err := format.Source([]byte(src))
-			if err != nil {
-				t.Fatalf("cmd/vorpal/main.go does not parse: %v\n%s", err, src)
+			src := goLambdaReadFile(t, typeScriptFrontendVorpalProgram)
+			if got := typeScriptFrontendArray(t, src, "tools"); !slices.Equal(got, cfg.DevTools()) {
+				t.Errorf("tools = %q, want %q", got, cfg.DevTools())
 			}
-			if string(formatted) != src {
-				t.Errorf("cmd/vorpal/main.go is not gofmt-clean:\n%s", src)
+			if got := typeScriptFrontendArray(t, src, "sourceIncludes"); !slices.Equal(got, cfg.SourceIncludes()) {
+				t.Errorf("sourceIncludes = %q, want %q", got, cfg.SourceIncludes())
+			}
+			if strings.Contains(src, "<no value>") {
+				t.Errorf("%s has an unrendered value:\n%s", typeScriptFrontendVorpalProgram, src)
 			}
 		})
 	}
 }
 
+// typeScriptFrontendArray decodes the string array the rendered program
+// declares as `const <name>: string[] = [ ... ];`, one JSON string per line.
+func typeScriptFrontendArray(t *testing.T, src, name string) []string {
+	t.Helper()
+	_, rest, found := strings.Cut(src, "const "+name+": string[] = [\n")
+	if !found {
+		t.Fatalf("no %s array in:\n%s", name, src)
+	}
+	body, _, found := strings.Cut(rest, "];\n")
+	if !found {
+		t.Fatalf("%s array is not closed", name)
+	}
+	values := []string{}
+	for line := range strings.SplitSeq(strings.TrimSuffix(body, "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var v string
+		if err := json.Unmarshal([]byte(strings.TrimSuffix(strings.TrimSpace(line), ",")), &v); err != nil {
+			t.Fatalf("%s entry %q is not a JSON string: %v", name, line, err)
+		}
+		values = append(values, v)
+	}
+	return values
+}
+
 // The frontend source keeps only the default allowlist, so a local .env
-// never reaches the registry, and always drops the output and node_modules.
+// never reaches the registry, and always drops the output, node_modules and
+// the config program.
 func TestTypeScriptFrontendVorpalSourceIsAllowlisted(t *testing.T) {
 	for name, tc := range map[string]struct {
 		mutate   func(*TypeScriptFrontendConfig)
@@ -264,25 +326,26 @@ func TestTypeScriptFrontendVorpalSourceIsAllowlisted(t *testing.T) {
 	}{
 		"default": {
 			func(*TypeScriptFrontendConfig) {},
-			[]string{"bun.lock", "bunfig.toml", "index.html", "package.json", "postcss.config", "public", "src", "tailwind.config", "tsconfig", "vite.config"},
-			[]string{"dist", "node_modules"},
+			typeScriptFrontendDefaultSourceIncludes,
+			[]string{"dist", "node_modules", "src/vorpal.ts"},
 		},
 		"portal": {
 			func(c *TypeScriptFrontendConfig) { *c = typeScriptFrontendPortalConfig() },
-			[]string{"bun.lock", "bunfig.toml", "index.html", "package.json", "postcss.config", "public", "src", "tailwind.config", "tsconfig", "vite.config", "env"},
-			[]string{"dist", "node_modules"},
+			typeScriptFrontendPortalIncludes,
+			[]string{"dist", "node_modules", "src/vorpal.ts"},
 		},
 		"output": {
 			func(c *TypeScriptFrontendConfig) { c.Output = "build/web" },
-			[]string{"bun.lock", "bunfig.toml", "index.html", "package.json", "postcss.config", "public", "src", "tailwind.config", "tsconfig", "vite.config"},
-			[]string{"build/web", "node_modules"},
+			typeScriptFrontendDefaultSourceIncludes,
+			[]string{"build/web", "node_modules", "src/vorpal.ts"},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg := NewTypeScriptFrontendConfig(Config{Name: "demo", Template: TypeScriptFrontendName})
 			tc.mutate(&cfg)
 			typeScriptFrontendRender(t, cfg)
-			excludes, includes := goLambdaSourceFilter(t, goLambdaParseVorpalProgram(t))
+			src := goLambdaReadFile(t, typeScriptFrontendVorpalProgram)
+			excludes, includes := typeScriptFrontendArray(t, src, "sourceExcludes"), typeScriptFrontendArray(t, src, "sourceIncludes")
 			if !slices.Equal(includes, tc.includes) {
 				t.Errorf("source includes = %q, want %q", includes, tc.includes)
 			}
@@ -299,7 +362,7 @@ func TestTypeScriptFrontendJustfileRecipes(t *testing.T) {
 	typeScriptFrontendRender(t, typeScriptFrontendPortalConfig())
 	src := goLambdaReadFile(t, "justfile")
 	for _, want := range []string{
-		"build: install\n    bun --bun run build\n",
+		"build: install\n    bun --bun run build:prod\n",
 		"check: install generate\n    bun --bun run lint\n    bun --bun run build:tsc\n",
 		"generate: install\n    #!/usr/bin/env bash\n    set -euxo pipefail\n    " + typeScriptFrontendPortalGenerate + "\n",
 		"install:\n    bun install --frozen-lockfile\n",

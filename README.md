@@ -545,15 +545,30 @@ permissions and scans, and has no deploy or publish job. The name must be
 lowercase letters, digits, `_` and `-`. See
 [`examples/typescript-frontend`](./examples/typescript-frontend/build-configs.yaml).
 
-The Vorpal config program is Go, as in every template, so the repository
-needs a `go.mod` for `cmd/vorpal`. The development environment carries no
-Go, so with a host Go run `go mod init <module-path>` and `go mod tidy` once
-after the first `build-configs generate`. Then pin the sources in
-`Vorpal.lock` for every platform that builds, such as
-`vorpal prepare <name>` and `vorpal prepare --system x86_64-linux <name>`, and
-the same for `<name>-dev`. The generated program compiles against the
-Vorpal Go SDK this repository pins, `v0.0.0-20261115062959-5088ef6c6cee`;
-earlier versions are untested.
+Unlike the other templates, the Vorpal config program is TypeScript:
+`src/vorpal.ts`, with `language = "typescript"` in `Vorpal.toml`. Vorpal
+compiles it with `bun build --compile` from `bun.lock`, `package.json`,
+`tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go and no
+`go.mod`. The template does not write `package.json`: add
+`@altf4llc/vorpal-sdk` as a devDependency yourself. The program is written
+against 0.6.0; other versions are untested. 0.6.0 does not export the SDK's
+`Bun` builder, so the program defines bun 1.4.4 with the same inputs. An SDK
+upgrade that changes the SDK's bun leaves the build step on 1.4.4 and the
+development environment on the new version. Compiling the program runs
+`bun install --frozen-lockfile` over the whole `package.json` from the public
+npm registry, so any change to `package.json`, `bun.lock` or `tsconfig.json`
+recompiles it before the next dev shell or CI job. After the first
+`build-configs generate`, pin the sources in `Vorpal.lock` for every platform
+that builds, such as `vorpal prepare <name>` and
+`vorpal prepare --system x86_64-linux <name>`, and the same for `<name>-dev`.
+A repository that generated an earlier Go version keeps its
+`cmd/vorpal/main.go`; delete it.
+
+`src/vorpal.ts` sits under `src`, so the project's own `scripts.lint` and
+`scripts.typecheck` check it when their globs cover `src`. A strict lint
+setup, or a typecheck without `skipLibCheck`, can reject it, and the file
+cannot be edited; list it in `.bcignore` to own it instead. It stays out of
+the frontend artifact's source, so editing it never rebuilds the frontend.
 
 - `scripts.build` (default `build`), `scripts.lint` (default `lint`),
   `scripts.typecheck` (default `typecheck`) and `scripts.test` (default
@@ -570,18 +585,22 @@ earlier versions are untested.
 - `audit.level` (`low`, `moderate`, `high` or `critical`) passes
   `--audit-level`, and `audit.production: true` passes `--production`, to
   `bun audit`. Unset, any advisory in any locked package fails `vuln-scan`.
-- `vorpal.tools`, `vorpal.excludeTools` and `vorpal.script` work as in the
-  other templates. There is no `vorpal.extension`.
+- `vorpal.tools` and `vorpal.excludeTools` work as in the other templates.
+  There is no `vorpal.extension`, and no `vorpal.script`, which the Vorpal
+  CLI reads only for a Go config program.
 - `vorpal.includes` defaults to `bun.lock`, `bunfig.toml`, `index.html`,
-  `package.json`, `postcss.config`, `public`, `src`, `tailwind.config`,
-  `tsconfig` and `vite.config`. An `.npmrc` stays out, so a private registry
-  configured there does not reach the build. Vorpal matches includes as path
-  prefixes, so `tsconfig` keeps every `tsconfig*.json` and each `*.config`
-  entry keeps every extension of that file. Setting the list replaces the
-  default: copy it and add Vite's `envDir`, such as `env`, and any other path
-  the build reads. A `.env` file inside an included directory, such as
-  `env/.env.local`, is uploaded to the registry. The `output` directory and
-  `node_modules` are excluded either way.
+  `package.json`, `public`, `src`, `tsconfig.json`, `tsconfig.app.json`,
+  `tsconfig.node.json`, and `postcss.config`, `tailwind.config` and
+  `vite.config` in their `.js`, `.cjs`, `.mjs` and `.ts` forms (`vite.config`
+  also `.mts`). An `.npmrc` stays out, so a private registry configured there
+  does not reach the build. Vorpal keeps a path only when an include equals
+  it or one of its leading directories: `src` keeps `src/main.tsx`, but
+  `tsconfig` keeps no `tsconfig.json`. List every file by its exact name; an
+  entry that matches nothing keeps nothing. Setting the list replaces the
+  default: list what the build reads, including Vite's `envDir`, such as
+  `env`. A `.env` file inside an included directory, such as
+  `env/.env.local`, is uploaded to the registry. The `output` directory,
+  `node_modules` and `src/vorpal.ts` are excluded either way.
 
 The `justfile` recipes:
 

@@ -3,16 +3,16 @@
 # Do not edit it by hand. Listing a path in .bcignore opts that file
 # out of generation.
 
-language = "go"
+language = "typescript"
 
 [source]
 includes = [
-    "cmd/vorpal",
-    "go.mod",
-    "go.sum",
-    "internal/vorpal"
+    "bun.lock",
+    "bunfig.toml",
+    "package.json",
+    "src/vorpal.ts",
+    "tsconfig.json"
 ]
-{{ if .Vorpal.Script }}script = {{ printf "%q" .Vorpal.Script }}
-{{ end }}
-[source.go]
-directory = "cmd/vorpal"
+
+[source.typescript]
+entrypoint = "src/vorpal.ts"

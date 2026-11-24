@@ -39,7 +39,6 @@ var vorpalMainTemplates = []string{
 	"go-library/cmd__vorpal__main.go.tmpl",
 	"terraform/cmd__vorpal__main.go.tmpl",
 	"terraform-module/cmd__vorpal__main.go.tmpl",
-	"typescript-frontend/cmd__vorpal__main.go.tmpl",
 }
 
 // TestTemplatesCarryGeneratedNotice walks every template and checks the notice
@@ -71,7 +70,7 @@ func TestTemplatesCarryGeneratedNotice(t *testing.T) {
 func checkTemplateNotice(t *testing.T, p, content string) {
 	t.Helper()
 
-	// Only the vorpal programs carry the Go generated-code marker; the
+	// Only the Go vorpal programs carry the Go generated-code marker; the
 	// scaffold stub never does, because it is edited by hand.
 	wantMarker := slices.Contains(vorpalMainTemplates, p)
 	if got := strings.Contains(content, "Code generated"); got != wantMarker {
@@ -150,7 +149,7 @@ func checkNoticeBeforePackage(t *testing.T, p, content, notice string) {
 // newline so a notice cannot match across two separate blocks.
 func commentText(p, content string) string {
 	marker := "#"
-	if strings.HasSuffix(p, ".go.tmpl") {
+	if strings.HasSuffix(p, ".go.tmpl") || strings.HasSuffix(p, ".ts.tmpl") {
 		marker = "//"
 	}
 

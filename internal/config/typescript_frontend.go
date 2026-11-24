@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -11,9 +12,13 @@ import (
 
 const TypeScriptFrontendName = "typescript-frontend"
 
+// typeScriptFrontendVorpalProgram is the TypeScript Vorpal config program,
+// the entrypoint Vorpal.toml names.
+const typeScriptFrontendVorpalProgram = "src/vorpal.ts"
+
 var (
 	// typeScriptFrontendScriptPattern bounds a package.json script name, which
-	// reaches justfile recipe bodies and Go string literals. It admits the
+	// reaches justfile recipe bodies and the Vorpal program. It admits the
 	// `build:tsc` style that npm and bun accept.
 	typeScriptFrontendScriptPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:._-]*$`)
 
@@ -33,21 +38,32 @@ var (
 
 	// typeScriptFrontendDefaultSourceIncludes is the frontend source when
 	// vorpal.includes is unset. Vorpal ignores .gitignore, uploads the source
-	// to the registry and matches includes as path prefixes, so the list names
-	// what a Vite build reads: `tsconfig` keeps every tsconfig*.json, and each
-	// `*.config` entry every extension of that config, while a local .env
-	// stays out.
+	// to the registry and keeps a path only when an include equals it or one
+	// of its leading directories, so the list names each file a Vite build
+	// reads, in each common extension, while a local .env stays out. An entry
+	// that matches nothing keeps nothing.
 	typeScriptFrontendDefaultSourceIncludes = []string{
 		"bun.lock",
 		"bunfig.toml",
 		"index.html",
 		"package.json",
-		"postcss.config",
+		"postcss.config.cjs",
+		"postcss.config.js",
+		"postcss.config.mjs",
+		"postcss.config.ts",
 		"public",
 		"src",
-		"tailwind.config",
-		"tsconfig",
-		"vite.config",
+		"tailwind.config.cjs",
+		"tailwind.config.js",
+		"tailwind.config.mjs",
+		"tailwind.config.ts",
+		"tsconfig.app.json",
+		"tsconfig.json",
+		"tsconfig.node.json",
+		"vite.config.js",
+		"vite.config.mjs",
+		"vite.config.mts",
+		"vite.config.ts",
 	}
 
 	// typeScriptFrontendAuditLevels are the severities `bun audit
@@ -100,10 +116,9 @@ func (c TypeScriptFrontendConfig) AuditArgs() string {
 }
 
 // TypeScriptFrontendVorpalConfig takes go-lambda's vorpal options except
-// extension, whose hook contract builds Go artifacts.
+// extension, whose hook contract builds Go artifacts, and script, which the
+// Vorpal CLI reads only for a Go config program.
 type TypeScriptFrontendVorpalConfig struct {
-	// Script is the `script` command in Vorpal.toml; unset omits the line.
-	Script string `json:"script,omitempty" yaml:"script,omitempty"`
 	// Tools are Vorpal artifact aliases added to the default development
 	// environment tools.
 	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty"`
@@ -111,8 +126,8 @@ type TypeScriptFrontendVorpalConfig struct {
 	// (`jq:1.8.1`).
 	ExcludeTools []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
 	// Includes replaces the frontend source allowlist with these paths,
-	// relative to the project root. The output directory and node_modules are
-	// excluded either way.
+	// relative to the project root. The output directory, node_modules and
+	// the config program are excluded either way.
 	Includes []string `json:"includes,omitempty" yaml:"includes,omitempty"`
 }
 
@@ -165,14 +180,23 @@ func (c TypeScriptFrontendConfig) SourceIncludes() []string {
 }
 
 // SourceExcludes returns the paths no frontend source keeps: the build
-// output, so a local build never changes the artifact digest, and
-// node_modules, which the build step installs from bun.lock.
+// output, so a local build never changes the artifact digest; node_modules,
+// which the build step installs from bun.lock; and the Vorpal config
+// program, which the frontend build never reads.
 func (c TypeScriptFrontendConfig) SourceExcludes() []string {
 	excludes := []string{c.Output}
-	if c.Output != "node_modules" {
-		excludes = append(excludes, "node_modules")
+	for _, p := range []string{"node_modules", typeScriptFrontendVorpalProgram} {
+		if p != c.Output {
+			excludes = append(excludes, p)
+		}
 	}
 	return excludes
+}
+
+// JSString returns s as a JavaScript string literal. A JSON string is one.
+func (c TypeScriptFrontendConfig) JSString(s string) (string, error) {
+	b, err := json.Marshal(s)
+	return string(b), err
 }
 
 // CheckDeps returns the recipes `just check` depends on, each preceded by a
@@ -256,11 +280,11 @@ func (c TypeScriptFrontendConfig) Render() error {
 		return err
 	}
 
-	vorpalProgram, err := templates.RenderTemplate(templates.TypeScriptFrontendTemplates, "cmd/vorpal/main.go.tmpl", c)
+	vorpalProgram, err := templates.RenderTemplate(templates.TypeScriptFrontendTemplates, typeScriptFrontendVorpalProgram+".tmpl", c)
 	if err != nil {
 		return err
 	}
-	files["./cmd/vorpal/main.go"] = vorpalProgram
+	files["./"+typeScriptFrontendVorpalProgram] = vorpalProgram
 
 	if err := templates.WriteFiles(files); err != nil {
 		return err
