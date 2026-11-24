@@ -38,7 +38,7 @@ func TestResolveTools(t *testing.T) {
 func TestTemplatesVorpalToolsAddAndExcludeToolsOptOut(t *testing.T) {
 	type devTooler interface{ DevTools() []string }
 
-	for _, template := range []string{GoCobraCliName, GoLambdaName, GoServiceName, GoLibraryName, TerraformName, TerraformModuleName} {
+	for _, template := range []string{GoCobraCliName, GoLambdaName, GoServiceName, GoLibraryName, TerraformName, TerraformModuleName, TypeScriptFrontendName} {
 		t.Run(template, func(t *testing.T) {
 			load := func(vorpal map[string]any) []string {
 				t.Helper()

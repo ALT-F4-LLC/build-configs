@@ -107,6 +107,9 @@ Every Go template's `justfile` carries the recipes this repository's own
   environment, and does not run `build`. `terraform` CI runs no `package`
   either, because every CI step already builds the development environment
   that `package` builds.
+- The `typescript-frontend` justfile shares `doc-validate` and `secret-scan`
+  and runs bun for the rest; see
+  [`typescript-frontend`](#typescript-frontend).
 
 Every template's development environment carries `jq` 1.8.1 and `just`
 1.45.0 by default. The Go defaults add `golangci-lint`, `govulncheck`,
@@ -114,7 +117,10 @@ Every template's development environment carries `jq` 1.8.1 and `just`
 25.0.1, and `openapi-generator-cli` with `openapi.enable`. The `terraform`
 defaults add `awscli2`, `gitleaks`, `rumdl` and `terraform` at
 `vorpal.terraformVersion`;
-`terraform-module` drops `awscli2`. Every template always includes its
+`terraform-module` drops `awscli2`. The `typescript-frontend` defaults add
+`gitleaks` and `rumdl`, and its development environment always carries the
+Vorpal SDK's `bun` 1.4.4, which `vorpal.excludeTools` cannot drop. Every
+template always includes its
 defaults. A `go-cobra-cli` or `go-library` configuration that already adds
 `jq` or `just`, or a `terraform` one that adds `jq`, now renders both
 versions unless it lists the tool in `vorpal.excludeTools`. Likewise, a
@@ -146,7 +152,9 @@ and `go-service` with `privateModules`), then `vuln-scan`. `terraform` and `terr
 run only `secret-scan` and `check`. Each scan step renders only while the
 development environment carries its tool (`rumdl`, `gitleaks` or
 `govulncheck`) at any version, so excluding one in `vorpal.excludeTools` also
-drops its step. With `gitleaks`, the job checks out the full history so it
+drops its step. `typescript-frontend`'s `vuln-scan` runs `bun audit`, so it
+renders whatever `vorpal.excludeTools` holds.
+With `gitleaks`, the job checks out the full history so it
 scans every commit; allowlist a false positive in a `.gitleaks.toml` or
 `.gitleaksignore` at the repository root. With `privateModules` set, the job
 writes the GitHub App token to `~/.netrc` after the credential-free scans,
@@ -154,11 +162,13 @@ before `just check` and `just vuln-scan`, and always removes it afterward.
 A failed step stops the steps after it. Earlier versions ran
 `doc-validate`, `secret-scan` and `vuln-scan` as separate jobs; a repository
 that requires those status checks must require `check` instead.
-Generated CI runs `test` only for `go-library`.
+Generated CI runs `test` only for `go-library`, and for
+`typescript-frontend` with `scripts.test` set, as the last `check` step.
 
 The job after `check` in every generated workflow needs `check`, so a failed
-check or scan blocks it: `build` in `go-cobra-cli`, `go-lambda` and
-`go-service`, `test` in `go-library`, `plan` in `terraform`, and `package` in
+check or scan blocks it: `build` in `go-cobra-cli`, `go-lambda`,
+`go-service` and `typescript-frontend`, `test` in `go-library`, `plan` in
+`terraform`, and `package` in
 `terraform-module`.
 Deploy and apply jobs follow those jobs, so they wait on the checks too.
 
@@ -524,6 +534,94 @@ The generated `cmd/vorpal/main.go` needs the Vorpal Go SDK at or after
 `v0.0.0-20261112004409-56d9bfe3f08b` with a Vorpal agent and worker at 0.5.0
 or later for a build that attaches the private module credential, as
 `go-lambda` does.
+
+### `typescript-frontend`
+
+`typescript-frontend` scaffolds a static TypeScript frontend built with bun,
+such as a Vite single-page app. A `package.json` build script writes static
+files, and Vorpal packages that output directory as one artifact called
+`<name>`. It follows `go-service`'s conventions for the fork guard,
+permissions and scans, and has no deploy or publish job. The name must be
+lowercase letters, digits, `_` and `-`. See
+[`examples/typescript-frontend`](./examples/typescript-frontend/build-configs.yaml).
+
+The Vorpal config program is Go, as in every template, so the repository
+needs a `go.mod` for `cmd/vorpal`. The development environment carries no
+Go, so with a host Go run `go mod init <module-path>` and `go mod tidy` once
+after the first `build-configs generate`. Then pin the sources in
+`Vorpal.lock` for every platform that builds, such as
+`vorpal prepare <name>` and `vorpal prepare --system x86_64-linux <name>`, and
+the same for `<name>-dev`. The generated program compiles against the
+Vorpal Go SDK this repository pins, `v0.0.0-20261115062959-5088ef6c6cee`;
+earlier versions are untested.
+
+- `scripts.build` (default `build`), `scripts.lint` (default `lint`),
+  `scripts.typecheck` (default `typecheck`) and `scripts.test` (default
+  unset) name `package.json` scripts. A name holds letters, digits, `:`,
+  `.`, `_` and `-`. With `scripts.test` unset, no `test` recipe or CI step
+  renders.
+- `output` (default `dist`) is the directory the build script writes,
+  relative to the root.
+- `generate` lists shell lines for a `generate` recipe. `check` depends on
+  it, and the CI `build` job runs it before `just package`, so a generated,
+  gitignored source such as an API client reaches the Vorpal source. A tool a
+  line needs goes in `vorpal.tools`; the example adds `openapi-generator-cli`
+  and `openjdk`.
+- `audit.level` (`low`, `moderate`, `high` or `critical`) passes
+  `--audit-level`, and `audit.production: true` passes `--production`, to
+  `bun audit`. Unset, any advisory in any locked package fails `vuln-scan`.
+- `vorpal.tools`, `vorpal.excludeTools` and `vorpal.script` work as in the
+  other templates. There is no `vorpal.extension`.
+- `vorpal.includes` defaults to `bun.lock`, `bunfig.toml`, `index.html`,
+  `package.json`, `postcss.config`, `public`, `src`, `tailwind.config`,
+  `tsconfig` and `vite.config`. An `.npmrc` stays out, so a private registry
+  configured there does not reach the build. Vorpal matches includes as path
+  prefixes, so `tsconfig` keeps every `tsconfig*.json` and each `*.config`
+  entry keeps every extension of that file. Setting the list replaces the
+  default: copy it and add Vite's `envDir`, such as `env`, and any other path
+  the build reads. A `.env` file inside an included directory, such as
+  `env/.env.local`, is uploaded to the registry. The `output` directory and
+  `node_modules` are excluded either way.
+
+The `justfile` recipes:
+
+- `install` runs `bun install --frozen-lockfile`. `build`, `check`,
+  `generate`, `test` and `vuln-scan` depend on it.
+- `check` runs `scripts.lint`, then `scripts.typecheck`.
+- `build` runs `scripts.build` natively into `output`. CI never runs it.
+- `package [name]` runs `vorpal build --path <name>`, defaulting to the
+  frontend artifact.
+- `test` runs `scripts.test`, and `vuln-scan` runs `bun audit` with the
+  `audit` flags. `doc-validate` and `secret-scan` match the Go templates'.
+
+Every script runs through `bun --bun run`, so package binaries such as `tsc`
+and `vite` run under bun even where `node` is on `PATH`. Local runs then
+match the Linux Vorpal sandbox, which has no `node`. No frontend has been
+built in a Vorpal sandbox with this template yet. A script that calls `npm`
+or `node` itself, such as a `build` that chains `npm run build:tsc`, depends
+on bun substituting for them, which is untested.
+
+The Vorpal artifact installs from `bun.lock` with `--frozen-lockfile`, runs
+`bun --bun run <scripts.build>`, fails when `output` is missing, and copies
+`output` into the artifact. `bun install` fetches from the public npm
+registry inside the build. The template configures no private registry and
+no credential. Vite builds in its default mode, `production`, unless
+`scripts.build` names a script that passes `--mode`. The CI artifact checks
+that the frontend builds; nothing deploys it.
+
+The CI `check` job runs `secret-scan`, `doc-validate`, `check`, `vuln-scan`
+and, with `scripts.test`, `test`. The `build` job needs `check`, runs
+`generate`, then `just package <name>`. Both jobs carry the fork guard and
+`permissions: contents: read` only. No job requests an OIDC token, reads a
+secret, or deploys.
+
+There is no deploy job because quirk-frontend-portal, the repository this
+template was shaped on, deploys by hand from a workstation (`aws s3 sync` and
+a CloudFront invalidation) with the workstation's ambient AWS credentials. It
+has no CI, no GitHub OIDC role and no stored secret. A deploy job from CI
+would first need a GitHub OIDC role for that bucket and distribution.
+Generation overwrites the `justfile`, so keep project recipes such as a manual
+deploy in another file, or list `justfile` in `.bcignore`.
 
 ### `go-library`
 

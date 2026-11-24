@@ -52,6 +52,14 @@ func TestRenderMapsListEveryFileOnceFromItsOwningSet(t *testing.T) {
 			},
 		},
 		{
+			template: TypeScriptFrontendName,
+			rm:       NewTypeScriptFrontendConfig(name).renderMap(),
+			owners: map[*template.Template][]string{
+				templates.AllCommonTemplates:    {".github/renovate.json"},
+				templates.VorpalCommonTemplates: vorpal,
+			},
+		},
+		{
 			template: TerraformModuleName,
 			rm:       NewTerraformModuleConfig(name).renderMap(),
 			owners: map[*template.Template][]string{

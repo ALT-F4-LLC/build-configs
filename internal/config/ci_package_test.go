@@ -84,6 +84,7 @@ func TestCIRunsPackageWithoutBuild(t *testing.T) {
 		{name: GoLibraryName},
 		{name: TerraformName},
 		{name: TerraformModuleName},
+		{name: TypeScriptFrontendName},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.render != nil {

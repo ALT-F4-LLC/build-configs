@@ -41,16 +41,20 @@ var (
 	//go:embed all:templates/terraform-module/*
 	terraformModuleFS embed.FS
 
-	AllCommonTemplates       *template.Template
-	GoCommonTemplates        *template.Template
-	TerraformCommonTemplates *template.Template
-	VorpalCommonTemplates    *template.Template
-	GoCobraCliTemplates      *template.Template
-	GoLambdaTemplates        *template.Template
-	GoLibraryTemplates       *template.Template
-	GoServiceTemplates       *template.Template
-	TerraformTemplates       *template.Template
-	TerraformModuleTemplates *template.Template
+	//go:embed all:templates/typescript-frontend/*
+	typeScriptFrontendFS embed.FS
+
+	AllCommonTemplates          *template.Template
+	GoCommonTemplates           *template.Template
+	TerraformCommonTemplates    *template.Template
+	VorpalCommonTemplates       *template.Template
+	GoCobraCliTemplates         *template.Template
+	GoLambdaTemplates           *template.Template
+	GoLibraryTemplates          *template.Template
+	GoServiceTemplates          *template.Template
+	TerraformTemplates          *template.Template
+	TerraformModuleTemplates    *template.Template
+	TypeScriptFrontendTemplates *template.Template
 )
 
 // RenderMap maps a template set to the filenames* that should be written.
@@ -69,6 +73,7 @@ func init() {
 	GoServiceTemplates = template.Must(template.ParseFS(goServiceFS, "templates/go-service/*"))
 	TerraformTemplates = template.Must(template.ParseFS(terraformFS, "templates/terraform/*"))
 	TerraformModuleTemplates = template.Must(template.ParseFS(terraformModuleFS, "templates/terraform-module/*"))
+	TypeScriptFrontendTemplates = template.Must(template.ParseFS(typeScriptFrontendFS, "templates/typescript-frontend/*"))
 }
 
 func RenderTemplates(in RenderMap, context any) (map[string]string, error) {

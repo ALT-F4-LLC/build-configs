@@ -10,12 +10,13 @@ import (
 func TestEveryTemplateCarriesJqAndJust(t *testing.T) {
 	cfg := Config{Name: "demo"}
 	for name, tools := range map[string][]string{
-		GoCobraCliName:      NewGoCobraCliConfig(cfg).DevTools(),
-		GoLambdaName:        NewGoLambdaConfig(cfg).DevTools(),
-		GoServiceName:       NewGoServiceConfig(cfg).DevTools(),
-		GoLibraryName:       NewGoLibraryConfig(cfg).DevTools(),
-		TerraformName:       NewTerraformConfig(cfg).DevTools(),
-		TerraformModuleName: NewTerraformModuleConfig(cfg).DevTools(),
+		GoCobraCliName:         NewGoCobraCliConfig(cfg).DevTools(),
+		GoLambdaName:           NewGoLambdaConfig(cfg).DevTools(),
+		GoServiceName:          NewGoServiceConfig(cfg).DevTools(),
+		GoLibraryName:          NewGoLibraryConfig(cfg).DevTools(),
+		TerraformName:          NewTerraformConfig(cfg).DevTools(),
+		TerraformModuleName:    NewTerraformModuleConfig(cfg).DevTools(),
+		TypeScriptFrontendName: NewTypeScriptFrontendConfig(cfg).DevTools(),
 	} {
 		for _, want := range []string{"jq:1.8.1", "just:1.45.0"} {
 			if !slices.Contains(tools, want) {

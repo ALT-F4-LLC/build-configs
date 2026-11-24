@@ -144,6 +144,24 @@ func (c Config) GetTemplater() (Templater, error) {
 		}
 		return tpl, nil
 
+	case TypeScriptFrontendName:
+		if Debug {
+			fmt.Println("loading typescript-frontend templater")
+		}
+		tpl := NewTypeScriptFrontendConfig(c)
+
+		// Convert the parameters (map type) to JSON
+		b, err := json.Marshal(c.Parameters)
+		if err != nil {
+			return tpl, err
+		}
+
+		// Then convert them back into the type for the templater selected
+		if err := json.Unmarshal(b, &tpl); err != nil {
+			return tpl, err
+		}
+		return tpl, nil
+
 	case "terraform-module":
 		if Debug {
 			fmt.Println("loading terraform module templater")

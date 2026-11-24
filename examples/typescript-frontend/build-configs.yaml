@@ -1,0 +1,41 @@
+---
+name: quirk-frontend-portal
+template: typescript-frontend
+parameters:
+  # package.json scripts the justfile runs under bun. Defaults: build, lint
+  # and typecheck; test is unset, so no test recipe or CI step renders. Point
+  # build at a script that passes Vite's --mode to pick an env file.
+  scripts:
+    # build: build
+    # lint: lint
+    typecheck: build:tsc
+    # test: test
+  # Optional: the directory the build script writes (default dist).
+  # output: dist
+  # Shell lines for a `generate` recipe that `check` depends on and CI runs
+  # before packaging. This one writes the gitignored API client.
+  generate:
+    - openapi-generator-cli generate --input-spec src/api/portal.json --generator-name typescript-axios --output src/client
+  # Optional: `bun audit` flags for `vuln-scan`.
+  # audit:
+  #   level: high
+  #   production: true
+  vorpal:
+    # Added to the default tools for the generate line above.
+    tools:
+      - openapi-generator-cli:7.18.0
+      - openjdk:25.0.1
+    # The Vorpal source allowlist. Setting it replaces the default, so list
+    # every path the build reads; env holds the Vite mode files.
+    includes:
+      - bun.lock
+      - bunfig.toml
+      - index.html
+      - package.json
+      - postcss.config
+      - public
+      - src
+      - tailwind.config
+      - tsconfig
+      - vite.config
+      - env

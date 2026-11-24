@@ -39,6 +39,7 @@ var vorpalMainTemplates = []string{
 	"go-library/cmd__vorpal__main.go.tmpl",
 	"terraform/cmd__vorpal__main.go.tmpl",
 	"terraform-module/cmd__vorpal__main.go.tmpl",
+	"typescript-frontend/cmd__vorpal__main.go.tmpl",
 }
 
 // TestTemplatesCarryGeneratedNotice walks every template and checks the notice
@@ -70,7 +71,7 @@ func TestTemplatesCarryGeneratedNotice(t *testing.T) {
 func checkTemplateNotice(t *testing.T, p, content string) {
 	t.Helper()
 
-	// Only the five vorpal programs carry the Go generated-code marker; the
+	// Only the vorpal programs carry the Go generated-code marker; the
 	// scaffold stub never does, because it is edited by hand.
 	wantMarker := slices.Contains(vorpalMainTemplates, p)
 	if got := strings.Contains(content, "Code generated"); got != wantMarker {

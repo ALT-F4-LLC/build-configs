@@ -64,6 +64,7 @@ var scanJobsTemplates = []struct {
 	{GoLibraryName, ".github/workflows/ci.yaml", map[string]string{"doc-validate": "rumdl", "secret-scan": "gitleaks", "vuln-scan": "govulncheck"}},
 	{TerraformName, ".github/workflows/terraform.yaml", map[string]string{"secret-scan": "gitleaks"}},
 	{TerraformModuleName, ".github/workflows/terraform.yaml", map[string]string{"secret-scan": "gitleaks"}},
+	{TypeScriptFrontendName, ".github/workflows/ci.yaml", map[string]string{"doc-validate": "rumdl", "secret-scan": "gitleaks"}},
 }
 
 func scanJobsRender(t *testing.T, template, workflow string, parameters map[string]any) scanJobsWorkflow {
@@ -250,6 +251,7 @@ func TestScanJobsGateDownstreamJobs(t *testing.T) {
 		{GoLibraryName, ".github/workflows/ci.yaml", nil, []string{"test"}},
 		{TerraformName, ".github/workflows/terraform.yaml", nil, []string{"plan"}},
 		{TerraformModuleName, ".github/workflows/terraform.yaml", nil, []string{"package"}},
+		{TypeScriptFrontendName, ".github/workflows/ci.yaml", nil, []string{"build"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.template+"/"+strings.Join(tc.gated, "+"), func(t *testing.T) {
@@ -266,4 +268,17 @@ func TestScanJobsGateDownstreamJobs(t *testing.T) {
 			scanJobsCheckNeeds(t, wf)
 		})
 	}
+}
+
+// typescript-frontend's vuln-scan runs `bun audit`, and bun comes from the
+// TypeScript development environment rather than a listed tool, so the scan
+// stays in the check job after `just check` even with every default excluded.
+func TestScanJobsTypeScriptFrontendAuditNeedsNoListedTool(t *testing.T) {
+	wf := scanJobsRender(t, TypeScriptFrontendName, ".github/workflows/ci.yaml", map[string]any{
+		"vorpal": map[string]any{"excludeTools": []any{"gitleaks", "jq", "just", "rumdl"}},
+	})
+	if got, want := scanJobsCheckRuns(wf), []string{"just check", "just vuln-scan"}; !slices.Equal(got, want) {
+		t.Errorf("check runs %q, want %q", got, want)
+	}
+	scanJobsCheckNeeds(t, wf)
 }

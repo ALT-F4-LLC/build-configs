@@ -98,3 +98,33 @@ func TestCINetrcCredentialStaysInHomeNetrc(t *testing.T) {
 		})
 	}
 }
+
+// TestCINetrcTypeScriptFrontendWritesNoCredential renders the
+// typescript-frontend workflow, whose dependencies come from the public npm
+// registry, in its default and quirk-frontend-portal shapes, and checks that
+// no job mints the GitHub App token, writes a .netrc or reads a secret.
+func TestCINetrcTypeScriptFrontendWritesNoCredential(t *testing.T) {
+	for name, cfg := range map[string]TypeScriptFrontendConfig{
+		"default": NewTypeScriptFrontendConfig(Config{Name: "example", Template: TypeScriptFrontendName}),
+		"portal":  typeScriptFrontendPortalConfig(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			typeScriptFrontendRender(t, cfg)
+			src := goLambdaReadFile(t, ".github/workflows/ci.yaml")
+			var wf ciNetrcWorkflow
+			if err := yaml.Unmarshal([]byte(src), &wf); err != nil {
+				t.Fatalf("workflow does not parse: %v\n%s", err, src)
+			}
+			for job, j := range wf.Jobs {
+				for _, step := range j.Steps {
+					if strings.HasPrefix(step.Uses, "extractions/netrc@") || strings.HasPrefix(step.Uses, "actions/create-github-app-token@") || strings.Contains(step.Run, ".netrc") {
+						t.Errorf("job %s step %+v handles a credential", job, step)
+					}
+				}
+			}
+			if strings.Contains(src, "secrets.") {
+				t.Errorf("workflow reads a secret:\n%s", src)
+			}
+		})
+	}
+}
