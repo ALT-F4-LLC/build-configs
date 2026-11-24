@@ -60,6 +60,14 @@ just build
 
 ## Templates
 
+The Vorpal config program is Go in the four `go-*` templates, which are tied to
+the Go language. Every other template, `terraform`, `terraform-module` and
+`typescript-frontend`, writes it in TypeScript on `@altf4llc/vorpal-sdk`, with
+`language = "typescript"` in `Vorpal.toml`, and needs no Go toolchain. A new
+template that is not tied to a programming language follows the TypeScript
+rule; the template lists in `internal/config/vorpal_language_test.go` enforce
+it.
+
 Every Go template's `justfile` carries the recipes this repository's own
 `justfile` defines, by name:
 
