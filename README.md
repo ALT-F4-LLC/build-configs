@@ -110,12 +110,16 @@ Every Go template's `justfile` carries the recipes this repository's own
 - The Vorpal config program of `terraform` and `terraform-module` is
   TypeScript: `src/vorpal.ts` with `language = "typescript"` in
   `Vorpal.toml`, as in [`typescript-frontend`](#typescript-frontend). Vorpal
-  compiles it with `bun build --compile` from `bun.lock`, `package.json`, an
-  optional `tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go
-  and no `go.mod`. The generator writes none of those files except
-  `src/vorpal.ts`: add `@altf4llc/vorpal-sdk` 0.6.0 as a devDependency and
-  commit `bun.lock`, which needs a bun from outside the dev shell for the
-  first `bun install`. Then pin the sources in `Vorpal.lock` for every
+  compiles it with `bun build --compile` from `bun.lock`, `package.json`,
+  `tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go and no
+  `go.mod`. The first `build-configs generate` also creates `package.json`,
+  `bun.lock` and `tsconfig.json`, and never overwrites one that exists, so
+  Renovate, bun and you own them afterward. `package.json` pins
+  `@altf4llc/vorpal-sdk` 0.6.0, `typescript` and `@types/bun`, named for the
+  repository, and `bun.lock` is the lockfile bun 1.4.4 writes for exactly
+  those three, with integrity hashes. Opt out of one with `.bcignore`. A
+  repository that already has a `package.json` keeps it: add the SDK at 0.6.0
+  yourself and run `bun install`. Then pin the sources in `Vorpal.lock` for every
   platform that builds, such as `vorpal prepare <name>-dev` and
   `vorpal prepare --system x86_64-linux <name>-dev`; the program declares only
   the development environment. `.gitignore` ignores `node_modules`. There

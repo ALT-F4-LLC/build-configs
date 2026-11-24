@@ -73,6 +73,10 @@ func (c TerraformModuleConfig) Render() error {
 	}
 	files["./"+terraformVorpalProgram] = program
 
+	if err := addTerraformScaffold(files, c); err != nil {
+		return err
+	}
+
 	if err := templates.WriteFiles(files); err != nil {
 		return err
 	}

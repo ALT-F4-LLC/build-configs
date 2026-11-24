@@ -39,6 +39,14 @@ var vorpalMainTemplates = []string{
 	"go-library/cmd__vorpal__main.go.tmpl",
 }
 
+// scaffoldDataTemplates are the Bun project files the terraform templates
+// create once and leave to the developer, Renovate and bun.
+var scaffoldDataTemplates = []string{
+	"common/terraform/package.json",
+	"common/terraform/bun.lock",
+	"common/terraform/tsconfig.json",
+}
+
 // TestTemplatesCarryGeneratedNotice walks every template and checks the notice
 // that tells a developer the rendered file is generated.
 func TestTemplatesCarryGeneratedNotice(t *testing.T) {
@@ -76,6 +84,11 @@ func checkTemplateNotice(t *testing.T, p, content string) {
 	}
 
 	switch {
+	case slices.Contains(scaffoldDataTemplates, p):
+		// Strict JSON and a bun-owned lockfile cannot carry a comment.
+		if strings.Contains(commentText(p, content), generatedNotice) {
+			t.Errorf("%s: carries the generated notice, but the generator creates it only once", p)
+		}
 	case p == renovateJSON:
 		checkRenovateNotice(t, content)
 	case p == scaffoldStub:
