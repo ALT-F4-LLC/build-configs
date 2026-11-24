@@ -110,13 +110,15 @@ Every Go template's `justfile` carries the recipes this repository's own
 - The Vorpal config program of `terraform` and `terraform-module` is
   TypeScript: `src/vorpal.ts` with `language = "typescript"` in
   `Vorpal.toml`, as in [`typescript-frontend`](#typescript-frontend). Vorpal
-  compiles it with `bun build --compile` from `bun.lock`, `package.json`,
-  `tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go and no
-  `go.mod`. The generator writes none of those files except `src/vorpal.ts`:
-  add `@altf4llc/vorpal-sdk` 0.6.0 as a devDependency, commit `bun.lock`, and
-  pin the sources in `Vorpal.lock` for every platform that builds, such as
-  `vorpal prepare <name>` and `vorpal prepare --system x86_64-linux <name>`,
-  and the same for `<name>-dev`. `.gitignore` ignores `node_modules`. There
+  compiles it with `bun build --compile` from `bun.lock`, `package.json`, an
+  optional `tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go
+  and no `go.mod`. The generator writes none of those files except
+  `src/vorpal.ts`: add `@altf4llc/vorpal-sdk` 0.6.0 as a devDependency and
+  commit `bun.lock`, which needs a bun from outside the dev shell for the
+  first `bun install`. Then pin the sources in `Vorpal.lock` for every
+  platform that builds, such as `vorpal prepare <name>-dev` and
+  `vorpal prepare --system x86_64-linux <name>-dev`; the program declares only
+  the development environment. `.gitignore` ignores `node_modules`. There
   is no `vorpal.script`, which the Vorpal CLI reads only for a Go config
   program. A repository that generated an earlier Go version keeps its
   `cmd/vorpal/main.go`, `go.mod` and `go.sum`; delete them. Both justfiles
@@ -134,8 +136,9 @@ Every template's development environment carries `jq` 1.8.1 and `just`
 defaults add `awscli2`, `gitleaks`, `rumdl` and `terraform` at
 `vorpal.terraformVersion`;
 `terraform-module` drops `awscli2`. The `typescript-frontend` defaults add
-`gitleaks` and `rumdl`, and its development environment always carries the
-Vorpal SDK's `bun` 1.4.4, which `vorpal.excludeTools` cannot drop. Every
+`gitleaks` and `rumdl`. The development environments of `typescript-frontend`,
+`terraform` and `terraform-module` always carry the Vorpal SDK's `bun` 1.4.4,
+which `vorpal.excludeTools` cannot drop. Every
 template always includes its
 defaults. A `go-cobra-cli` or `go-library` configuration that already adds
 `jq` or `just`, or a `terraform` one that adds `jq`, now renders both
@@ -561,7 +564,7 @@ permissions and scans, and has no deploy or publish job. The name must be
 lowercase letters, digits, `_` and `-`. See
 [`examples/typescript-frontend`](./examples/typescript-frontend/build-configs.yaml).
 
-Unlike the other templates, the Vorpal config program is TypeScript:
+Like `terraform` and `terraform-module`, its Vorpal config program is TypeScript:
 `src/vorpal.ts`, with `language = "typescript"` in `Vorpal.toml`. Vorpal
 compiles it with `bun build --compile` from `bun.lock`, `package.json`,
 `tsconfig.json` and `src/vorpal.ts`, so the repository needs no Go and no
