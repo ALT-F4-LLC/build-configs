@@ -16,8 +16,11 @@ jobs:
     if: {{ .ForkGuardedIf "" }}
     permissions:
       contents: read
-    runs-on: altf4llc
+    runs-on: {{ .Runner }}
     steps:
+{{- if .NeedsVorpalSetup }}
+{{ .VorpalSetupStep 6 }}
+{{- end }}
       - uses: actions/checkout@v7
       {{- if .HasDevTool "gitleaks" }}
         with:
@@ -68,8 +71,11 @@ jobs:
       - check
     permissions:
       contents: read
-    runs-on: altf4llc
+    runs-on: {{ .Runner }}
     steps:
+{{- if .NeedsVorpalSetup }}
+{{ .VorpalSetupStep 6 }}
+{{- end }}
       - uses: actions/checkout@v7
       {{- if .Generate }}
       - run: just generate
@@ -134,8 +140,11 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    runs-on: altf4llc
+    runs-on: {{ .Runner }}
     steps:
+{{- if .NeedsVorpalSetup }}
+{{ .VorpalSetupStep 6 }}
+{{- end }}
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:

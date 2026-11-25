@@ -208,6 +208,66 @@ check or scan blocks it: `build` in `go-cobra-cli`, `go-lambda`,
 `terraform-module`.
 Deploy and apply jobs follow those jobs, so they wait on the checks too.
 
+### Repository Visibility and Runners
+
+Every template picks its CI runner from the top-level `visibility` key in
+`build-configs.yaml`, beside `name` and `template`:
+
+```yaml
+---
+name: example
+template: go-library
+visibility: public
+```
+
+- `private`, the default when the key is absent, runs every job on the
+  `altf4llc` runner group. That runner carries Vorpal, so a private render has
+  no setup step.
+- `public` runs every job on `ubuntu-latest`. A GitHub-hosted runner has no
+  Vorpal, so each job starts with `ALT-F4-LLC/setup-vorpal-action`, pinned to
+  Vorpal 0.6.0, before any step that runs through the Vorpal shell. The step
+  selects the `altf4llc-vorpal-registry` S3 registry, as the other ALT-F4-LLC
+  workflows on hosted runners do, because the local registry a fresh runner
+  starts holds none of the tool aliases the development environment fetches.
+  The repository therefore needs the `AWS_ACCESS_KEY_ID` and
+  `AWS_SECRET_ACCESS_KEY` secrets and the `AWS_DEFAULT_REGION` variable, which
+  the step passes to the action. Every job builds the development environment
+  cold, which takes longer than on the altf4llc runner. A public render is
+  tested here by its generated workflow only, not on a GitHub-hosted runner.
+- Any other value is an error, and so is `visibility` under `parameters`.
+- Build jobs take the architecture of the runner, so a deploying repository
+  moved to a hosted runner builds for the architecture that runner has.
+- Pull requests from forks still skip every job, because they carry neither
+  secrets nor an OIDC token. A public repository keeps that guard.
+
+### `terraform`
+
+`terraform` also reads these options, under `parameters.github`:
+
+- `runsOn` overrides the runner that `visibility` picks, for every job. A
+  runner other than `altf4llc` gets the Vorpal setup step, whichever option
+  chose it.
+- `appToken: true` adds an `actions/create-github-app-token` step to the
+  plan and apply jobs, after the role is assumed and before checkout. It
+  reads the `ALTF4LLC_GITHUB_APP_ID` and `ALTF4LLC_GITHUB_APP_PRIVATE_KEY`
+  secrets. Only the `just apply` step receives the token, as `GITHUB_TOKEN`:
+  the plan job generates it but passes it to no step, because a plan runs the
+  pull request's own code.
+- `env` sets environment variables on the plan and apply jobs.
+
+The plan job takes a concurrency group per pull request, `tf-plan-<number>`,
+and runs `just plan -lock=false` on pull requests, so a pull request's plan
+never waits for another pull request's plan or for an apply. Pushes and manual
+runs share `tf-lock` with every apply and keep the state lock. The justfile
+`plan` recipe forwards its arguments to `terraform plan`.
+
+On pull requests the plan job also renders a summary table of the resource
+changes with `jq`, and posts it with the full plan as one comment, which later
+runs update in place. The job holds `pull-requests: write`; the other jobs do
+not. The comment stays under the 65,536-character comment limit by cutting the
+summary and then the plan, and the full plan stays in the workflow log. A public
+repository publishes its plan output in that comment.
+
 ### `go-cobra-cli`
 
 `go-cobra-cli` scaffolds a Cobra CLI tool with Go that can be used to build out

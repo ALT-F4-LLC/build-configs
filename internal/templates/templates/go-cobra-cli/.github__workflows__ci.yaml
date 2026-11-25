@@ -16,8 +16,11 @@ jobs:
     if: ${{"{{"}} github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository {{"}}"}}
     permissions:
       contents: read
-    runs-on: altf4llc
+    runs-on: {{ .Runner }}
     steps:
+{{- if .NeedsVorpalSetup }}
+{{ .VorpalSetupStep 6 }}
+{{- end }}
       - uses: actions/checkout@v7
       {{- if .HasDevTool "gitleaks" }}
         with:
@@ -59,8 +62,11 @@ jobs:
       - check
     permissions:
       contents: read
-    runs-on: altf4llc
+    runs-on: {{ .Runner }}
     steps:
+{{- if .NeedsVorpalSetup }}
+{{ .VorpalSetupStep 6 }}
+{{- end }}
       {{- if .PrivateModules }}
       - id: generate-token
         uses: actions/create-github-app-token@v3

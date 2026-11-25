@@ -16,8 +16,11 @@ jobs:
     if: {{ .ForkGuardedIf "" }}
     permissions:
       contents: read
-    runs-on: altf4llc
+    runs-on: {{ .Runner }}
     steps:
+{{- if .NeedsVorpalSetup }}
+{{ .VorpalSetupStep 6 }}
+{{- end }}
       - uses: actions/checkout@v7
       {{- if .HasDevTool "gitleaks" }}
         with:
@@ -81,8 +84,11 @@ jobs:
       - check
     permissions:
       contents: read
-    runs-on: altf4llc
+    runs-on: {{ .Runner }}
     steps:
+{{- if .NeedsVorpalSetup }}
+{{ .VorpalSetupStep 6 }}
+{{- end }}
       - uses: actions/checkout@v7
       {{- if .Generate }}
       - run: just generate
@@ -144,8 +150,11 @@ jobs:
       group: deploy-{{ .Environment }}
       cancel-in-progress: false
       queue: max
-    runs-on: altf4llc
+    runs-on: {{ $.Runner }}
     steps:
+{{- if $.NeedsVorpalSetup }}
+{{ $.VorpalSetupStep 6 }}
+{{- end }}
       - uses: actions/checkout@v7
       - uses: aws-actions/configure-aws-credentials@v6
         with:
