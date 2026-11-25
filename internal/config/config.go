@@ -90,7 +90,15 @@ func (c Config) validateVisibility() error {
 		}
 	}
 	switch c.Visibility {
-	case "", VisibilityPrivate, VisibilityPublic:
+	case "", VisibilityPrivate:
+		return nil
+	case VisibilityPublic:
+		// The plan job uploads terraform.tfplan, which holds variable and
+		// state values in cleartext, and a public repository's artifacts
+		// download for any signed-in GitHub user.
+		if c.Template == TerraformName {
+			return fmt.Errorf("the %s template does not support visibility %q: its plan artifact holds cleartext variable and state values", TerraformName, VisibilityPublic)
+		}
 		return nil
 	}
 	return fmt.Errorf("unsupported visibility %q: use %q or %q", c.Visibility, VisibilityPrivate, VisibilityPublic)

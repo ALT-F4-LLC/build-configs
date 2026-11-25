@@ -10,7 +10,7 @@ import (
 // existing private goldens stay as they are and prove a private render did not
 // change. Regenerate with -update after reviewing the diff.
 func TestPublicVisibilityWorkflowSnapshot(t *testing.T) {
-	for _, tc := range visibilityTemplates {
+	for _, tc := range publicVisibilityTemplates() {
 		t.Run(tc.template, func(t *testing.T) {
 			golden, err := filepath.Abs(filepath.Join("testdata", tc.template+"-public-workflow.golden"))
 			if err != nil {

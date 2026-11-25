@@ -67,6 +67,24 @@ func visibilityRender(t *testing.T, cfg Config, workflow string) visibilityWorkf
 	return wf
 }
 
+// publicVisibilityTemplates is visibilityTemplates without the terraform
+// template, which rejects public.
+func publicVisibilityTemplates() []struct {
+	template string
+	workflow string
+} {
+	var out []struct {
+		template string
+		workflow string
+	}
+	for _, tc := range visibilityTemplates {
+		if tc.template != TerraformName {
+			out = append(out, tc)
+		}
+	}
+	return out
+}
+
 const visibilitySetupAction = "ALT-F4-LLC/setup-vorpal-action@0.2.1"
 
 // A repository with no visibility key is private, so every template keeps the
@@ -95,7 +113,7 @@ func TestVisibilityDefaultsToPrivateRunnerOnEveryTemplate(t *testing.T) {
 // A public repository runs on a GitHub-hosted runner, which has no Vorpal, so
 // every job installs it before any step that runs through the Vorpal shell.
 func TestPublicVisibilityUsesHostedRunnerWithVorpalSetupOnEveryTemplate(t *testing.T) {
-	for _, tc := range visibilityTemplates {
+	for _, tc := range publicVisibilityTemplates() {
 		t.Run(tc.template, func(t *testing.T) {
 			wf := visibilityRender(t, Config{Name: "demo", Template: tc.template, Visibility: VisibilityPublic}, tc.workflow)
 
@@ -188,6 +206,26 @@ func TestPublicVisibilityCoversJobsAddedByOptions(t *testing.T) {
 	}
 }
 
+// The terraform plan artifact holds cleartext variable and state values, and a
+// public repository's artifacts are open to any signed-in GitHub user, so the
+// template refuses public. The other templates keep accepting it.
+func TestTerraformRejectsPublicVisibility(t *testing.T) {
+	_, err := Config{Name: "demo", Template: TerraformName, Visibility: VisibilityPublic}.GetTemplater()
+	if err == nil {
+		t.Fatal("terraform accepted visibility public")
+	}
+	for _, want := range []string{"terraform", "public", "cleartext"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q lacks %q", err, want)
+		}
+	}
+	for _, tc := range publicVisibilityTemplates() {
+		if _, err := (Config{Name: "demo", Template: tc.template, Visibility: VisibilityPublic}).GetTemplater(); err != nil {
+			t.Errorf("%s rejected visibility public: %v", tc.template, err)
+		}
+	}
+}
+
 func TestVisibilityRejectsUnknownValue(t *testing.T) {
 	for _, tc := range visibilityTemplates {
 		_, err := Config{Name: "demo", Template: tc.template, Visibility: "internal"}.GetTemplater()
@@ -241,8 +279,8 @@ func TestTerraformRunsOnOverridesVisibility(t *testing.T) {
 		wantSetup  bool
 	}{
 		{"private custom runner", VisibilityPrivate, "ubuntu-latest", "ubuntu-latest", true},
-		{"public custom runner", VisibilityPublic, "custom-runner", "custom-runner", true},
-		{"public pinned to altf4llc", VisibilityPublic, "altf4llc", "altf4llc", false},
+		{"private custom self-hosted runner", VisibilityPrivate, "custom-runner", "custom-runner", true},
+		{"private pinned to altf4llc", VisibilityPrivate, "altf4llc", "altf4llc", false},
 		{"private default", VisibilityPrivate, "", "altf4llc", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
