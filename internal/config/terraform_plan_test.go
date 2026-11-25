@@ -212,7 +212,7 @@ func TestTerraformAppTokenStepInPlanAndApply(t *testing.T) {
 			t.Errorf("job %s token step id = %q, want generate-token", name, step.ID)
 		}
 		want := map[string]string{
-			"app-id":      "${{ secrets.ALTF4LLC_GITHUB_APP_ID }}",
+			"client-id":   "${{ vars.ALTF4LLC_GITHUB_APP_CLIENT_ID }}",
 			"owner":       "${{ github.repository_owner }}",
 			"private-key": "${{ secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY }}",
 		}

@@ -251,10 +251,11 @@ visibility: public
   chose it.
 - `appToken: true` adds an `actions/create-github-app-token` step to the
   plan and apply jobs, after the role is assumed and before checkout. It
-  reads the `ALTF4LLC_GITHUB_APP_ID` and `ALTF4LLC_GITHUB_APP_PRIVATE_KEY`
-  secrets. Only the `just apply` step receives the token, as `GITHUB_TOKEN`:
-  the plan job generates it but passes it to no step, because a plan runs the
-  pull request's own code.
+  reads the `ALTF4LLC_GITHUB_APP_CLIENT_ID` variable and the
+  `ALTF4LLC_GITHUB_APP_PRIVATE_KEY` secret. Only the `just apply` step
+  receives the token, as `GITHUB_TOKEN`: the plan job generates it but passes
+  it to no step, because a plan runs the pull request's own code. The go-cobra-cli,
+  go-lambda and go-service workflows read the same variable and secret.
 - `env` sets environment variables on the plan and apply jobs.
 
 The plan job takes a concurrency group per pull request, `tf-plan-<number>`,

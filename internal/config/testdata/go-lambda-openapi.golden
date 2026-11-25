@@ -96,7 +96,7 @@ jobs:
       - id: generate-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.ALTF4LLC_GITHUB_APP_ID }}
+          client-id: ${{ vars.ALTF4LLC_GITHUB_APP_CLIENT_ID }}
           owner: ${{ github.repository_owner }}
           private-key: ${{ secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY }}
       - uses: extractions/netrc@v3
@@ -125,7 +125,7 @@ jobs:
       - id: generate-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.ALTF4LLC_GITHUB_APP_ID }}
+          client-id: ${{ vars.ALTF4LLC_GITHUB_APP_CLIENT_ID }}
           owner: ${{ github.repository_owner }}
           private-key: ${{ secrets.ALTF4LLC_GITHUB_APP_PRIVATE_KEY }}
       - uses: extractions/netrc@v3
