@@ -1,3 +1,4 @@
 ---
 name: build-configs
 template: go-cobra-cli
+visibility: public
