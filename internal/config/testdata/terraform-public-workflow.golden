@@ -80,8 +80,11 @@ jobs:
     - if: github.event_name == 'pull_request'
       name: Render plan summary
       run: |
+        set -o pipefail
+        command -v jq >/dev/null || { echo '::error::jq is not in the Vorpal shell; the plan summary needs it'; exit 1; }
         terraform show -no-color terraform.tfplan > terraform-plan.txt
         {
+          echo '<!-- terraform-plan-summary -->'
           echo '## Terraform Plan Summary'
           echo
           terraform show -json terraform.tfplan | jq -r '
@@ -139,7 +142,7 @@ jobs:
             issue_number,
           });
           const existing = comments.find((comment) =>
-            comment.user.type === 'Bot' && comment.body.includes('Terraform Plan Summary'));
+            comment.user.type === 'Bot' && comment.body.includes('<!-- terraform-plan-summary -->'));
           if (existing) {
             await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
           } else {

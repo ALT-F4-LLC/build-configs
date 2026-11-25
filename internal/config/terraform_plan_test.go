@@ -110,7 +110,7 @@ func TestTerraformPlanCommentsOnPullRequests(t *testing.T) {
 	plan := jobs["plan"]
 
 	render, renderStep := terraformPlanFindStep(plan, func(s terraformPlanStep) bool {
-		return strings.HasPrefix(s.Run, "terraform show -no-color terraform.tfplan > terraform-plan.txt")
+		return strings.Contains(s.Run, "terraform show -no-color terraform.tfplan > terraform-plan.txt")
 	})
 	comment, commentStep := terraformPlanFindStep(plan, func(s terraformPlanStep) bool {
 		return strings.HasPrefix(s.Uses, "actions/github-script@")
@@ -143,8 +143,14 @@ func TestTerraformPlanCommentsOnPullRequests(t *testing.T) {
 		t.Errorf("render step uses awk, which the development environment lacks:\n%s", renderStep.Run)
 	}
 
+	for _, want := range []string{"Terraform Plan Summary", "<!-- terraform-plan-summary -->", "set -o pipefail", "command -v jq"} {
+		if !strings.Contains(renderStep.Run, want) {
+			t.Errorf("render step lacks %q:\n%s", want, renderStep.Run)
+		}
+	}
+
 	script := commentStep.With["script"]
-	for _, want := range []string{"Terraform Plan Summary", "listComments", "updateComment", "createComment", "paginate", "60000"} {
+	for _, want := range []string{"<!-- terraform-plan-summary -->", "listComments", "updateComment", "createComment", "paginate", "60000"} {
 		if !strings.Contains(script, want) {
 			t.Errorf("comment script lacks %q:\n%s", want, script)
 		}

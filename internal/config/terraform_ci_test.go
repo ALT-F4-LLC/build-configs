@@ -71,7 +71,7 @@ func terraformCINormalizeRun(run string) string {
 	switch {
 	case strings.HasPrefix(run, "just plan "):
 		return "just plan"
-	case strings.HasPrefix(run, "terraform show -no-color terraform.tfplan > terraform-plan.txt"):
+	case strings.Contains(run, "terraform show -no-color terraform.tfplan > terraform-plan.txt"):
 		return "render plan summary"
 	}
 	return run
