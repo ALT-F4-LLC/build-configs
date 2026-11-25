@@ -41,6 +41,15 @@ const (
 	// fresh runner starts has none, so every ALT-F4-LLC workflow on a hosted
 	// runner selects this bucket.
 	hostedVorpalRegistryBucket = "altf4llc-vorpal-registry"
+	// configureAWSCredentials trades the job's GitHub OIDC token for the
+	// short-lived AWS credentials the S3 registry needs, so no AWS key is
+	// stored in the repository.
+	configureAWSCredentials = "aws-actions/configure-aws-credentials@v6"
+	// hostedVorpalRegion is the region of the S3 registry, which every
+	// ALT-F4-LLC role session uses.
+	hostedVorpalRegion = "us-west-2"
+	// awsAccountID owns the registry bucket and the altf4llc-gha-* roles.
+	awsAccountID = "677459762413"
 )
 
 // Runner returns the CI runner the workflows use: the altf4llc runner group
@@ -58,24 +67,39 @@ func (c Config) NeedsVorpalSetup() bool {
 	return c.Runner() != PrivateRunner
 }
 
-// VorpalSetupStep returns the workflow step that installs Vorpal, indented by
-// indent spaces. Templates call it inside an if on NeedsVorpalSetup, so a
-// render on the altf4llc runner stays unchanged.
-func (c Config) VorpalSetupStep(indent int) string {
-	return vorpalSetupStep(indent)
+// VorpalRoleARN returns the IAM role a job on a hosted runner assumes through
+// GitHub OIDC to reach the Vorpal registry bucket. The role follows the
+// altf4llc-gha-<repository> convention and lives in terraform-aws-gha-iam.
+func (c Config) VorpalRoleARN() string {
+	return fmt.Sprintf("arn:aws:iam::%s:role/altf4llc-gha-%s-vorpal", awsAccountID, c.Name)
 }
 
-func vorpalSetupStep(indent int) string {
+// VorpalSetupStep returns the workflow steps that install Vorpal, indented by
+// indent spaces. Templates call it inside an if on NeedsVorpalSetup, so a
+// render on the altf4llc runner stays unchanged. Every job that calls it needs
+// `id-token: write`, which the templates add under the same condition.
+func (c Config) VorpalSetupStep(indent int) string {
+	return vorpalSetupStep(indent, c.VorpalRoleARN())
+}
+
+// vorpalSetupStep assumes the registry role first. The credentials step
+// exports AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN and
+// AWS_DEFAULT_REGION to the job, and the setup action passes them to the
+// Vorpal services it starts, so the setup step sets no env of its own. The
+// services hold the credentials for the job's lifetime, which the role
+// session (one hour unless the role says otherwise) caps.
+func vorpalSetupStep(indent int, roleARN string) string {
 	pad := strings.Repeat(" ", indent)
-	return pad + "- uses: " + setupVorpalAction + "\n" +
+	return pad + "- uses: " + configureAWSCredentials + "\n" +
+		pad + "  with:\n" +
+		pad + "    audience: sts.amazonaws.com\n" +
+		pad + "    aws-region: " + hostedVorpalRegion + "\n" +
+		pad + "    role-to-assume: " + roleARN + "\n" +
+		pad + "- uses: " + setupVorpalAction + "\n" +
 		pad + "  with:\n" +
 		pad + "    registry-backend: s3\n" +
 		pad + "    registry-backend-s3-bucket: " + hostedVorpalRegistryBucket + "\n" +
-		pad + "    version: " + hostedVorpalVersion + "\n" +
-		pad + "  env:\n" +
-		pad + "    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}\n" +
-		pad + "    AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}\n" +
-		pad + "    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+		pad + "    version: " + hostedVorpalVersion
 }
 
 // validateVisibility rejects an unknown visibility. The key is top-level only:

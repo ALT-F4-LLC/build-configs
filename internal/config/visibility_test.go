@@ -32,8 +32,9 @@ type visibilityStep struct {
 }
 
 type visibilityJob struct {
-	RunsOn string           `yaml:"runs-on"`
-	Steps  []visibilityStep `yaml:"steps"`
+	Permissions map[string]string `yaml:"permissions"`
+	RunsOn      string            `yaml:"runs-on"`
+	Steps       []visibilityStep  `yaml:"steps"`
 }
 
 type visibilityWorkflow struct {
@@ -85,7 +86,53 @@ func publicVisibilityTemplates() []struct {
 	return out
 }
 
-const visibilitySetupAction = "ALT-F4-LLC/setup-vorpal-action@0.2.1"
+const (
+	visibilitySetupAction = "ALT-F4-LLC/setup-vorpal-action@0.2.1"
+	visibilityRoleAction  = "aws-actions/configure-aws-credentials@v6"
+	visibilityDemoRole    = "arn:aws:iam::677459762413:role/altf4llc-gha-demo-vorpal"
+)
+
+// assertVorpalSetup checks the two steps a hosted runner starts with: the
+// OIDC role session, then the setup action, which takes its AWS credentials
+// from the job environment the first step exports. The job also needs
+// id-token: write for the OIDC token.
+func assertVorpalSetup(t *testing.T, name string, job visibilityJob) {
+	t.Helper()
+	if len(job.Steps) < 2 {
+		t.Fatalf("job %s has %d steps, want the role and setup steps first", name, len(job.Steps))
+	}
+	role, setup := job.Steps[0], job.Steps[1]
+	if role.Uses != visibilityRoleAction {
+		t.Errorf("job %s first step uses %q, want %q", name, role.Uses, visibilityRoleAction)
+	}
+	for key, want := range map[string]string{
+		"audience":       "sts.amazonaws.com",
+		"aws-region":     "us-west-2",
+		"role-to-assume": visibilityDemoRole,
+	} {
+		if got := role.With[key]; got != want {
+			t.Errorf("job %s role with.%s = %q, want %q", name, key, got, want)
+		}
+	}
+	if setup.Uses != visibilitySetupAction {
+		t.Errorf("job %s second step uses %q, want %q", name, setup.Uses, visibilitySetupAction)
+	}
+	for key, want := range map[string]string{
+		"version":                    "0.6.0",
+		"registry-backend":           "s3",
+		"registry-backend-s3-bucket": "altf4llc-vorpal-registry",
+	} {
+		if got := setup.With[key]; got != want {
+			t.Errorf("job %s setup with.%s = %q, want %q", name, key, got, want)
+		}
+	}
+	if len(setup.Env) != 0 {
+		t.Errorf("job %s setup step sets env %v; its AWS credentials come from the role step", name, setup.Env)
+	}
+	if job.Permissions["id-token"] != "write" {
+		t.Errorf("job %s permissions = %v, want id-token: write for the OIDC token", name, job.Permissions)
+	}
+}
 
 // A repository with no visibility key is private, so every template keeps the
 // altf4llc runner group and installs nothing, which keeps its existing output.
@@ -121,27 +168,7 @@ func TestPublicVisibilityUsesHostedRunnerWithVorpalSetupOnEveryTemplate(t *testi
 				if job.RunsOn != "ubuntu-latest" {
 					t.Errorf("job %s runs-on = %q, want ubuntu-latest", name, job.RunsOn)
 				}
-				if len(job.Steps) == 0 {
-					t.Fatalf("job %s has no steps", name)
-				}
-				first := job.Steps[0]
-				if first.Uses != visibilitySetupAction {
-					t.Errorf("job %s first step uses %q, want %q", name, first.Uses, visibilitySetupAction)
-				}
-				for key, want := range map[string]string{
-					"version":                    "0.6.0",
-					"registry-backend":           "s3",
-					"registry-backend-s3-bucket": "altf4llc-vorpal-registry",
-				} {
-					if got := first.With[key]; got != want {
-						t.Errorf("job %s setup with.%s = %q, want %q", name, key, got, want)
-					}
-				}
-				for _, key := range []string{"AWS_ACCESS_KEY_ID", "AWS_DEFAULT_REGION", "AWS_SECRET_ACCESS_KEY"} {
-					if first.Env[key] == "" {
-						t.Errorf("job %s setup step sets no %s, which the S3 registry needs", name, key)
-					}
-				}
+				assertVorpalSetup(t, name, job)
 			}
 		})
 	}
@@ -194,9 +221,7 @@ func TestPublicVisibilityCoversJobsAddedByOptions(t *testing.T) {
 				if job.RunsOn != PublicRunner {
 					t.Errorf("job %s runs-on = %q, want %q", name, job.RunsOn, PublicRunner)
 				}
-				if len(job.Steps) == 0 || job.Steps[0].Uses != visibilitySetupAction {
-					t.Errorf("job %s does not start with the Vorpal setup step: %+v", name, job.Steps)
-				}
+				assertVorpalSetup(t, name, job)
 			}
 			slices.Sort(got)
 			if !slices.Equal(got, tc.wantJobs) {

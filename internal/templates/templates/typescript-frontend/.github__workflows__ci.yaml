@@ -16,6 +16,9 @@ jobs:
     if: {{ .ForkGuardedIf "" }}
     permissions:
       contents: read
+{{- if .NeedsVorpalSetup }}
+      id-token: write
+{{- end }}
     runs-on: {{ .Runner }}
     steps:
 {{- if .NeedsVorpalSetup }}
@@ -47,6 +50,9 @@ jobs:
       - check
     permissions:
       contents: read
+{{- if .NeedsVorpalSetup }}
+      id-token: write
+{{- end }}
     runs-on: {{ .Runner }}
     steps:
 {{- if .NeedsVorpalSetup }}

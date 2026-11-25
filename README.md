@@ -226,14 +226,23 @@ visibility: public
 - `public` runs every job on `ubuntu-latest`. A GitHub-hosted runner has no
   Vorpal, so each job starts with `ALT-F4-LLC/setup-vorpal-action`, pinned to
   Vorpal 0.6.0, before any step that runs through the Vorpal shell. The step
-  selects the `altf4llc-vorpal-registry` S3 registry, as the other ALT-F4-LLC
-  workflows on hosted runners do, because the local registry a fresh runner
-  starts holds none of the tool aliases the development environment fetches.
-  The repository therefore needs the `AWS_ACCESS_KEY_ID` and
-  `AWS_SECRET_ACCESS_KEY` secrets and the `AWS_DEFAULT_REGION` variable, which
-  the step passes to the action. Every job builds the development environment
-  cold, which takes longer than on the altf4llc runner. A public render is
-  tested here by its generated workflow only, not on a GitHub-hosted runner.
+  selects the `altf4llc-vorpal-registry` S3 registry, because the local
+  registry a fresh runner starts holds none of the tool aliases the
+  development environment fetches. A registry needs AWS credentials, which
+  come from GitHub OIDC and not from stored keys: ahead of the setup step,
+  `aws-actions/configure-aws-credentials` assumes
+  `arn:aws:iam::677459762413:role/altf4llc-gha-<name>-vorpal` in `us-west-2`,
+  and the setup action passes the session it exports to the Vorpal services.
+  Each job therefore carries `id-token: write`. The repository needs no AWS
+  secret or variable, but the role must exist in terraform-aws-gha-iam: trusted
+  by this repository's OIDC subjects (`ref:refs/heads/main`, `pull_request`,
+  and any `environment:<name>` a job uses) and allowed `s3:GetObject` and
+  `s3:PutObject` on `altf4llc-vorpal-registry/*`. The Vorpal services keep
+  the session for the whole job, so a job longer than the role's maximum
+  session (one hour by default) loses registry access. Every job builds the
+  development environment cold, which takes longer than on the altf4llc
+  runner. A public render is tested here by its generated workflow only, not on
+  a GitHub-hosted runner, and no run can pass until the role exists.
 - Any other value is an error, and so is `visibility` under `parameters`. The
   `terraform` template also rejects `public`, because its plan artifact holds
   cleartext variable and state values.
@@ -587,8 +596,10 @@ with no stored registry credential. On a push to `main` the `build` job
 uploads `image.tar` as the `image` artifact after `~/.netrc` is removed. A
 separate `push` job then runs only when
 `github.event_name == 'push' && github.ref == 'refs/heads/main'`, so a pull
-request builds the image but never requests an AWS credential or pushes. The
-`push` job needs `build` and is the only job with `id-token: write`. It holds
+request builds the image but never pushes, and on the altf4llc runner never
+requests an AWS credential. The `push` job needs `build` and is the only job
+with `id-token: write`, except that a `public` render adds it to every job for
+the Vorpal registry role (see Repository Visibility and Runners). It holds
 no GitHub App token and runs no generator or service build; its only Vorpal
 build is the development environment behind `.github/vorpal-shell.sh`, which
 runs the repository's `cmd/vorpal` program. It then:
@@ -740,8 +751,9 @@ that the frontend builds; nothing deploys it.
 The CI `check` job runs `secret-scan`, `doc-validate`, `check`, `vuln-scan`
 and, with `scripts.test`, `test`. The `build` job needs `check`, runs
 `generate`, then `just package <name>`. Both jobs carry the fork guard and
-`permissions: contents: read` only. No job requests an OIDC token, reads a
-secret, or deploys.
+`permissions: contents: read` only. On the altf4llc runner no job requests an
+OIDC token, reads a secret, or deploys; a `public` render adds
+`id-token: write` for the Vorpal registry role.
 
 There is no deploy job because quirk-frontend-portal, the repository this
 template was shaped on, deploys by hand from a workstation (`aws s3 sync` and
