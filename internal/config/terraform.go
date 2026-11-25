@@ -9,9 +9,13 @@ import (
 
 const TerraformName = "terraform"
 
+// GitHubConfig holds the terraform workflow options. RunsOn overrides the
+// runner the repository's visibility picks; AppToken adds a GitHub App token
+// step to the plan and apply jobs.
 type GitHubConfig struct {
-	Env    map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-	RunsOn string            `json:"runsOn,omitempty" yaml:"runsOn,omitempty"`
+	AppToken bool              `json:"appToken,omitempty" yaml:"appToken,omitempty"`
+	Env      map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	RunsOn   string            `json:"runsOn,omitempty" yaml:"runsOn,omitempty"`
 }
 
 type TerraformConfigRole struct {
@@ -22,7 +26,6 @@ type TerraformConfigRole struct {
 type TerraformConfig struct {
 	Config
 	GitHub   GitHubConfig          `json:"github,omitempty" yaml:"github,omitempty"`
-	Region   string                `json:"region,omitempty" yaml:"region,omitempty"`
 	Role     TerraformConfigRole   `json:"role,omitempty" yaml:"role,omitempty"`
 	Schedule *string               `json:"schedule,omitempty" yaml:"schedule,omitempty"`
 	Vorpal   TerraformVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
@@ -52,9 +55,24 @@ func (c TerraformConfig) DevTools() []string {
 
 func NewGitHubConfig() GitHubConfig {
 	return GitHubConfig{
-		Env:    map[string]string{},
-		RunsOn: "altf4llc",
+		Env: map[string]string{},
 	}
+}
+
+// Runner returns the runner every job uses: github.runsOn when set, otherwise
+// the one the repository's visibility picks.
+func (c TerraformConfig) Runner() string {
+	if c.GitHub.RunsOn != "" {
+		return c.GitHub.RunsOn
+	}
+	return c.Config.Runner()
+}
+
+// NeedsVorpalSetup reports whether the jobs must install Vorpal, which every
+// runner but the altf4llc group requires, whether visibility or github.runsOn
+// chose it.
+func (c TerraformConfig) NeedsVorpalSetup() bool {
+	return c.Runner() != PrivateRunner
 }
 
 func NewTerraformConfigRole(name string) TerraformConfigRole {
@@ -68,7 +86,6 @@ func NewTerraformConfig(c Config) TerraformConfig {
 	return TerraformConfig{
 		Config:   c,
 		GitHub:   NewGitHubConfig(),
-		Region:   "us-west-2",
 		Role:     NewTerraformConfigRole(c.Name),
 		Schedule: nil,
 		Vorpal: TerraformVorpalConfig{

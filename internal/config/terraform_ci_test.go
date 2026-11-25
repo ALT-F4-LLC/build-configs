@@ -65,9 +65,25 @@ var terraformCIRenders = []struct {
 	{"default", func(t *testing.T) { terraformVorpalRender(t, nil) }},
 }
 
-func TestTerraformDefaultGitHubRunsOnIsAltf4llc(t *testing.T) {
-	if got := NewTerraformConfig(Config{Name: "demo"}).GitHub.RunsOn; got != "altf4llc" {
-		t.Errorf("default github.runsOn = %q, want %q", got, "altf4llc")
+// terraformCINormalizeRun reduces the two run steps whose text is an
+// expression or a script to a short name, so a test can compare run lists.
+func terraformCINormalizeRun(run string) string {
+	switch {
+	case strings.HasPrefix(run, "just plan "):
+		return "just plan"
+	case strings.HasPrefix(run, "terraform show -no-color terraform.tfplan > terraform-plan.txt"):
+		return "render plan summary"
+	}
+	return run
+}
+
+func TestTerraformDefaultRunnerIsAltf4llc(t *testing.T) {
+	cfg := NewTerraformConfig(Config{Name: "demo"})
+	if cfg.GitHub.RunsOn != "" {
+		t.Errorf("default github.runsOn = %q, want unset so visibility decides", cfg.GitHub.RunsOn)
+	}
+	if got := cfg.Runner(); got != "altf4llc" {
+		t.Errorf("default Runner() = %q, want %q", got, "altf4llc")
 	}
 }
 
@@ -140,9 +156,11 @@ func TestTerraformWorkflowJobPermissionsDoNotWiden(t *testing.T) {
 
 	readOnly := map[string]string{"contents": "read"}
 	assumesRole := map[string]string{"contents": "read", "id-token": "write"}
+	// Only the plan job comments on the pull request, so only it may write them.
+	commentsOnPR := map[string]string{"contents": "read", "id-token": "write", "pull-requests": "write"}
 	want := map[string]map[string]string{
 		"check": readOnly,
-		"plan":  assumesRole,
+		"plan":  commentsOnPR,
 		"apply": assumesRole,
 	}
 	for name, perms := range want {
@@ -163,7 +181,7 @@ func TestTerraformWorkflowRunsJustThroughVorpalShellAfterCheckout(t *testing.T) 
 
 			wantRuns := map[string][]string{
 				"check": {"just secret-scan", "just check"},
-				"plan":  {"aws sts get-caller-identity", "just init", "just validate", "just plan"},
+				"plan":  {"aws sts get-caller-identity", "just init", "just validate", "just plan", "render plan summary"},
 				"apply": {"aws sts get-caller-identity", "just init", "just apply"},
 			}
 			for name, want := range wantRuns {
@@ -178,7 +196,7 @@ func TestTerraformWorkflowRunsJustThroughVorpalShellAfterCheckout(t *testing.T) 
 					if step.Run == "" {
 						continue
 					}
-					runs = append(runs, step.Run)
+					runs = append(runs, terraformCINormalizeRun(step.Run))
 					if step.Shell != terraformCIVorpalShell {
 						t.Errorf("job %s step %q shell = %q, want %q", name, step.Run, step.Shell, terraformCIVorpalShell)
 					}

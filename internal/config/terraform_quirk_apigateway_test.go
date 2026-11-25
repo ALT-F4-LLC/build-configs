@@ -78,11 +78,11 @@ func TestTerraformQuirkAPIGatewayConfigValues(t *testing.T) {
 	if got := cfg.GitHub.Env["TF_VAR_PLATFORM_DIRECTORY_TOKEN"]; got != terraformQuirkAPIGatewayEnvValue {
 		t.Errorf("GitHub.Env token = %q, want %q", got, terraformQuirkAPIGatewayEnvValue)
 	}
-	if cfg.GitHub.RunsOn != "altf4llc" {
-		t.Errorf("GitHub.RunsOn = %q, want altf4llc", cfg.GitHub.RunsOn)
+	if cfg.GitHub.RunsOn != "" {
+		t.Errorf("GitHub.RunsOn = %q, want unset", cfg.GitHub.RunsOn)
 	}
-	if cfg.Region != "us-west-2" {
-		t.Errorf("Region = %q, want us-west-2", cfg.Region)
+	if got := cfg.Runner(); got != "altf4llc" {
+		t.Errorf("Runner() = %q, want altf4llc", got)
 	}
 	if cfg.Role.PlanARN != terraformQuirkAPIGatewayPlanARN {
 		t.Errorf("Role.PlanARN = %q, want %q", cfg.Role.PlanARN, terraformQuirkAPIGatewayPlanARN)

@@ -30,8 +30,8 @@ validate:
 package:
     vorpal build --path {{ .ShellQuotedDevEnvironment }}
 
-plan:
-    terraform plan -out "terraform.tfplan"
+plan *ARGS:
+    terraform plan -out "terraform.tfplan" {{"{{"}} ARGS {{"}}"}}
 
 apply:
     terraform apply "terraform.tfplan"

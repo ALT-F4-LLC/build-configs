@@ -29,7 +29,6 @@ func TestTerraformSnapshot(t *testing.T) {
 			config: func() TerraformConfig {
 				cfg := NewTerraformConfig(Config{Name: "example", Template: TerraformName})
 				cfg.Schedule = &schedule
-				cfg.Region = "us-east-1"
 				cfg.GitHub.Env = map[string]string{"TF_VAR_example": "value"}
 				return cfg
 			},
