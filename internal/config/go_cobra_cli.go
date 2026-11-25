@@ -8,11 +8,8 @@ const GoCobraCliName = "go-cobra-cli"
 
 type GoCobraCliConfig struct {
 	Config
-	CgoEnabled     bool                   `json:"cgoEnabled,omitempty" yaml:"cgoEnabled,omitempty"`
-	GoVersion      string                 `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
 	Lint           GolangCILintConfig     `json:"lint,omitempty" yaml:"lint,omitempty"`
 	PrivateModules string                 `json:"privateModules,omitempty" yaml:"privateModules,omitempty"`
-	Version        string                 `json:"version,omitempty" yaml:"version,omitempty"`
 	Vorpal         GoCobraCliVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
 }
 
@@ -40,11 +37,8 @@ func NewGoCobraCliConfig(c Config) GoCobraCliConfig {
 	lint.Exclude = []string{}
 
 	return GoCobraCliConfig{
-		CgoEnabled: false,
-		Config:     c,
-		GoVersion:  "1.22",
-		Lint:       lint,
-		Version:    "0.1.0",
+		Config: c,
+		Lint:   lint,
 		Vorpal: GoCobraCliVorpalConfig{
 			BuildDirectory: "cmd/" + c.Name,
 			Includes:       []string{"cmd/" + c.Name, "go.mod", "go.sum", "internal"},
