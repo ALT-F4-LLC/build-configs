@@ -291,7 +291,7 @@ internal tooling. This is the template this CLI uses.
 `go-lambda` scaffolds an lambda setup in Go.
 
 To use it, you need to run the generator and then run `go mod init` and
-`go mod tidy`, then update your `vendorHash`.
+`go mod tidy`.
 
 #### Services
 
