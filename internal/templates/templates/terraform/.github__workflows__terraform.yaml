@@ -55,14 +55,6 @@ jobs:
       id-token: write
     runs-on: {{ .GitHub.RunsOn }}
     steps:
-    {{- if .GitHub.Action.SetupDeployKey }}
-    - id: deploy-key
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{"{{"}} secrets.ALTF4LLC_DEPLOY_KEY {{"}}"}}
-        known_hosts: unnecessary
-        name: id_rsa
-    {{- end }}
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
@@ -83,13 +75,6 @@ jobs:
       with:
         name: tf-plan
         path: terraform.tfplan
-    {{- if .GitHub.Action.SetupDeployKey }}
-    - env:
-        KEY_OUTCOME: ${{"{{"}} steps.deploy-key.outcome {{"}}"}}
-      if: always()
-      run: if [ "$KEY_OUTCOME" = success ]; then rm -f "$HOME/.ssh/id_rsa"; fi
-      shell: bash
-    {{- end }}
 
   apply:
     concurrency:
@@ -110,14 +95,6 @@ jobs:
       id-token: write
     runs-on: {{ .GitHub.RunsOn }}
     steps:
-    {{- if .GitHub.Action.SetupDeployKey }}
-    - id: deploy-key
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{"{{"}} secrets.ALTF4LLC_DEPLOY_KEY {{"}}"}}
-        known_hosts: unnecessary
-        name: id_rsa
-    {{- end }}
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
@@ -135,10 +112,3 @@ jobs:
       shell: bash .github/vorpal-shell.sh {0}
     - run: just apply
       shell: bash .github/vorpal-shell.sh {0}
-    {{- if .GitHub.Action.SetupDeployKey }}
-    - env:
-        KEY_OUTCOME: ${{"{{"}} steps.deploy-key.outcome {{"}}"}}
-      if: always()
-      run: if [ "$KEY_OUTCOME" = success ]; then rm -f "$HOME/.ssh/id_rsa"; fi
-      shell: bash
-    {{- end }}

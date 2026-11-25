@@ -9,14 +9,9 @@ import (
 
 const TerraformName = "terraform"
 
-type GitHubConfigAction struct {
-	SetupDeployKey bool `json:"setupDeployKey,omitempty" yaml:"setupDeployKey,omitempty"`
-}
-
 type GitHubConfig struct {
-	Action GitHubConfigAction `json:"action,omitempty" yaml:"action,omitempty"`
-	Env    map[string]string  `json:"env,omitempty" yaml:"env,omitempty"`
-	RunsOn string             `json:"runsOn,omitempty" yaml:"runsOn,omitempty"`
+	Env    map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	RunsOn string            `json:"runsOn,omitempty" yaml:"runsOn,omitempty"`
 }
 
 type TerraformConfigRole struct {
@@ -55,15 +50,8 @@ func (c TerraformConfig) DevTools() []string {
 	return resolveTools(defaults, c.Vorpal.Tools, c.Vorpal.ExcludeTools)
 }
 
-func NewGitHubConfigAction() GitHubConfigAction {
-	return GitHubConfigAction{
-		SetupDeployKey: false,
-	}
-}
-
 func NewGitHubConfig() GitHubConfig {
 	return GitHubConfig{
-		Action: NewGitHubConfigAction(),
 		Env:    map[string]string{},
 		RunsOn: "altf4llc",
 	}

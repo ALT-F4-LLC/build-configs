@@ -58,39 +58,11 @@ func terraformCIStepIndex(job terraformCIWorkflowJob, action string) int {
 	})
 }
 
-// terraformCIIsDeployKeyCleanup reports whether step is the always() step in
-// the runner's bash that removes the key file job's ssh-key-action step names,
-// and only when that step succeeded, so a key it did not write survives.
-func terraformCIIsDeployKeyCleanup(job terraformCIWorkflowJob, step terraformCIWorkflowStep) bool {
-	key := terraformCIStepIndex(job, "shimataro/ssh-key-action")
-	if key < 0 {
-		return false
-	}
-	keyStep := job.Steps[key]
-	if keyStep.ID == "" || keyStep.With["name"] == "" {
-		return false
-	}
-	wantRun := `if [ "$KEY_OUTCOME" = success ]; then rm -f "$HOME/.ssh/` + keyStep.With["name"] + `"; fi`
-	wantOutcome := "${{ steps." + keyStep.ID + ".outcome }}"
-	return step.If == "always()" && step.Shell == "bash" && step.Run == wantRun &&
-		maps.Equal(step.Env, map[string]string{"KEY_OUTCOME": wantOutcome})
-}
-
-func terraformCIRenderDeployKey(t *testing.T) {
-	t.Helper()
-	terraformVorpalRender(t, map[string]interface{}{
-		"github": map[string]interface{}{
-			"action": map[string]interface{}{"setupDeployKey": true},
-		},
-	})
-}
-
 var terraformCIRenders = []struct {
 	name   string
 	render func(t *testing.T)
 }{
 	{"default", func(t *testing.T) { terraformVorpalRender(t, nil) }},
-	{"deploy key", terraformCIRenderDeployKey},
 }
 
 func TestTerraformDefaultGitHubRunsOnIsAltf4llc(t *testing.T) {
@@ -203,7 +175,7 @@ func TestTerraformWorkflowRunsJustThroughVorpalShellAfterCheckout(t *testing.T) 
 				}
 				var runs []string
 				for i, step := range job.Steps {
-					if step.Run == "" || terraformCIIsDeployKeyCleanup(job, step) {
+					if step.Run == "" {
 						continue
 					}
 					runs = append(runs, step.Run)
@@ -288,52 +260,13 @@ func TestTerraformWorkflowKeepsCredentialAndArtifactSteps(t *testing.T) {
 	}
 }
 
-func TestTerraformWorkflowRemovesDeployKeyItWrote(t *testing.T) {
-	terraformCIRenderDeployKey(t)
-
-	wf := terraformCIParseWorkflow(t)
-
-	for _, name := range []string{"plan", "apply"} {
-		job := wf.Jobs[name]
-		key := terraformCIStepIndex(job, "shimataro/ssh-key-action")
-		if key < 0 {
-			t.Errorf("job %s has no ssh-key-action step", name)
-			continue
-		}
-		if job.Steps[key].ID == "" || job.Steps[key].With["name"] == "" {
-			t.Errorf("job %s ssh-key-action needs an id and a key file name: %+v", name, job.Steps[key])
-			continue
-		}
-		cleanup := slices.IndexFunc(job.Steps, func(s terraformCIWorkflowStep) bool {
-			return terraformCIIsDeployKeyCleanup(job, s)
-		})
-		if cleanup < 0 {
-			t.Errorf("job %s has no `if: always()` bash step removing the key file only on ssh-key-action success: %+v", name, job.Steps)
-			continue
-		}
-		if cleanup < key {
-			t.Errorf("job %s removes the key at step %d, before ssh-key-action at step %d", name, cleanup, key)
-		}
-		for i, step := range job.Steps {
-			if step.Shell == terraformCIVorpalShell && i > cleanup {
-				t.Errorf("job %s step %q needs the key but runs after its cleanup", name, step.Run)
-			}
-		}
-	}
-
-	src := terraformVorpalReadFile(t, terraformCIWorkflowPath)
-	if strings.Contains(src, "rm -rf") {
-		t.Errorf("%s removes a directory recursively:\n%s", terraformCIWorkflowPath, src)
-	}
-}
-
-func TestTerraformWorkflowOmitsDeployKeyByDefault(t *testing.T) {
+func TestTerraformWorkflowOmitsDeployKey(t *testing.T) {
 	terraformVorpalRender(t, nil)
 
 	src := terraformVorpalReadFile(t, terraformCIWorkflowPath)
-	for _, unwanted := range []string{"ssh-key-action", ".ssh"} {
+	for _, unwanted := range []string{"ssh-key-action", ".ssh", "DEPLOY_KEY"} {
 		if strings.Contains(src, unwanted) {
-			t.Errorf("%s contains %q without setupDeployKey:\n%s", terraformCIWorkflowPath, unwanted, src)
+			t.Errorf("%s contains %q:\n%s", terraformCIWorkflowPath, unwanted, src)
 		}
 	}
 }

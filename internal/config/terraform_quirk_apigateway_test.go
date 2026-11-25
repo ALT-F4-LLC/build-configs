@@ -12,17 +12,15 @@ import (
 )
 
 // terraformQuirkAPIGatewayYAML is the build-configs.yaml for
-// terraform-quirk-apigateway on the terraform template. It keeps the deploy
-// key and the platform directory token from the Nix-era file and drops
-// setupNix, providers and runsOn: nixos. The first two no longer exist on
-// the template, and the jobs run on the default altf4llc runner.
+// terraform-quirk-apigateway on the terraform template. It keeps the platform
+// directory token from the Nix-era file and drops the deploy key, setupNix,
+// providers and runsOn: nixos. None of those exist on the template, and the
+// jobs run on the default altf4llc runner.
 const terraformQuirkAPIGatewayYAML = `---
 name: terraform-quirk-apigateway
 template: terraform
 parameters:
   github:
-    action:
-      setupDeployKey: true
     env:
       TF_VAR_PLATFORM_DIRECTORY_TOKEN: ${{ secrets.TF_VAR_PLATFORM_DIRECTORY_TOKEN }}
 `
@@ -77,9 +75,6 @@ func TestTerraformQuirkAPIGatewayDeclaresEveryKey(t *testing.T) {
 func TestTerraformQuirkAPIGatewayConfigValues(t *testing.T) {
 	cfg := terraformQuirkAPIGatewayConfig(t)
 
-	if !cfg.GitHub.Action.SetupDeployKey {
-		t.Error("GitHub.Action.SetupDeployKey = false, want true")
-	}
 	if got := cfg.GitHub.Env["TF_VAR_PLATFORM_DIRECTORY_TOKEN"]; got != terraformQuirkAPIGatewayEnvValue {
 		t.Errorf("GitHub.Env token = %q, want %q", got, terraformQuirkAPIGatewayEnvValue)
 	}
@@ -98,8 +93,7 @@ func TestTerraformQuirkAPIGatewayConfigValues(t *testing.T) {
 }
 
 // The workflow keeps what the Nix-era one did: the token on the plan and
-// apply jobs only, the deploy key before the AWS credentials, the same roles,
-// and no Nix runner.
+// apply jobs only, the same roles, no deploy key and no Nix runner.
 func TestTerraformQuirkAPIGatewayWorkflow(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := terraformQuirkAPIGatewayConfig(t).Render(); err != nil {
@@ -134,10 +128,12 @@ func TestTerraformQuirkAPIGatewayWorkflow(t *testing.T) {
 			t.Errorf("job %s token env = %q, want %q", tc.job, got, terraformQuirkAPIGatewayEnvValue)
 		}
 
-		key := terraformCIStepIndex(job, "shimataro/ssh-key-action")
+		if key := terraformCIStepIndex(job, "shimataro/ssh-key-action"); key >= 0 {
+			t.Errorf("job %s has a deploy key step at %d", tc.job, key)
+		}
 		aws := terraformCIStepIndex(job, "aws-actions/configure-aws-credentials")
-		if key < 0 || aws < 0 || key > aws {
-			t.Errorf("job %s: deploy key step at %d, AWS credentials step at %d, want the key first", tc.job, key, aws)
+		if aws < 0 {
+			t.Errorf("job %s has no AWS credentials step", tc.job)
 			continue
 		}
 		if got := job.Steps[aws].With["role-to-assume"]; got != tc.arn {

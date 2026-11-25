@@ -57,7 +57,7 @@ func TestTerraformConfigDropsNixSettings(t *testing.T) {
 	}{
 		{reflect.TypeFor[TerraformConfig](), "Nix"},
 		{reflect.TypeFor[TerraformConfig](), "Providers"},
-		{reflect.TypeFor[GitHubConfigAction](), "SetupNix"},
+		{reflect.TypeFor[GitHubConfig](), "Action"},
 	} {
 		if _, ok := tc.typ.FieldByName(tc.field); ok {
 			t.Errorf("%s still has a %s field", tc.typ.Name(), tc.field)
