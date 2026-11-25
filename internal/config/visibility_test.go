@@ -200,14 +200,16 @@ func TestVisibilityRejectsUnknownValue(t *testing.T) {
 // The parameter unmarshal promotes embedded Config fields, so a visibility
 // under parameters would silently override the top-level key.
 func TestVisibilityRejectsParameterSpelling(t *testing.T) {
-	cfg := Config{
-		Name:       "demo",
-		Template:   TerraformName,
-		Visibility: VisibilityPrivate,
-		Parameters: map[string]any{"visibility": VisibilityPublic},
-	}
-	if _, err := cfg.GetTemplater(); err == nil {
-		t.Error("GetTemplater accepted parameters.visibility")
+	for _, key := range []string{"visibility", "Visibility", "VISIBILITY"} {
+		cfg := Config{
+			Name:       "demo",
+			Template:   TerraformName,
+			Visibility: VisibilityPrivate,
+			Parameters: map[string]any{key: VisibilityPublic},
+		}
+		if _, err := cfg.GetTemplater(); err == nil {
+			t.Errorf("GetTemplater accepted parameters.%s", key)
+		}
 	}
 }
 

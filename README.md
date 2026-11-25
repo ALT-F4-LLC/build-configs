@@ -265,8 +265,19 @@ On pull requests the plan job also renders a summary table of the resource
 changes with `jq`, and posts it with the full plan as one comment, which later
 runs update in place. The job holds `pull-requests: write`; the other jobs do
 not. The comment stays under the 65,536-character comment limit by cutting the
-summary and then the plan, and the full plan stays in the workflow log. A public
-repository publishes its plan output in that comment.
+summary and then the plan, and the full plan stays in the workflow log. The
+summary step needs `jq` in the Vorpal shell, so a config that excludes the `jq`
+tool breaks pull request plans.
+
+A public repository publishes its plan output in that comment. It also
+publishes the `tf-plan` artifact, a binary plan file that holds variable and
+state values in cleartext, sensitive ones included, and that any signed-in
+GitHub user can download. Use `public` with this template only when that
+exposure is acceptable.
+
+The `github.appToken` step in the plan job only generates the token. No plan
+step receives it, so a plan that needs the token for a provider or a private
+module source runs unauthenticated.
 
 ### `go-cobra-cli`
 

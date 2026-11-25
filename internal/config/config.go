@@ -59,8 +59,8 @@ func (c Config) NeedsVorpalSetup() bool {
 }
 
 // VorpalSetupStep returns the workflow step that installs Vorpal, indented by
-// indent spaces, or "" when the runner already carries it. Templates call it
-// inside an if on NeedsVorpalSetup, so a private render stays unchanged.
+// indent spaces. Templates call it inside an if on NeedsVorpalSetup, so a
+// render on the altf4llc runner stays unchanged.
 func (c Config) VorpalSetupStep(indent int) string {
 	return vorpalSetupStep(indent)
 }
@@ -82,8 +82,12 @@ func vorpalSetupStep(indent int) string {
 // a parameters.visibility would be promoted onto the embedded Config by the
 // parameter unmarshal and silently win, so it is an error too.
 func (c Config) validateVisibility() error {
-	if _, ok := c.Parameters["visibility"]; ok {
-		return errors.New("visibility is a top-level key beside name and template, not a parameter")
+	// encoding/json matches field names case-insensitively, so every
+	// spelling of the key reaches the embedded Config.
+	for key := range c.Parameters {
+		if strings.EqualFold(key, "visibility") {
+			return errors.New("visibility is a top-level key beside name and template, not a parameter")
+		}
 	}
 	switch c.Visibility {
 	case "", VisibilityPrivate, VisibilityPublic:
