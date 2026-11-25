@@ -325,6 +325,9 @@ func TestTerraformRunsOnOverridesVisibility(t *testing.T) {
 				if hasSetup != tc.wantSetup {
 					t.Errorf("job %s has setup step = %v, want %v", name, hasSetup, tc.wantSetup)
 				}
+				if tc.wantSetup {
+					assertVorpalSetup(t, name, job)
+				}
 			}
 		})
 	}

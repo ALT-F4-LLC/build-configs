@@ -237,7 +237,8 @@ visibility: public
   secret or variable, but the role must exist in terraform-aws-gha-iam: trusted
   by this repository's OIDC subjects (`ref:refs/heads/main`, `pull_request`,
   and any `environment:<name>` a job uses) and allowed `s3:GetObject` and
-  `s3:PutObject` on `altf4llc-vorpal-registry/*`. The Vorpal services keep
+  `s3:PutObject` on `altf4llc-vorpal-registry/*`; Vorpal's worker pushes every
+  artifact it builds, and a failed push fails the build. The Vorpal services keep
   the session for the whole job, so a job longer than the role's maximum
   session (one hour by default) loses registry access. Every job builds the
   development environment cold, which takes longer than on the altf4llc
