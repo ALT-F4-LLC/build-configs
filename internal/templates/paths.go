@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	pathDivider = "/"
+	pathDivider     = "/"
 	templateDivider = "__"
 )
 

@@ -2,21 +2,20 @@ package config
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/ALT-F4-LLC/build-configs/internal/templates"
 )
 
 const TerraformName = "terraform"
 
-type GitHubConfigAction struct {
-	SetupDeployKey bool `json:"setupDeployKey,omitempty" yaml:"setupDeployKey,omitempty"`
-	SetupNix       bool `json:"setupNix,omitempty" yaml:"setupNix,omitempty"`
-}
-
+// GitHubConfig holds the terraform workflow options. RunsOn overrides the
+// runner the repository's visibility picks; AppToken adds a GitHub App token
+// step to the plan and apply jobs.
 type GitHubConfig struct {
-	Action GitHubConfigAction `json:"action,omitempty" yaml:"action,omitempty"`
-	Env    map[string]string  `json:"env,omitempty" yaml:"env,omitempty"`
-	RunsOn string             `json:"runsOn,omitempty" yaml:"runsOn,omitempty"`
+	AppToken bool              `json:"appToken,omitempty" yaml:"appToken,omitempty"`
+	Env      map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	RunsOn   string            `json:"runsOn,omitempty" yaml:"runsOn,omitempty"`
 }
 
 type TerraformConfigRole struct {
@@ -26,27 +25,54 @@ type TerraformConfigRole struct {
 
 type TerraformConfig struct {
 	Config
-	GitHub    GitHubConfig        `json:"github,omitempty" yaml:"github,omitempty"`
-	Nix       NixConfig           `json:"nix,omitempty" yaml:"nix,omitempty"`
-	Region    string              `json:"region,omitempty" yaml:"region,omitempty"`
-	Role      TerraformConfigRole `json:"role,omitempty" yaml:"role,omitempty"`
-	Schedule  *string             `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	Providers []string            `json:"providers,omitempty" yaml:"providers,omitempty"`
+	GitHub   GitHubConfig          `json:"github,omitempty" yaml:"github,omitempty"`
+	Role     TerraformConfigRole   `json:"role,omitempty" yaml:"role,omitempty"`
+	Schedule *string               `json:"schedule,omitempty" yaml:"schedule,omitempty"`
+	Vorpal   TerraformVorpalConfig `json:"vorpal,omitempty" yaml:"vorpal,omitempty"`
 }
 
-func NewGitHubConfigAction() GitHubConfigAction {
-	return GitHubConfigAction{
-		SetupDeployKey: false,
-		SetupNix:       true,
-	}
+// terraformVorpalProgram is the TypeScript Vorpal config program the terraform
+// and terraform-module templates render.
+const terraformVorpalProgram = "src/vorpal.ts"
+
+// TerraformVorpalConfig drives the generated Vorpal.toml and src/vorpal.ts
+// program. Tools adds Vorpal artifact aliases to the default list;
+// ExcludeTools removes defaults by name or full alias. The Vorpal CLI reads a
+// script only for a Go config program, so there is no script option.
+type TerraformVorpalConfig struct {
+	TerraformVersion string   `json:"terraformVersion,omitempty" yaml:"terraformVersion,omitempty"`
+	Tools            []string `json:"tools,omitempty" yaml:"tools,omitempty"`
+	ExcludeTools     []string `json:"excludeTools,omitempty" yaml:"excludeTools,omitempty"`
+}
+
+// DevTools returns the Vorpal artifact aliases the development environment
+// fetches: the defaults and terraform at TerraformVersion, plus Tools, minus
+// ExcludeTools.
+func (c TerraformConfig) DevTools() []string {
+	defaults := append(slices.Clone(terraformDefaultTools), "terraform:"+c.Vorpal.TerraformVersion)
+	return resolveTools(defaults, c.Vorpal.Tools, c.Vorpal.ExcludeTools)
 }
 
 func NewGitHubConfig() GitHubConfig {
 	return GitHubConfig{
-		Action: NewGitHubConfigAction(),
-		Env:    map[string]string{},
-		RunsOn: "ubuntu-latest",
+		Env: map[string]string{},
 	}
+}
+
+// Runner returns the runner every job uses: github.runsOn when set, otherwise
+// the one the repository's visibility picks.
+func (c TerraformConfig) Runner() string {
+	if c.GitHub.RunsOn != "" {
+		return c.GitHub.RunsOn
+	}
+	return c.Config.Runner()
+}
+
+// NeedsVorpalSetup reports whether the jobs must install Vorpal, which every
+// runner but the altf4llc group requires, whether visibility or github.runsOn
+// chose it.
+func (c TerraformConfig) NeedsVorpalSetup() bool {
+	return c.Runner() != PrivateRunner
 }
 
 func NewTerraformConfigRole(name string) TerraformConfigRole {
@@ -60,31 +86,56 @@ func NewTerraformConfig(c Config) TerraformConfig {
 	return TerraformConfig{
 		Config:   c,
 		GitHub:   NewGitHubConfig(),
-		Nix:      NewNixConfig(),
-		Region:   "us-west-2",
 		Role:     NewTerraformConfigRole(c.Name),
 		Schedule: nil,
+		Vorpal: TerraformVorpalConfig{
+			TerraformVersion: "1.13.1",
+		},
+	}
+}
+
+func (c TerraformConfig) renderMap() templates.RenderMap {
+	return templates.RenderMap{
+		templates.AllCommonTemplates: {
+			".github/renovate.json",
+		},
+		templates.VorpalCommonTemplates: vorpalCommonFiles(),
+		templates.TerraformCommonTemplates: {
+			".gitignore",
+			"Vorpal.toml",
+		},
+		templates.TerraformTemplates: {
+			".github/workflows/terraform.yaml",
+			"justfile",
+		},
 	}
 }
 
 func (c TerraformConfig) Render() error {
-	renderMap := templates.RenderMap{
-		templates.AllCommonTemplates: {
-			".envrc",
-			".github/renovate.json",
-		},
-		templates.TerraformTemplates: {
-			".github/workflows/terraform.yaml",
-			".gitignore",
-			"flake.nix",
-			"justfile",
-		},
-	}
-
-	files, err := templates.RenderTemplates(renderMap, c)
+	files, err := templates.RenderTemplates(c.renderMap(), c)
 	if err != nil {
 		return err
 	}
 
-	return templates.WriteFiles(files)
+	vorpalProgram, err := templates.RenderTemplate(templates.TerraformTemplates, terraformVorpalProgram+".tmpl", c)
+	if err != nil {
+		return err
+	}
+	files["./"+terraformVorpalProgram] = vorpalProgram
+
+	if err := addTerraformScaffold(files, c); err != nil {
+		return err
+	}
+
+	if err := templates.WriteFiles(files); err != nil {
+		return err
+	}
+
+	return makeVorpalShellExecutable()
+}
+
+// HasDevTool reports whether the development environment carries the named
+// tool at any version.
+func (c TerraformConfig) HasDevTool(name string) bool {
+	return hasTool(c.DevTools(), name)
 }

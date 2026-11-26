@@ -9,7 +9,7 @@ import (
 var Version = "git"
 
 var versionCmd = &cobra.Command{
-	Use: "version",
+	Use:   "version",
 	Short: "Shows the version number of build-configs, then exits.",
 	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Printf("build-configs version '%s'\n", Version)
