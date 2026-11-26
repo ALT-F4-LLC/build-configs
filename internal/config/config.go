@@ -41,10 +41,10 @@ const (
 	// fresh runner starts has none, so every ALT-F4-LLC workflow on a hosted
 	// runner selects this bucket.
 	hostedVorpalRegistryBucket = "altf4llc-vorpal-registry"
-	// configureAWSCredentials trades the job's GitHub OIDC token for the
+	// configureAWSAction trades the job's GitHub OIDC token for the
 	// short-lived AWS credentials the S3 registry needs, so no AWS key is
 	// stored in the repository.
-	configureAWSCredentials = "aws-actions/configure-aws-credentials@v6"
+	configureAWSAction = "aws-actions/configure-aws-credentials@v6"
 	// hostedVorpalRegion is the region of the S3 registry, which every
 	// ALT-F4-LLC role session uses.
 	hostedVorpalRegion = "us-west-2"
@@ -90,7 +90,7 @@ func (c Config) VorpalSetupStep(indent int) string {
 // session (one hour unless the role says otherwise) caps.
 func vorpalSetupStep(indent int, roleARN string) string {
 	pad := strings.Repeat(" ", indent)
-	return pad + "- uses: " + configureAWSCredentials + "\n" +
+	return pad + "- uses: " + configureAWSAction + "\n" +
 		pad + "  with:\n" +
 		pad + "    audience: sts.amazonaws.com\n" +
 		pad + "    aws-region: " + hostedVorpalRegion + "\n" +
