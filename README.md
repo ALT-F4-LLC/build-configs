@@ -149,11 +149,11 @@ Every Go template's `justfile` carries the recipes this repository's own
   named for the repository. The lock is the `bun.lock` the Vorpal CLI ships
   at its 0.6.0 tag in its TypeScript template, with every package pinned by
   integrity hash; `bun install --frozen-lockfile` accepts it and a plain
-  `bun install` leaves it unchanged on bun 1.4.4. Then pin the sources in
-  `Vorpal.lock` for every platform that builds, such as
-  `vorpal prepare <name>-dev` and
-  `vorpal prepare --system x86_64-linux <name>-dev`; the program declares only
-  the development environment. `.gitignore` ignores `node_modules`. There
+  `bun install` leaves it unchanged on bun 1.4.4. Then copy `Vorpal.lock` from
+  a repository using the same Vorpal SDK version (currently `terraform-github`
+  for SDK 0.6.0), commit it, and let CI run. Do not run `vorpal prepare`
+  locally; the program declares only the development environment. `.gitignore`
+  ignores `node_modules`. There
   is no `vorpal.script`, which the Vorpal CLI reads only for a Go config
   program. A repository that generated an earlier Go version keeps its
   `cmd/vorpal/main.go`, `go.mod` and `go.sum`; delete them. Both justfiles
