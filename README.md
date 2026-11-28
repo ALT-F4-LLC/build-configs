@@ -47,7 +47,7 @@ to skip templating:
 justfile
 ```
 
-## Onboarding Terraform repositories
+## Onboarding Terraform Repositories
 
 Add a `build-configs.yaml` at the repository root, then run
 `build-configs generate` from that repository. For example:
