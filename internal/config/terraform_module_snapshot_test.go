@@ -14,37 +14,44 @@ import (
 
 var terraformModuleUpdateGolden = flag.Bool("update", false, "regenerate golden snapshot files under testdata")
 
-const terraformModuleSnapshotConfig = `name: example-module
-template: terraform-module
-`
-
 func TestTerraformModuleSnapshot(t *testing.T) {
-	golden, err := filepath.Abs(filepath.Join("testdata", "terraform-module.golden"))
-	if err != nil {
-		t.Fatalf("resolve golden path: %v", err)
-	}
+	for _, tc := range []struct {
+		name   string
+		golden string
+		config string
+	}{
+		{name: "private", golden: "terraform-module.golden", config: "name: example-module\ntemplate: terraform-module\n"},
+		{name: "public", golden: "terraform-module-public.golden", config: "name: example-module\ntemplate: terraform-module\nvisibility: public\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			golden, err := filepath.Abs(filepath.Join("testdata", tc.golden))
+			if err != nil {
+				t.Fatalf("resolve golden path: %v", err)
+			}
 
-	var cfg Config
-	if err := yaml.Unmarshal([]byte(terraformModuleSnapshotConfig), &cfg); err != nil {
-		t.Fatalf("parse config: %v", err)
-	}
+			var cfg Config
+			if err := yaml.Unmarshal([]byte(tc.config), &cfg); err != nil {
+				t.Fatalf("parse config: %v", err)
+			}
 
-	root := t.TempDir()
-	out := filepath.Join(root, "out")
-	if err := os.Mkdir(out, 0o750); err != nil {
-		t.Fatalf("create render dir: %v", err)
-	}
-	t.Chdir(out)
+			root := t.TempDir()
+			out := filepath.Join(root, "out")
+			if err := os.Mkdir(out, 0o750); err != nil {
+				t.Fatalf("create render dir: %v", err)
+			}
+			t.Chdir(out)
 
-	tpl, err := cfg.GetTemplater()
-	if err != nil {
-		t.Fatalf("GetTemplater: %v", err)
-	}
-	if err := tpl.Render(); err != nil {
-		t.Fatalf("Render: %v", err)
-	}
+			tpl, err := cfg.GetTemplater()
+			if err != nil {
+				t.Fatalf("GetTemplater: %v", err)
+			}
+			if err := tpl.Render(); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
 
-	terraformModuleCompareGolden(t, golden, terraformModuleSnapshot(t, root))
+			terraformModuleCompareGolden(t, golden, terraformModuleSnapshot(t, root))
+		})
+	}
 }
 
 func TestTerraformModuleSnapshotRecordsMissingFinalNewline(t *testing.T) {

@@ -33,6 +33,33 @@ func TestTerraformSnapshot(t *testing.T) {
 				return cfg
 			},
 		},
+		{
+			name:   "terraform-aws-gha-iam",
+			golden: "terraform-aws-gha-iam.golden",
+			config: func() TerraformConfig {
+				cfg := NewTerraformConfig(Config{Name: "terraform-aws-gha-iam", Template: TerraformName})
+				cfg.GitHub.AppToken = true
+				cfg.GitHub.RunsOn = "altf4llc"
+				return cfg
+			},
+		},
+		{
+			name:   "custom OIDC and secrets",
+			golden: "terraform-custom-config.golden",
+			config: func() TerraformConfig {
+				cfg := NewTerraformConfig(Config{Name: "terraform-custom-config", Template: TerraformName})
+				cfg.GitHub.RunsOn = "altf4llc"
+				cfg.GitHub.Env = map[string]string{
+					"TF_VAR_deployment_token": "${{ secrets.DEPLOYMENT_TOKEN }}", // #nosec G101 -- GitHub secret expression, not a literal credential
+					"TF_VAR_region":           "us-east-1",
+				}
+				cfg.Role.PlanARN = "arn:aws:iam::111122223333:role/custom-plan"
+				cfg.Role.ApplyARN = "arn:aws:iam::111122223333:role/custom-apply"
+				cfg.Role.Region = "eu-west-1"
+				cfg.Vorpal.Tools = []string{"terraform-docs:0.20.0"}
+				return cfg
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			golden, err := filepath.Abs(filepath.Join("testdata", tc.golden))

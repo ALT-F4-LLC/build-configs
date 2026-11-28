@@ -250,7 +250,7 @@ func TestScanJobsGateDownstreamJobs(t *testing.T) {
 		{GoServiceName, ".github/workflows/ci.yaml", map[string]any{"image": map[string]any{"repository": "quirk/x", "roleArn": "arn:aws:iam::677459762413:role/x"}}, []string{"build"}},
 		{GoLibraryName, ".github/workflows/ci.yaml", nil, []string{"test"}},
 		{TerraformName, ".github/workflows/terraform.yaml", nil, []string{"plan"}},
-		{TerraformModuleName, ".github/workflows/terraform.yaml", nil, []string{"package"}},
+		{TerraformModuleName, ".github/workflows/terraform.yaml", nil, []string{"build"}},
 		{TypeScriptFrontendName, ".github/workflows/ci.yaml", nil, []string{"build"}},
 	}
 	for _, tc := range cases {

@@ -21,6 +21,7 @@ type GitHubConfig struct {
 type TerraformConfigRole struct {
 	PlanARN  string `json:"planArn,omitempty" yaml:"planArn,omitempty"`
 	ApplyARN string `json:"applyArn,omitempty" yaml:"applyArn,omitempty"`
+	Region   string `json:"region,omitempty" yaml:"region,omitempty"`
 }
 
 type TerraformConfig struct {
@@ -79,6 +80,7 @@ func NewTerraformConfigRole(name string) TerraformConfigRole {
 	return TerraformConfigRole{
 		ApplyARN: fmt.Sprintf("arn:aws:iam::677459762413:role/altf4llc-gha-%s-apply", name),
 		PlanARN:  fmt.Sprintf("arn:aws:iam::677459762413:role/altf4llc-gha-%s-plan", name),
+		Region:   "us-west-2",
 	}
 }
 

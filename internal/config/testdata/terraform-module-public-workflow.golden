@@ -37,7 +37,7 @@ jobs:
       - run: just check
         shell: bash .github/vorpal-shell.sh {0}
 
-  package:
+  build:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     needs:
       - check
@@ -57,7 +57,5 @@ jobs:
           registry-backend-s3-bucket: altf4llc-vorpal-registry
           version: 0.6.0
       - uses: actions/checkout@v7
-      - run: just package
-        shell: bash .github/vorpal-shell.sh {0}
-      - run: echo "just package built the Vorpal dev environment (vorpal build --path 'demo-dev'); it does not run terraform init or validate." >> "$GITHUB_STEP_SUMMARY"
+      - run: just build
         shell: bash .github/vorpal-shell.sh {0}

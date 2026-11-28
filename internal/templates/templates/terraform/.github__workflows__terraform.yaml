@@ -68,7 +68,7 @@ jobs:
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
-        aws-region: us-west-2
+        aws-region: {{ .Role.Region }}
         role-to-assume: {{ .Role.PlanARN }}
     {{- if .GitHub.AppToken }}
     - id: generate-token
@@ -192,7 +192,7 @@ jobs:
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         audience: sts.amazonaws.com
-        aws-region: us-west-2
+        aws-region: {{ .Role.Region }}
         role-to-assume: {{ .Role.ApplyARN }}
     {{- if .GitHub.AppToken }}
     - id: generate-token
