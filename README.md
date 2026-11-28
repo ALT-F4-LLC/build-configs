@@ -130,9 +130,9 @@ Every Go template's `justfile` carries the recipes this repository's own
   environment. Their development environments carry `gitleaks`, and their
   `secret-scan` recipe matches the Go templates'. Generated CI runs
   `secret-scan` in the `check` job while `gitleaks` is in the development
-  environment, and does not run `build`. `terraform` CI runs no `package`
-  either, because every CI step already builds the development environment
-  that `package` builds.
+  environment. `terraform-module` CI also runs `just build` in a dependent
+  `build` job; `terraform` CI has no `build` job. Neither workflow runs
+  `package`, because CI uses the development environment directly.
 - The Vorpal config program of `terraform` and `terraform-module` is
   TypeScript: `src/vorpal.ts` with `language = "typescript"` in
   `Vorpal.toml`, as in [`typescript-frontend`](#typescript-frontend). Vorpal
