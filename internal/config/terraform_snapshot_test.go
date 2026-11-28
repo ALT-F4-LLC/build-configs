@@ -50,7 +50,7 @@ func TestTerraformSnapshot(t *testing.T) {
 				cfg := NewTerraformConfig(Config{Name: "terraform-custom-config", Template: TerraformName})
 				cfg.GitHub.RunsOn = "altf4llc"
 				cfg.GitHub.Env = map[string]string{
-					"TF_VAR_deployment_token": "${{ secrets.DEPLOYMENT_TOKEN }}",
+					"TF_VAR_deployment_token": "${{ secrets.DEPLOYMENT_TOKEN }}", //nolint:gosec // GitHub secret expression, not a literal credential
 					"TF_VAR_region":           "us-east-1",
 				}
 				cfg.Role.PlanARN = "arn:aws:iam::111122223333:role/custom-plan"
