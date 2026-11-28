@@ -173,6 +173,11 @@ func (c Config) GetTemplater() (Templater, error) {
 	if err := c.validateVisibility(); err != nil {
 		return nil, err
 	}
+	if c.Template == TerraformName || c.Template == TerraformModuleName {
+		if err := validateTerraformLegacyOptions(c.Parameters); err != nil {
+			return nil, err
+		}
+	}
 
 	switch c.Template {
 	case "go-cobra-cli":
@@ -311,6 +316,19 @@ func loadConfigJSON(b []byte) (Config, error) {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return cfg, err
 	}
+	if cfg.Template == TerraformName || cfg.Template == TerraformModuleName {
+		var root map[string]json.RawMessage
+		if err := json.Unmarshal(b, &root); err != nil {
+			return cfg, err
+		}
+		keys := make([]string, 0, len(root))
+		for key := range root {
+			keys = append(keys, key)
+		}
+		if err := validateTerraformLegacyRootKeys(keys); err != nil {
+			return cfg, err
+		}
+	}
 
 	Cfg = cfg
 
@@ -322,6 +340,21 @@ func loadConfigYaml(b []byte) (Config, error) {
 
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return cfg, err
+	}
+	if cfg.Template == TerraformName || cfg.Template == TerraformModuleName {
+		var root map[interface{}]interface{}
+		if err := yaml.Unmarshal(b, &root); err != nil {
+			return cfg, err
+		}
+		keys := make([]string, 0, len(root))
+		for key := range root {
+			if key, ok := key.(string); ok {
+				keys = append(keys, key)
+			}
+		}
+		if err := validateTerraformLegacyRootKeys(keys); err != nil {
+			return cfg, err
+		}
 	}
 
 	Cfg = cfg

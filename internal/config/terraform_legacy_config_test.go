@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"reflect"
@@ -65,49 +66,80 @@ func TestTerraformConfigDropsNixSettings(t *testing.T) {
 	}
 }
 
-// Config decoding ignores unknown keys, so a consumer config written for the
-// Nix template still renders and its Nix settings leave no trace.
-func TestTerraformRendersConfigWithLegacyNixKeys(t *testing.T) {
-	terraformVorpalRender(t, map[string]interface{}{
-		"github": map[string]interface{}{
-			"action": map[string]interface{}{"setupNix": true},
+func TestTerraformRejectsLegacyNixKeys(t *testing.T) {
+	cases := []struct {
+		name       string
+		key        string
+		parameters map[string]interface{}
+	}{
+		{
+			name: "nix",
+			key:  "nix",
+			parameters: map[string]interface{}{
+				"nix": map[string]interface{}{"nixpkgsBranch": "legacy"},
+			},
 		},
-		"nix": map[string]interface{}{
-			"cachix":        map[string]interface{}{"binaryCache": "legacy-binary-cache"},
-			"nixpkgsBranch": "legacy-nixpkgs-branch",
-			"systems":       []interface{}{"legacy-system"},
+		{
+			name: "setupNix",
+			key:  "setupNix",
+			parameters: map[string]interface{}{
+				"github": map[string]interface{}{
+					"action": map[string]interface{}{"setupNix": true},
+				},
+			},
 		},
-		"providers": []interface{}{"legacy-provider"},
-	})
-
-	if _, err := os.Stat("flake.nix"); !errors.Is(err, fs.ErrNotExist) {
-		t.Errorf("flake.nix stat error with legacy keys = %v, want it absent", err)
+		{
+			name:       "installNix",
+			key:        "installNix",
+			parameters: map[string]interface{}{"installNix": true},
+		},
+		{
+			name:       "cachix",
+			key:        "cachix",
+			parameters: map[string]interface{}{"cachix": map[string]interface{}{"binaryCache": "legacy"}},
+		},
 	}
-
-	rendered := 0
-	err := fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+	for _, template := range []string{TerraformName, TerraformModuleName} {
+		for _, tc := range cases {
+			t.Run(template+"/"+tc.name, func(t *testing.T) {
+				cfg := Config{Name: "example", Template: template, Parameters: tc.parameters}
+				if _, err := cfg.GetTemplater(); err == nil ||
+					!strings.Contains(err.Error(), tc.key) ||
+					!strings.Contains(err.Error(), "delete") ||
+					!strings.Contains(err.Error(), "build-configs.yaml") {
+					t.Errorf("GetTemplater error = %v, want an actionable error naming %q to delete", err, tc.key)
+				}
+			})
 		}
-		rendered++
-		lower := strings.ToLower(terraformVorpalReadFile(t, path))
-		for _, legacy := range []string{
-			"setupnix",
-			"legacy-binary-cache",
-			"legacy-nixpkgs-branch",
-			"legacy-system",
-			"legacy-provider",
-		} {
-			if strings.Contains(lower, legacy) {
-				t.Errorf("rendered %s contains legacy value %q", path, legacy)
+	}
+}
+
+func TestTerraformRejectsRootLegacyNixKeys(t *testing.T) {
+	keys := []string{"nix", "setupNix", "installNix", "cachix"}
+	for _, template := range []string{TerraformName, TerraformModuleName} {
+		for _, key := range keys {
+			for _, format := range []string{"yaml", "json"} {
+				t.Run(template+"/"+key+"/"+format, func(t *testing.T) {
+					var (
+						data   []byte
+						loader func([]byte) (Config, error)
+					)
+					switch format {
+					case "yaml":
+						data = []byte(fmt.Sprintf("name: example\ntemplate: %s\n%s: true\n", template, key))
+						loader = loadConfigYaml
+					case "json":
+						data = []byte(fmt.Sprintf(`{"name":"example","template":%q,%q:true}`, template, key))
+						loader = loadConfigJSON
+					}
+					if _, err := loader(data); err == nil ||
+						!strings.Contains(err.Error(), key) ||
+						!strings.Contains(err.Error(), "delete") ||
+						!strings.Contains(err.Error(), "build-configs.yaml") {
+						t.Errorf("config loader error = %v, want an actionable error naming %q to delete", err, key)
+					}
+				})
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walking rendered files: %v", err)
-	}
-	if rendered == 0 {
-		t.Fatal("render wrote no files")
 	}
 }

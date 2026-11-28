@@ -33,10 +33,9 @@ func ciPackageRunsRecipe(run, name string) bool {
 	return false
 }
 
-// TestCIWorkflowTemplatesNeverRunBuild scans the workflow template sources, so
-// every conditional branch is covered, not only the configs the render test
-// below uses.
-func TestCIWorkflowTemplatesNeverRunBuild(t *testing.T) {
+// TestCIWorkflowTemplatesOnlyTerraformModuleRunsBuild scans the workflow
+// template sources, so every conditional branch is covered.
+func TestCIWorkflowTemplatesOnlyTerraformModuleRunsBuild(t *testing.T) {
 	paths, err := filepath.Glob("../templates/templates/*/.github__workflows__*.yaml")
 	if err != nil || len(paths) == 0 {
 		t.Fatalf("no workflow templates found: %v", err)
@@ -46,22 +45,23 @@ func TestCIWorkflowTemplatesNeverRunBuild(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
 		}
+		allowsBuild := filepath.Base(filepath.Dir(path)) == TerraformModuleName
 		for i, line := range strings.Split(string(src), "\n") {
-			if run, ok := strings.CutPrefix(strings.TrimLeft(strings.TrimSpace(line), "- "), "run:"); ok && ciPackageRunsRecipe(strings.TrimSpace(run), "build") {
+			if run, ok := strings.CutPrefix(strings.TrimLeft(strings.TrimSpace(line), "- "), "run:"); ok &&
+				ciPackageRunsRecipe(strings.TrimSpace(run), "build") && !allowsBuild {
 				t.Errorf("%s:%d runs just build: %s", path, i+1, strings.TrimSpace(line))
 			}
 		}
 	}
 }
 
-// TestCIRunsPackageWithoutBuild renders every template and checks that, when
-// its justfile defines both build and package, no CI job runs `just build`:
-// the package recipes compile through Vorpal on their own, so the native
-// build would be repeated work.
-func TestCIRunsPackageWithoutBuild(t *testing.T) {
+// TestCIPackageAndBuildRecipesMatchWorkflows checks that package workflows
+// avoid redundant builds, while terraform-module runs build for validation.
+func TestCIPackageAndBuildRecipesMatchWorkflows(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		render func(t *testing.T)
+		build  bool
 	}{
 		{name: GoCobraCliName, render: func(t *testing.T) { goCobraCliRenderTemp(t, goCobraCliPrivateModules) }},
 		{name: GoLambdaName, render: func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestCIRunsPackageWithoutBuild(t *testing.T) {
 		}},
 		{name: GoLibraryName},
 		{name: TerraformName},
-		{name: TerraformModuleName},
+		{name: TerraformModuleName, build: true},
 		{name: TypeScriptFrontendName},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -121,12 +121,16 @@ func TestCIRunsPackageWithoutBuild(t *testing.T) {
 				if err := yaml.Unmarshal(src, &wf); err != nil {
 					t.Fatalf("%s does not parse: %v", path, err)
 				}
-				for name, job := range wf.Jobs {
+				hasBuild := false
+				for _, job := range wf.Jobs {
 					for _, step := range job.Steps {
 						if ciPackageRunsRecipe(step.Run, "build") {
-							t.Errorf("%s job %s runs %q; want the package recipes only", path, name, step.Run)
+							hasBuild = true
 						}
 					}
+				}
+				if hasBuild != tc.build {
+					t.Errorf("%s workflow runs just build = %t, want %t", path, hasBuild, tc.build)
 				}
 			}
 		})

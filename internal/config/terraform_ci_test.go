@@ -251,7 +251,7 @@ func TestTerraformWorkflowKeepsCredentialAndArtifactSteps(t *testing.T) {
 		}
 		want := map[string]string{
 			"audience":       "sts.amazonaws.com",
-			"aws-region":     "us-west-2",
+			"aws-region":     role.Region,
 			"role-to-assume": wantRole,
 		}
 		if got := job.Steps[i].With; !maps.Equal(got, want) {
@@ -278,6 +278,24 @@ func TestTerraformWorkflowKeepsCredentialAndArtifactSteps(t *testing.T) {
 	}
 }
 
+func TestTerraformWorkflowUsesConfiguredRoleRegion(t *testing.T) {
+	terraformVorpalRender(t, map[string]any{
+		"role": map[string]any{"region": "eu-west-1"},
+	})
+
+	wf := terraformCIParseWorkflow(t)
+	for _, name := range []string{"plan", "apply"} {
+		i := terraformCIStepIndex(wf.Jobs[name], "aws-actions/configure-aws-credentials")
+		if i < 0 {
+			t.Errorf("job %s has no configure-aws-credentials step", name)
+			continue
+		}
+		if got := wf.Jobs[name].Steps[i].With["aws-region"]; got != "eu-west-1" {
+			t.Errorf("job %s AWS region = %q, want %q", name, got, "eu-west-1")
+		}
+	}
+}
+
 func TestTerraformWorkflowOmitsDeployKey(t *testing.T) {
 	terraformVorpalRender(t, nil)
 
@@ -290,26 +308,13 @@ func TestTerraformWorkflowOmitsDeployKey(t *testing.T) {
 }
 
 func TestTerraformWorkflowOmitsNixCachixFlake(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		params map[string]interface{}
-	}{
-		{"default", nil},
-		{"setupNix", map[string]interface{}{
-			"github": map[string]interface{}{"action": map[string]interface{}{"setupNix": true}},
-			"nix":    map[string]interface{}{"cachix": map[string]interface{}{"binaryCache": "legacy-cache"}},
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			terraformVorpalRender(t, tc.params)
+	terraformVorpalRender(t, nil)
 
-			got := strings.ToLower(terraformVorpalReadFile(t, terraformCIWorkflowPath))
-			for _, banned := range []string{"nix", "cachix", "flake", "legacy-cache"} {
-				if strings.Contains(got, banned) {
-					t.Errorf("%s contains %q:\n%s", terraformCIWorkflowPath, banned, got)
-				}
-			}
-		})
+	got := strings.ToLower(terraformVorpalReadFile(t, terraformCIWorkflowPath))
+	for _, banned := range []string{"nix", "cachix", "flake"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("%s contains %q:\n%s", terraformCIWorkflowPath, banned, got)
+		}
 	}
 }
 

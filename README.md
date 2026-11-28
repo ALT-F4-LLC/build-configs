@@ -47,6 +47,24 @@ to skip templating:
 justfile
 ```
 
+## Onboarding Terraform repositories
+
+Add a `build-configs.yaml` at the repository root, then run
+`build-configs generate` from that repository. For example:
+
+```yaml
+name: terraform-aws-gha-iam
+template: terraform
+parameters:
+  github:
+    runsOn: altf4llc
+    appToken: true
+```
+
+The templates do not generate `Vorpal.lock`. Copy it from a repository using
+the same Vorpal SDK version (currently `terraform-github` for SDK 0.6.0), commit
+it, and let CI run. Do not generate `Vorpal.lock` locally.
+
 ## Development
 
 The Vorpal dev shell provides Go and golangci-lint. Enter it with direnv, then
@@ -266,7 +284,15 @@ visibility: public
   receives the token, as `GITHUB_TOKEN`: the plan job generates it but passes
   it to no step, because a plan runs the pull request's own code. The go-cobra-cli,
   go-lambda and go-service workflows read the same variable and secret.
-- `env` sets environment variables on the plan and apply jobs.
+- `env` sets environment variables on the plan and apply jobs. Values may be
+  GitHub expressions such as `${{ secrets.TF_VAR_PROVIDER_TOKEN }}`.
+
+`parameters.role.planArn` and `parameters.role.applyArn` override the OIDC
+roles; otherwise they default to `altf4llc-gha-<name>-plan` and
+`altf4llc-gha-<name>-apply`. `parameters.role.region` selects the AWS region
+for both role assumptions and defaults to `us-west-2`.
+`parameters.vorpal.tools` adds artifact aliases to the default development
+tools, such as `terraform-docs:0.20.0`.
 
 The plan job takes a concurrency group per pull request, `tf-plan-<number>`,
 and runs `just plan -lock=false` on pull requests, so a pull request's plan
@@ -290,6 +316,12 @@ the repository, so keep a repository that uses this template private.
 The `github.appToken` step in the plan job only generates the token. No plan
 step receives it, so a plan that needs the token for a provider or a private
 module source runs unauthenticated.
+
+### `terraform-module`
+
+`terraform-module` uses the visibility-selected runner. Its `check` job runs
+`just check`; the dependent `build` job runs `just build`, which initializes
+without a backend and validates the module.
 
 ### `go-cobra-cli`
 

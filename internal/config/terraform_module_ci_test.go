@@ -71,8 +71,8 @@ func TestTerraformModuleWorkflowJobsRunOnAltf4llcThroughVorpalShell(t *testing.T
 
 	wf := terraformModuleParseWorkflow(t)
 
-	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"check", "package"}) {
-		t.Fatalf("jobs = %q, want [check package]", got)
+	if got := slices.Sorted(maps.Keys(wf.Jobs)); !slices.Equal(got, []string{"build", "check"}) {
+		t.Fatalf("jobs = %q, want [build check]", got)
 	}
 	wantShell := "bash " + terraformModuleShellPath + " {0}"
 	for name, job := range wf.Jobs {
@@ -101,6 +101,38 @@ func TestTerraformModuleWorkflowJobsRunOnAltf4llcThroughVorpalShell(t *testing.T
 		}
 		if runs == 0 {
 			t.Errorf("job %s runs no command", name)
+		}
+	}
+	for name, wantRun := range map[string]string{"check": "just check", "build": "just build"} {
+		if !slices.ContainsFunc(wf.Jobs[name].Steps, func(step terraformModuleWorkflowStep) bool {
+			return step.Run == wantRun
+		}) {
+			t.Errorf("job %s does not run %q", name, wantRun)
+		}
+	}
+}
+
+func TestTerraformModulePublicWorkflowUsesGitHubHostedRunners(t *testing.T) {
+	t.Chdir(t.TempDir())
+	tpl, err := Config{Name: "demo-module", Template: TerraformModuleName, Visibility: VisibilityPublic}.GetTemplater()
+	if err != nil {
+		t.Fatalf("GetTemplater: %v", err)
+	}
+	if err := tpl.Render(); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	wf := terraformModuleParseWorkflow(t)
+	for name, job := range wf.Jobs {
+		if job.RunsOn != PublicRunner {
+			t.Errorf("job %s runs-on = %q, want %q", name, job.RunsOn, PublicRunner)
+		}
+		if job.Permissions["id-token"] != "write" {
+			t.Errorf("job %s permissions = %v, want id-token: write", name, job.Permissions)
+		}
+		if !slices.ContainsFunc(job.Steps, func(step terraformModuleWorkflowStep) bool {
+			return strings.HasPrefix(step.Uses, "ALT-F4-LLC/setup-vorpal-action@")
+		}) {
+			t.Errorf("job %s has no Vorpal setup action", name)
 		}
 	}
 }
@@ -138,12 +170,13 @@ func TestTerraformModuleJustfileRecipes(t *testing.T) {
 	}
 }
 
-func TestTerraformModuleRendersConfigWithLegacyNixKey(t *testing.T) {
-	terraformModuleRenderTemp(t, "demo-module", map[string]any{
-		"nix": map[string]any{"cachix": map[string]any{"binaryCache": "legacy-cache"}},
-	})
-
-	if got := terraformModuleReadFile(t, terraformModuleWorkflowPath); strings.Contains(got, "legacy-cache") {
-		t.Errorf("%s still renders the legacy nix option:\n%s", terraformModuleWorkflowPath, got)
+func TestTerraformModuleRejectsLegacyNixKey(t *testing.T) {
+	cfg := Config{
+		Name:       "demo-module",
+		Template:   TerraformModuleName,
+		Parameters: map[string]any{"nix": map[string]any{"cachix": map[string]any{"binaryCache": "legacy-cache"}}},
+	}
+	if _, err := cfg.GetTemplater(); err == nil || !strings.Contains(err.Error(), "delete parameters.nix") {
+		t.Errorf("GetTemplater error = %v, want actionable nix-key error", err)
 	}
 }
