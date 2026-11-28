@@ -44,6 +44,9 @@ func findTerraformLegacyKey(value interface{}, path string) (string, string, boo
 			if _, ok := terraformLegacyKeys[strings.ToLower(key)]; ok {
 				return key, keyPath, true
 			}
+			if strings.EqualFold(path, "parameters.github") && strings.EqualFold(key, "env") {
+				continue
+			}
 			if legacyKey, legacyPath, ok := findTerraformLegacyKey(value[key], keyPath); ok {
 				return legacyKey, legacyPath, true
 			}

@@ -114,6 +114,25 @@ func TestTerraformRejectsLegacyNixKeys(t *testing.T) {
 	}
 }
 
+func TestTerraformAllowsLegacyNamesInGitHubEnv(t *testing.T) {
+	for _, template := range []string{TerraformName, TerraformModuleName} {
+		t.Run(template, func(t *testing.T) {
+			cfg := Config{
+				Name:     "example",
+				Template: template,
+				Parameters: map[string]interface{}{
+					"github": map[string]interface{}{
+						"env": map[string]interface{}{"NIX": "value"},
+					},
+				},
+			}
+			if _, err := cfg.GetTemplater(); err != nil {
+				t.Errorf("GetTemplater with github.env.NIX returned error: %v", err)
+			}
+		})
+	}
+}
+
 func TestTerraformRejectsRootLegacyNixKeys(t *testing.T) {
 	keys := []string{"nix", "setupNix", "installNix", "cachix"}
 	for _, template := range []string{TerraformName, TerraformModuleName} {
